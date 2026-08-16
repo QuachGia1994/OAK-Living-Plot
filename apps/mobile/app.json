@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Living Plot",
+    "slug": "living-plot",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "livingplot",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

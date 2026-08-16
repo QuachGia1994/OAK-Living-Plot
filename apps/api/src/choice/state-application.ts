@@ -1,0 +1,136 @@
+import type { ChoiceStateDelta, EpisodeProposal, RelationshipDelta, ThreadProposal } from '../ai/contracts';
+import type { FactState, RelationshipState, StructuredPlotState, ThreadState } from '../domain/story';
+
+export type StateApplicationResult =
+  | { ok: true; value: StructuredPlotState }
+  | { ok: false; error: string };
+
+export function applyCommittedChoiceState(
+  current: StructuredPlotState,
+  episodeId: string,
+  choiceId: string,
+  episode: Pick<EpisodeProposal, 'establishedFacts' | 'threadChanges'>,
+  delta: ChoiceStateDelta,
+): StateApplicationResult {
+  const state = cloneState(current);
+
+  const episodeThreadResolution = resolveThreads(state.openThreads, episode.threadChanges.resolve);
+  if (!episodeThreadResolution.ok) return episodeThreadResolution;
+  state.openThreads = episodeThreadResolution.value;
+  state.openThreads.push(...createThreads(`episode:${episodeId}:thread`, episode.threadChanges.open));
+  state.facts.push(...createFacts(`episode:${episodeId}:fact`, episode.establishedFacts));
+
+  for (const relationshipDelta of delta.relationships) {
+    const result = applyRelationshipDelta(state.relationships, relationshipDelta);
+    if (!result.ok) return result;
+  }
+
+  const factResolution = resolveFacts(state.facts, delta.factKeysToResolve);
+  if (!factResolution.ok) return factResolution;
+  state.facts = factResolution.value;
+  state.facts.push(...createFacts(`choice:${choiceId}:fact`, delta.factsToAdd));
+
+  const threadResolution = resolveThreads(state.openThreads, delta.threadKeysToResolve);
+  if (!threadResolution.ok) return threadResolution;
+  state.openThreads = threadResolution.value;
+  state.openThreads.push(...createThreads(`choice:${choiceId}:thread`, delta.threadsToOpen));
+  state.tone = delta.nextTone;
+
+  const duplicate = findDuplicateStateKey(state);
+  if (duplicate) return { ok: false, error: duplicate };
+  return { ok: true, value: state };
+}
+
+function cloneState(state: StructuredPlotState): StructuredPlotState {
+  return {
+    schemaVersion: 2,
+    relationships: state.relationships.map((item) => ({ ...item })),
+    facts: state.facts.map((item) => ({ ...item })),
+    openThreads: state.openThreads.map((item) => ({ ...item })),
+    tone: state.tone,
+  };
+}
+
+function applyRelationshipDelta(
+  relationships: RelationshipState[],
+  delta: RelationshipDelta,
+): { ok: true } | { ok: false; error: string } {
+  if (!delta.fromKey.trim() || !delta.toKey.trim() || delta.fromKey === delta.toKey) {
+    return { ok: false, error: 'Choice relationship reference is invalid.' };
+  }
+
+  let relation = relationships.find(
+    (item) => item.fromKey === delta.fromKey && item.toKey === delta.toKey,
+  );
+  if (!relation) {
+    relation = {
+      fromKey: delta.fromKey,
+      toKey: delta.toKey,
+      affinity: 0,
+      trust: 0,
+      tension: 0,
+      status: '',
+    };
+    relationships.push(relation);
+  }
+
+  const affinity = relation.affinity + delta.affinityDelta;
+  const trust = relation.trust + delta.trustDelta;
+  const tension = relation.tension + delta.tensionDelta;
+  if (!inRange(affinity, -100, 100) || !inRange(trust, -100, 100) || !inRange(tension, 0, 100)) {
+    return { ok: false, error: 'Choice relationship delta exceeds canonical bounds.' };
+  }
+
+  relation.affinity = affinity;
+  relation.trust = trust;
+  relation.tension = tension;
+  relation.status = delta.statusText;
+  return { ok: true };
+}
+
+function resolveFacts(facts: FactState[], keys: string[]): { ok: true; value: FactState[] } | { ok: false; error: string } {
+  const existing = new Set(facts.map((item) => item.key));
+  for (const key of keys) {
+    if (!existing.has(key)) return { ok: false, error: `Unknown fact key during commit: ${key}` };
+  }
+  const resolved = new Set(keys);
+  return { ok: true, value: facts.filter((item) => !resolved.has(item.key)) };
+}
+
+function resolveThreads(
+  threads: ThreadState[],
+  keys: string[],
+): { ok: true; value: ThreadState[] } | { ok: false; error: string } {
+  const existing = new Set(threads.map((item) => item.key));
+  for (const key of keys) {
+    if (!existing.has(key)) return { ok: false, error: `Unknown thread key during commit: ${key}` };
+  }
+  const resolved = new Set(keys);
+  return { ok: true, value: threads.filter((item) => !resolved.has(item.key)) };
+}
+
+function createFacts(prefix: string, texts: string[]): FactState[] {
+  return texts.map((text, index) => ({ key: `${prefix}:${index + 1}`, text }));
+}
+
+function createThreads(prefix: string, threads: ThreadProposal[]): ThreadState[] {
+  return threads.map((thread, index) => ({
+    key: `${prefix}:${index + 1}`,
+    title: thread.title,
+    urgency: thread.urgency,
+  }));
+}
+
+function findDuplicateStateKey(state: StructuredPlotState): string | null {
+  const relationshipKeys = state.relationships.map((item) => `${item.fromKey}\u0000${item.toKey}`);
+  if (new Set(relationshipKeys).size !== relationshipKeys.length) return 'Duplicate canonical relationship key.';
+  const factKeys = state.facts.map((item) => item.key);
+  if (new Set(factKeys).size !== factKeys.length) return 'Duplicate canonical fact key.';
+  const threadKeys = state.openThreads.map((item) => item.key);
+  if (new Set(threadKeys).size !== threadKeys.length) return 'Duplicate canonical thread key.';
+  return null;
+}
+
+function inRange(value: number, min: number, max: number): boolean {
+  return Number.isInteger(value) && value >= min && value <= max;
+}

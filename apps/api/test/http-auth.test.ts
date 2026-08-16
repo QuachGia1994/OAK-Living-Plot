@@ -1,0 +1,118 @@
+import { env } from 'cloudflare:workers';
+import { beforeEach, describe, expect, it } from 'vitest';
+import migrationSql from '../migrations/0001_initial.sql?raw';
+import type { SessionVerifier } from '../src/auth/session-verifier';
+import type { AppEnv } from '../src/env';
+import { handleRequest } from '../src/http/app';
+import { D1UserRepository } from '../src/persistence/d1-user-repository';
+import { applySqlMigration, resetStoryData } from './d1-test-utils';
+
+const db = (env as unknown as AppEnv).DB;
+const testEnv: AppEnv = {
+  DB: db,
+  CLERK_PUBLISHABLE_KEY: 'unused-in-injected-tests',
+  CLERK_JWT_KEY: 'unused-in-injected-tests',
+  CLERK_AUTHORIZED_PARTIES: 'https://living-plot.test',
+  GEMINI_API_KEY: 'unused-in-auth-tests',
+};
+
+beforeEach(async () => {
+  await applySqlMigration(db, migrationSql);
+  await resetStoryData(db);
+});
+
+describe('protected HTTP boundary', () => {
+  it('rejects an unauthenticated request', async () => {
+    const response = await handleRequest(request('/v1/me'), testEnv, {
+      sessionVerifier: verifier(null),
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Bearer');
+    expect(await response.json()).toEqual({ error: 'unauthorized' });
+  });
+
+  it('maps the authenticated subject to an internal user', async () => {
+    const response = await handleRequest(request('/v1/me'), testEnv, {
+      sessionVerifier: verifier('clerk-owner'),
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { user: { id: string } };
+    const row = await db
+      .prepare('SELECT id, auth_subject FROM users WHERE auth_subject = ?')
+      .bind('clerk-owner')
+      .first<{ id: string; auth_subject: string }>();
+    expect(body.user.id).toBe(row?.id);
+  });
+
+  it('returns an owned plot without exposing the internal owner id', async () => {
+    const owner = await seedOwnedPlot();
+    const response = await handleRequest(request('/v1/plots/plot-owner'), testEnv, {
+      sessionVerifier: verifier('clerk-owner'),
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { plot: Record<string, unknown> };
+    expect(body.plot.id).toBe('plot-owner');
+    expect(body.plot).not.toHaveProperty('userId');
+    expect(owner.id).toBeTruthy();
+  });
+
+  it('hides another user plot even when the client supplies the owner id', async () => {
+    const owner = await seedOwnedPlot();
+    const response = await handleRequest(
+      request('/v1/plots/plot-owner', { 'x-user-id': owner.id }),
+      testEnv,
+      { sessionVerifier: verifier('clerk-attacker') },
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'not_found' });
+  });
+
+  it('fails closed when the authentication verifier is unavailable', async () => {
+    const response = await handleRequest(request('/v1/me'), testEnv, {
+      sessionVerifier: {
+        async authenticate() {
+          throw new Error('provider failure');
+        },
+      },
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'auth_unavailable' });
+  });
+
+  it('fails closed when Clerk runtime configuration is missing', async () => {
+    const response = await handleRequest(request('/v1/me'), {
+      ...testEnv,
+      CLERK_PUBLISHABLE_KEY: '',
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'auth_unavailable' });
+  });
+});
+
+function verifier(subject: string | null): SessionVerifier {
+  return {
+    async authenticate() {
+      return subject ? { subject } : null;
+    },
+  };
+}
+
+function request(path: string, headers?: HeadersInit): Request {
+  return new Request(`https://living-plot.test${path}`, { headers });
+}
+
+async function seedOwnedPlot(): Promise<{ id: string }> {
+  const users = new D1UserRepository(db);
+  const owner = await users.resolveOrCreate('clerk-owner');
+  await db
+    .prepare('INSERT INTO plots (id, user_id, title, premise) VALUES (?, ?, ?, ?)')
+    .bind('plot-owner', owner.id, 'Private plot', 'A story that belongs only to its authenticated owner.')
+    .run();
+  return owner;
+}
