@@ -15,7 +15,8 @@ describe('GeminiStoryGenerator', () => {
     expect(String(url)).toContain('/v1beta/interactions');
     expect(new Headers(init?.headers).get('x-goog-api-key')).toBe('test-api-key');
     const body = JSON.parse(String(init?.body)) as GeminiRequestBody;
-    expect(body.model).toBe(STORY_MODEL);
+    expect(body.model).toBe('gemini-3.5-flash-lite');
+    expect(body.generation_config.thinking_level).toBe('minimal');
     expect(body.response_format.type).toBe('text');
     expect(body.response_format.mime_type).toBe('application/json');
     expect(body.response_format.schema.properties.choices.minItems).toBe(3);
@@ -94,6 +95,7 @@ interface GeminiRequestBody {
   input: string;
   system_instruction: string;
   store: boolean;
+  generation_config: { thinking_level: string };
   response_format: {
     type: string;
     mime_type: string;

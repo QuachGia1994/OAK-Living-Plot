@@ -5,7 +5,7 @@
 ## Provider boundary
 Story generation is exposed to application code through the provider-neutral `StoryGenerator` contract. `EpisodeGenerationInput`, `EpisodeProposal`, normalized usage, and normalized errors contain no Gemini-specific types.
 
-The Phase 1 adapter is `GeminiStoryGenerator` using the Gemini Interactions API and the stable model `gemini-2.5-flash-lite`. The adapter calls `POST /v1beta/interactions` directly from the Cloudflare Worker, sends the API key only in `x-goog-api-key`, and sets `store: false`.
+The Phase 1 adapter is `GeminiStoryGenerator` using the Gemini Interactions API and the GA model `gemini-3.5-flash-lite`. Slice 12 migrated away from the deprecated Gemini 2.5 Flash-Lite baseline before locking narrative evaluations. The adapter calls `POST /v1beta/interactions` directly from the Cloudflare Worker, sends the API key only in `x-goog-api-key`, sets `thinking_level: minimal`, and sets `store: false`.
 
 `GEMINI_API_KEY` is a Worker runtime value documented only by name in `.dev.vars.example`; it must never be shipped to the mobile client.
 
@@ -53,7 +53,7 @@ A structurally or semantically invalid successful provider response gets exactly
 
 Network failures and non-2xx provider responses are normalized to `provider_unavailable` and are not automatically retried inside this adapter. Upstream orchestration can make an explicit retry decision later without hiding duplicate provider spend.
 
-Token usage from each successful provider call is accumulated across the controlled structured-output retry so later cost telemetry can account for both attempts.
+Token usage from each successful provider call is accumulated across the controlled structured-output retry so cost telemetry accounts for both attempts.
 
 ## Persistence boundary
 `GeminiStoryGenerator` still returns only an `EpisodeProposal` and has no D1 authority. Slice 5 adds a separate `D1EpisodePublisher` that atomically publishes a validated proposal with server-generated IDs, generation-key idempotency, and optimistic plot-version guards. Story generation itself still does not consume quota or apply the user's later choice.

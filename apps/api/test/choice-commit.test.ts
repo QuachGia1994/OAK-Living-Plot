@@ -201,7 +201,7 @@ async function seedReadyEpisode(userId: string, plotId: string, generationKey: s
     proposal: makeValidProposal(),
     generation: {
       provider: 'gemini',
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-3.5-flash-lite',
       attempts: 1,
       usage: { inputTokens: 120, outputTokens: 80 },
     },

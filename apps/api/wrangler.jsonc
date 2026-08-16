@@ -11,5 +11,40 @@
       "preview_database_id": "living-plot-local",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AUDIO_BUCKET",
+      "bucket_name": "living-plot-audio"
+    }
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "ANALYTICS",
+      "dataset": "living_plot_events"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "TTS_QUEUE",
+        "queue": "living-plot-tts"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "living-plot-tts",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "retry_delay": 30,
+        "dead_letter_queue": "living-plot-tts-dlq"
+      },
+      {
+        "queue": "living-plot-tts-dlq",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5
+      }
+    ]
+  }
 }

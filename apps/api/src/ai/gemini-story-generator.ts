@@ -8,8 +8,13 @@ import type {
 } from './contracts';
 import { episodeResponseSchema, parseAndValidateEpisodeProposal } from './episode-schema';
 import { buildStoryPrompt, validateEpisodeGenerationInput } from './prompt';
+import {
+  NOOP_STORY_TELEMETRY,
+  type StoryGenerationAttemptOutcome,
+  type StoryTelemetrySink,
+} from '../telemetry/contracts';
 
-export const STORY_MODEL = 'gemini-2.5-flash-lite';
+export const STORY_MODEL = 'gemini-3.5-flash-lite';
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -30,6 +35,7 @@ export class GeminiStoryGenerator implements StoryGenerator {
     private readonly apiKey: string,
     private readonly fetcher: FetchLike = fetch,
     private readonly timeoutMs = 12_000,
+    private readonly telemetry: StoryTelemetrySink = NOOP_STORY_TELEMETRY,
   ) {}
 
   async generate(input: EpisodeGenerationInput): Promise<Result<StoryGenerationSuccess, StoryGenerationError>> {
@@ -51,6 +57,7 @@ export class GeminiStoryGenerator implements StoryGenerator {
       usage.inputTokens += provider.value.usage.inputTokens;
       usage.outputTokens += provider.value.usage.outputTokens;
       const validated = parseAndValidateEpisodeProposal(provider.value.text, input);
+      this.recordAttempt(attempt as 1 | 2, validated.ok ? 'accepted' : 'rejected', provider.value.usage);
       if (validated.ok) {
         return {
           ok: true,
@@ -74,6 +81,18 @@ export class GeminiStoryGenerator implements StoryGenerator {
     return { ok: false, error: { code: 'invalid_response', message: 'Story generation failed.', attempts: 2 } };
   }
 
+  private recordAttempt(
+    attempt: 1 | 2,
+    outcome: StoryGenerationAttemptOutcome,
+    usage: StoryGenerationUsage,
+  ): void {
+    try {
+      this.telemetry.recordGenerationAttempt({ provider: 'gemini', model: STORY_MODEL, attempt, outcome, usage });
+    } catch {
+      // Telemetry is observational and must never change story-generation behavior.
+    }
+  }
+
   private async requestModel(
     input: EpisodeGenerationInput,
     validationErrors: string[],
@@ -92,6 +111,7 @@ export class GeminiStoryGenerator implements StoryGenerator {
           model: STORY_MODEL,
           input: prompt.userContent,
           system_instruction: prompt.systemInstruction,
+          generation_config: { thinking_level: 'minimal' },
           response_format: {
             type: 'text',
             mime_type: 'application/json',

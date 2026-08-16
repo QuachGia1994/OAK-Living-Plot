@@ -19,6 +19,18 @@ All notable changes to Living Plot will be documented in this file.
 - Canonical plot-memory schema v2 with keyed multi-dimensional relationships, facts, and threads plus deterministic legacy-v1 upgrade.
 - Atomic/idempotent choice commit with append-only commit snapshots, episode completion, canonical state application, and optimistic version enforcement.
 - Server-side UTC quota ledger with atomic reserve/consume/release, Free/Plus limits, in-flight counters, idempotency, and reconciliation.
+- Expo core-loop UI for home/recent plots, three-decision plot setup, episode reading, exactly three choices, committed consequence, next episode, and resume.
+- Provider-neutral mobile `StoryExperienceClient` with deterministic preview implementation and mobile behavior tests.
+- Google Cloud TTS service-account JWT/OAuth adapter plus provider-neutral MP3 `SpeechSynthesizer`.
+- D1 audio-asset lifecycle with voice-quota reservation, Queue/DLQ processing, private R2 storage, staged retry recovery, and owner-scoped audio delivery.
+- RevenueCat webhook security with custom authorization, raw-body HMAC verification, event-id idempotency, subscriber refresh, and D1-materialized Free/Plus entitlement.
+- Expo RevenueCat purchase/paywall/restore boundary with explicit internal App User ID, backend entitlement refresh, public platform SDK-key configuration, and development-build support.
+- Privacy-safe Cloudflare Analytics Engine story-generation telemetry with retry-aware provider token usage and exact revisioned Gemini Standard paid rate-card cost in integer nano-USD.
+- Deterministic narrative quality fixtures/evals covering continuity, thread momentum, branch distinctness, consequence specificity, repetition control, and adversarial story regressions.
+- Gemini 3.5 Flash-Lite production story baseline with minimal thinking and updated Standard paid cost accounting, replacing the deprecated Gemini 2.5 Flash-Lite target.
+- Clerk Expo 4 mobile identity with SecureStore-backed token cache and privacy-preserving email-code sign-in-or-up flow.
+- Protected live-story HTTP core loop for home/create/resume/generate/commit using internal ownership, server-derived state versions, backend quota, and existing Gemini/publication/choice boundaries.
+- Idempotent live plot creation metadata (`creation_key`, locale, initial mood) plus mobile HTTP story client and shared `/v1/me` internal identity for RevenueCat.
 
 ### Fixed
 - Unified ESLint 9 across workspaces and loaded Cloudflare Vitest test types so clean-install quality gates pass.

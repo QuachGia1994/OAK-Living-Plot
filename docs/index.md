@@ -8,6 +8,12 @@
 - [Phase 1 episode publication boundary](arch/episode-publication.md) — atomic D1 publish, generation-key idempotency, and optimistic version guards.
 - [Phase 1 choice-commit boundary](arch/choice-commit.md) — canonical state v2, choice idempotency, state application, and commit concurrency.
 - [Phase 1 quota ledger](arch/quota-ledger.md) — UTC daily limits, atomic reservations, terminal transitions, and reconciliation.
+- [Phase 1 mobile core loop](arch/mobile-core-loop.md) — Expo onboarding, episode, exactly-three-choice, consequence, next-episode, and resume UI boundary.
+- [Phase 1 TTS and private audio](arch/tts-audio.md) — Google OAuth/TTS, Queue/DLQ processing, voice quota, and private R2 delivery.
+- [Phase 1 RevenueCat entitlements](arch/revenuecat-entitlements.md) — verified webhook/provider sync, D1 Free/Plus authority, and mobile paywall/restore trust boundary.
+- [Phase 1 analytics and AI cost telemetry](arch/analytics-cost.md) — privacy-safe Analytics Engine schema, fail-open semantics, retry-aware Gemini token usage, and exact nano-USD rate-card arithmetic.
+- [Phase 1 narrative quality evaluations](arch/narrative-evals.md) — deterministic continuity/branch/consequence/repetition fixtures and adversarial regression thresholds.
+- [Phase 1 mobile auth and live story](arch/mobile-auth-live-story.md) — Clerk email OTP, internal identity, protected core-loop HTTP routes, idempotent creation, and shared billing trust chain.
 - [Foundation implementation slice 1](plan/done/foundation-slice1.md) — completed workspace/CI foundation and verification evidence.
 - [D1 implementation slice 2](plan/done/d1-slice2.md) — completed D1/domain baseline and verification evidence.
 - [Authentication implementation slice 3](plan/done/auth-slice3.md) — completed auth/ownership boundary and verification evidence.
@@ -15,3 +21,9 @@
 - [Episode-publication implementation slice 5](plan/done/episode-publication-slice5.md) — completed publication transaction/idempotency boundary and verification evidence.
 - [Choice-commit implementation slice 6](plan/done/choice-commit-slice6.md) — completed choice commit/state application boundary and verification evidence.
 - [Quota implementation slice 7](plan/done/quota-slice7.md) — completed quota ledger/enforcement boundary and verification evidence.
+- [Mobile core-loop implementation slice 8](plan/done/mobile-core-loop-slice8.md) — completed Expo core-loop UI boundary and verification evidence.
+- [TTS/private-audio implementation slice 9](plan/done/tts-audio-slice9.md) — completed TTS/Queue/R2 boundary and verification evidence.
+- [RevenueCat entitlement implementation slice 10](plan/done/revenuecat-slice10.md) — completed entitlement/paywall boundary and verification evidence.
+- [Analytics/cost telemetry implementation slice 11](plan/done/analytics-cost-slice11.md) — completed observational Analytics Engine telemetry and exact revisioned Gemini cost-accounting evidence.
+- [Narrative/evals implementation slice 12](plan/done/narrative-evals-slice12.md) — completed Gemini 3.5 Flash-Lite migration plus deterministic narrative-quality regression evidence.
+- [Authenticated live-story integration slice 13](plan/done/live-story-integration-slice13.md) — completed Clerk Expo identity, protected live-story core loop, internal-user billing identity, and local integration evidence.

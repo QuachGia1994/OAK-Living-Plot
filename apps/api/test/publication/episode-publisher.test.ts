@@ -48,7 +48,7 @@ describe('D1EpisodePublisher', () => {
       state_version_before: 4,
       state_version_after_publish: 5,
       provider: 'gemini',
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-3.5-flash-lite',
       generation_attempts: 1,
       input_tokens: 120,
       output_tokens: 80,
@@ -177,7 +177,7 @@ function makePublicationInput(generationKey: string, expectedStateVersion: numbe
     proposal: makeValidProposal(),
     generation: {
       provider: 'gemini',
-      model: 'gemini-2.5-flash-lite',
+      model: 'gemini-3.5-flash-lite',
       attempts: 1,
       usage: { inputTokens: 120, outputTokens: 80 },
     },
