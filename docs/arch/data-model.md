@@ -25,8 +25,14 @@ The three candidate choices attached to an episode. SQL enforces positions 1–3
 ### `choice_commits`
 Append-only committed choice history. An episode can be committed once, sequence numbers are unique within a plot, and composite foreign keys prevent committing a choice from another episode. Migration `0003_choice_commit.sql` adds choice key/intent/consequence, state versions before/after commit, and the canonical `state_json_after` snapshot.
 
+### `usage_events`
+Append-only quota audit ledger added in migration `0004_quota_ledger.sql`. Records `reserved`, `consumed`, and `released` transitions for text/voice work on the reservation's original UTC day.
+
+### `quota_reservations`
+Materialized current quota-reservation lifecycle keyed by `(user_id, reservation_key)`. Used to make reserve/consume/release idempotent and race-safe.
+
 ### `daily_usage`
-Server-side counters for fresh text and voiced episode generation. The schema enforces non-negative counts and `voiced_episodes <= text_episodes`. Subscription/entitlement provider state is intentionally deferred.
+Materialized UTC-day enforcement counters. Migration 0004 rebuilds the table with independent text/voice consumed counters plus text/voice in-flight reservation counters. Effective quota usage is `consumed + reserved`; voice is no longer constrained by same-day text consumption.
 
 ## Structured memory
 Phase 1 does not use Vectorize or a vector database. Runtime canonical plot state is schema v2 with keyed relationships/facts/threads:
@@ -63,5 +69,7 @@ The current Wrangler `database_id` is a non-production placeholder and `preview_
 - Choice position 4 is rejected.
 - Only one choice can be committed per episode.
 - A choice cannot be committed against a different episode.
-- Voiced daily usage cannot exceed text episode usage.
+- Free/Plus text and voice quotas are enforced atomically under concurrent reservation attempts.
+- Quota reserve/consume/release retries are idempotent and materialized counters reconcile with the append-only usage ledger.
+- Voice quota is independent from same-day text consumption and UTC rollover preserves the reservation's original day.
 - Repository reads structured plot memory and character state through one D1 boundary.

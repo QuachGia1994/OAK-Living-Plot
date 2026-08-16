@@ -18,6 +18,7 @@ All notable changes to Living Plot will be documented in this file.
 - Publication migration storing choice intent/consequence/state-delta snapshots plus episode generation/version/provider metadata.
 - Canonical plot-memory schema v2 with keyed multi-dimensional relationships, facts, and threads plus deterministic legacy-v1 upgrade.
 - Atomic/idempotent choice commit with append-only commit snapshots, episode completion, canonical state application, and optimistic version enforcement.
+- Server-side UTC quota ledger with atomic reserve/consume/release, Free/Plus limits, in-flight counters, idempotency, and reconciliation.
 
 ### Fixed
 - Unified ESLint 9 across workspaces and loaded Cloudflare Vitest test types so clean-install quality gates pass.

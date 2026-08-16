@@ -11,6 +11,8 @@ export async function applySqlMigration(db: D1Database, sql: string): Promise<vo
 
 export async function resetStoryData(db: D1Database): Promise<void> {
   const tables = [
+    'usage_events',
+    'quota_reservations',
     'choice_commits',
     'episode_choices',
     'episodes',
@@ -21,6 +23,10 @@ export async function resetStoryData(db: D1Database): Promise<void> {
   ];
 
   for (const table of tables) {
-    await db.prepare(`DELETE FROM ${table}`).run();
+    const exists = await db
+      .prepare("SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .bind(table)
+      .first<{ found: number }>();
+    if (exists?.found === 1) await db.prepare(`DELETE FROM ${table}`).run();
   }
 }
