@@ -3,36 +3,38 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
+import { useUiCopy } from '@/features/localization/ui-copy';
 import { ActionButton, BrandMark, Card, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, radius, spacing } from '@/ui/theme';
 
 export default function AuthScreen() {
   const auth = useMobileAuth();
   const router = useRouter();
+  const { t } = useUiCopy();
 
   if (!auth.configured) {
     return (
       <Screen>
         <BrandMark />
         <Card>
-          <Eyebrow>Preview build</Eyebrow>
-          <Text style={styles.title}>Sign-in is not connected in this preview.</Text>
-          <Text style={styles.body}>You can still explore the complete story flow. Account sign-in will be available once the live service is connected.</Text>
+          <Eyebrow>{t('Preview build', 'Bản xem trước')}</Eyebrow>
+          <Text style={styles.title}>{t('Sign-in is not connected in this preview.', 'Đăng nhập chưa được kết nối trong bản xem trước.')}</Text>
+          <Text style={styles.body}>{t('You can still explore the complete story flow. Account sign-in will be available once the live service is connected.', 'Bạn vẫn có thể khám phá toàn bộ luồng câu chuyện. Đăng nhập sẽ khả dụng khi dịch vụ live được kết nối.')}</Text>
         </Card>
-        <ActionButton label="Back to preview" onPress={() => router.replace('/')} />
+        <ActionButton label={t('Back to preview', 'Quay lại bản xem trước')} onPress={() => router.replace('/')} />
       </Screen>
     );
   }
 
   if (!auth.isLoaded) {
-    return <Screen><BrandMark /><Text style={styles.body}>Loading secure session…</Text></Screen>;
+    return <Screen><BrandMark /><Text style={styles.body}>{t('Loading secure session…', 'Đang tải phiên đăng nhập an toàn…')}</Text></Screen>;
   }
   if (auth.isSignedIn) {
     return (
       <Screen>
         <BrandMark />
-        <Card><Text style={styles.title}>You’re signed in.</Text></Card>
-        <ActionButton label="Open Living Plot" onPress={() => router.replace('/')} />
+        <Card><Text style={styles.title}>{t('You’re signed in.', 'Bạn đã đăng nhập.')}</Text></Card>
+        <ActionButton label={t('Open Living Plot', 'Mở Living Plot')} onPress={() => router.replace('/')} />
       </Screen>
     );
   }
@@ -41,6 +43,7 @@ export default function AuthScreen() {
 
 function ClerkEmailOtpForm() {
   const router = useRouter();
+  const { t } = useUiCopy();
   const { signIn, fetchStatus } = useSignIn();
   const { signUp, fetchStatus: signUpFetchStatus } = useSignUp();
   const [email, setEmail] = useState('');
@@ -51,7 +54,7 @@ function ClerkEmailOtpForm() {
 
   async function sendCode() {
     const identifier = email.trim().toLocaleLowerCase();
-    if (!identifier) return setMessage('Enter your email address.');
+    if (!identifier) return setMessage(t('Enter your email address.', 'Nhập địa chỉ email của bạn.'));
     setMessage(null);
     const { error: createError } = await signIn.create({
       identifier,
@@ -64,7 +67,7 @@ function ClerkEmailOtpForm() {
   }
 
   async function verifyCode() {
-    if (!code.trim()) return setMessage('Enter the verification code.');
+    if (!code.trim()) return setMessage(t('Enter the verification code.', 'Nhập mã xác minh.'));
     setMessage(null);
     const { error } = await signIn.emailCode.verifyCode({ code: code.trim() });
     if (error) {
@@ -76,7 +79,7 @@ function ClerkEmailOtpForm() {
       return;
     }
     if (signIn.status !== 'complete') {
-      setMessage('This Clerk instance requires additional verification. Phase 1 expects email-code-only authentication.');
+      setMessage(t('This Clerk instance requires additional verification. Phase 1 expects email-code-only authentication.', 'Cấu hình Clerk này yêu cầu xác minh bổ sung. Phase 1 chỉ hỗ trợ xác thực bằng mã email.'));
       return;
     }
     await signIn.finalize({ navigate: () => router.replace('/') });
@@ -90,7 +93,7 @@ function ClerkEmailOtpForm() {
       return;
     }
     const missing = signUp.missingFields?.join(', ') || 'additional fields';
-    setMessage(`Your Clerk instance requires ${missing}. Living Plot Phase 1 expects email-only public sign-up; update Clerk Dashboard requirements before continuing.`);
+    setMessage(t(`Your Clerk instance requires ${missing}. Living Plot Phase 1 expects email-only public sign-up; update Clerk Dashboard requirements before continuing.`, `Clerk đang yêu cầu ${missing}. Living Plot Phase 1 chỉ hỗ trợ đăng ký công khai bằng email; hãy cập nhật yêu cầu trong Clerk Dashboard trước khi tiếp tục.`));
   }
 
   function startOver() {
@@ -104,12 +107,12 @@ function ClerkEmailOtpForm() {
     <Screen>
       <BrandMark />
       <View style={styles.intro}>
-        <Eyebrow>Keep your stories with you</Eyebrow>
-        <Text style={styles.title}>{verifying ? 'Check your email.' : 'Continue with email.'}</Text>
+        <Eyebrow>{t('Keep your stories with you', 'Giữ câu chuyện bên bạn')}</Eyebrow>
+        <Text style={styles.title}>{verifying ? t('Check your email.', 'Kiểm tra email.') : t('Continue with email.', 'Tiếp tục bằng email.')}</Text>
         <Text style={styles.body}>
           {verifying
-            ? `Enter the one-time code sent to ${email.trim()}.`
-            : 'One email code is enough. Your plots, choices and story progress stay linked to your account.'}
+            ? t(`Enter the one-time code sent to ${email.trim()}.`, `Nhập mã dùng một lần đã gửi tới ${email.trim()}.`)
+            : t('One email code is enough. Your plots, choices and story progress stay linked to your account.', 'Chỉ cần một mã email. Cốt truyện, lựa chọn và tiến độ sẽ gắn với tài khoản của bạn.')}
         </Text>
       </View>
 
@@ -142,14 +145,14 @@ function ClerkEmailOtpForm() {
         )}
         {message ? <Text style={styles.error}>{message}</Text> : null}
         <ActionButton
-          label={verifying ? 'Verify code' : 'Send email code'}
+          label={verifying ? t('Verify code', 'Xác minh mã') : t('Send email code', 'Gửi mã email')}
           busy={busy}
           onPress={() => void (verifying ? verifyCode() : sendCode())}
         />
         {verifying ? (
           <>
-            <ActionButton label="Resend code" variant="secondary" disabled={busy} onPress={() => void signIn.emailCode.sendCode()} />
-            <ActionButton label="Start over" variant="ghost" disabled={busy} onPress={startOver} />
+            <ActionButton label={t('Resend code', 'Gửi lại mã')} variant="secondary" disabled={busy} onPress={() => void signIn.emailCode.sendCode()} />
+            <ActionButton label={t('Start over', 'Làm lại')} variant="ghost" disabled={busy} onPress={startOver} />
           </>
         ) : null}
       </Card>

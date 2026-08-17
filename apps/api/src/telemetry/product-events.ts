@@ -8,11 +8,21 @@ export type ProductEventName =
   | 'next_episode_published'
   | 'voice_requested';
 
+export type EpisodeDepthBucket = 'none' | 'episode_1' | 'episodes_2_3' | 'episodes_4_7' | 'episode_8_plus';
+
 export interface ProductEventTelemetry {
   event: ProductEventName;
   mood?: LiveStoryMood;
   episodeNumber?: number;
   tier?: 'free' | 'plus';
+}
+
+export function episodeDepthBucket(episodeNumber?: number): EpisodeDepthBucket {
+  if (typeof episodeNumber !== 'number' || !Number.isInteger(episodeNumber) || episodeNumber < 1) return 'none';
+  if (episodeNumber === 1) return 'episode_1';
+  if (episodeNumber <= 3) return 'episodes_2_3';
+  if (episodeNumber <= 7) return 'episodes_4_7';
+  return 'episode_8_plus';
 }
 
 export interface ProductTelemetrySink {

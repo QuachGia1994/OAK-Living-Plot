@@ -52,3 +52,19 @@ The Android artifact remains preview-safe when repository variables are absent. 
 - `EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY` or platform RevenueCat public SDK keys.
 
 Backend credentials belong in the Worker secret store, not GitHub public Expo variables.
+
+## Live beta smoke gates
+
+After the development Worker and Clerk session exist, set `LIVING_PLOT_SMOKE_API_URL` and a short-lived `LIVING_PLOT_SMOKE_BEARER_TOKEN` in the local shell. The smoke runner never prints the token.
+
+```bash
+npm run live:smoke:health
+npm run live:smoke:core
+npm run live:smoke:voice
+npm run live:smoke:billing
+npm run live:smoke:all
+```
+
+`core` proves authenticated create → choice commit → next episode → resume and archives the smoke plot afterward. `voice` requires either the episode created by `all` or `LIVING_PLOT_SMOKE_EPISODE_ID`; it waits for Queue/TTS/R2 to reach `ready` and then fetches private audio bytes. `billing` is intentionally strict: it passes only when `/v1/entitlement` is actually Plus with a provider sync timestamp, so a local RevenueCat SDK action without webhook/D1 convergence is not accepted as proof.
+
+These commands are external gates, not CI substitutes. Missing live values/resources are reported as blocked rather than replaced by fixtures.

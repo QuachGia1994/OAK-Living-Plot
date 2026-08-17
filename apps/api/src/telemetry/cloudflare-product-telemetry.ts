@@ -1,4 +1,4 @@
-import type { ProductEventTelemetry, ProductTelemetrySink } from './product-events';
+import { episodeDepthBucket, type ProductEventTelemetry, type ProductTelemetrySink } from './product-events';
 
 export class CloudflareProductTelemetrySink implements ProductTelemetrySink {
   constructor(private readonly dataset: Pick<AnalyticsEngineDataset, 'writeDataPoint'>) {}
@@ -11,6 +11,7 @@ export class CloudflareProductTelemetrySink implements ProductTelemetrySink {
         event.event,
         event.mood ?? 'none',
         event.tier ?? 'unknown',
+        episodeDepthBucket(event.episodeNumber),
       ],
       doubles: [
         1,

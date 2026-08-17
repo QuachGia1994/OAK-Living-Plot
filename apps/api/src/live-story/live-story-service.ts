@@ -4,6 +4,7 @@ import type { ChoiceCommitError } from '../choice/contracts';
 import { D1ChoiceCommitter } from '../choice/d1-choice-committer';
 import { D1EpisodePublisher } from '../publication/d1-episode-publisher';
 import type { EpisodePublicationError } from '../publication/contracts';
+import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences';
 import { D1QuotaLedger } from '../quota/d1-quota-ledger';
 import type { QuotaError } from '../quota/contracts';
 import { quotaPolicyFor } from '../quota/policy';
@@ -29,6 +30,7 @@ export class LiveStoryService {
   private readonly stories: D1LiveStoryRepository;
   private readonly entitlements: D1EntitlementRepository;
   private readonly quota: D1QuotaLedger;
+  private readonly preferences: D1UserPreferencesRepository;
   private readonly publisher: D1EpisodePublisher;
   private readonly choices: D1ChoiceCommitter;
 
@@ -41,6 +43,7 @@ export class LiveStoryService {
     this.stories = new D1LiveStoryRepository(db);
     this.entitlements = new D1EntitlementRepository(db, clock);
     this.quota = new D1QuotaLedger(db, clock);
+    this.preferences = new D1UserPreferencesRepository(db);
     this.publisher = new D1EpisodePublisher(db);
     this.choices = new D1ChoiceCommitter(db);
   }
@@ -51,9 +54,10 @@ export class LiveStoryService {
     const policy = quotaPolicyFor(entitlement.tier);
     const utcDay = utcDayFromMillis(this.clock());
     const usage = await this.quota.getDailyUsage(userId, utcDay);
-    const [recentPlots, activity] = await Promise.all([
+    const [recentPlots, activity, preferences] = await Promise.all([
       this.stories.listOwnedPlots(userId),
       this.stories.loadRetentionActivity(userId),
+      this.preferences.get(userId),
     ]);
     return {
       ok: true,
@@ -66,7 +70,7 @@ export class LiveStoryService {
           voiceLimit: policy.voiceEpisodesPerUtcDay,
           resetAt: nextUtcReset(utcDay),
         },
-        retention: buildRetentionSnapshot(activity, recentPlots.length, this.clock()),
+        retention: buildRetentionSnapshot(activity, recentPlots.length, this.clock(), preferences.uiLocale),
       },
     };
   }

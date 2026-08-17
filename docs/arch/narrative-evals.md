@@ -1,6 +1,6 @@
 # Phase 1 narrative quality evaluations
 
-> updated 2026-08-16 · 0.0.0
+> updated 2026-08-17 · 0.0.0
 
 ## Purpose
 Schema validation protects canonical state, but valid JSON can still produce weak interactive drama. Slice 12 adds a deterministic offline evaluation layer for narrative regressions without granting an evaluator authority over runtime story state.
@@ -19,13 +19,16 @@ Each fixture contains bounded canonical `EpisodeGenerationInput` plus a provider
 ## Deterministic dimensions
 `evaluateNarrative()` first passes the proposal through the same structural/canonical validator used by production. A structural failure receives score zero.
 
-Valid proposals are then scored from 0–100 on five dimensions:
+Valid proposals are then scored from 0–100 on eight dimensions:
 
 1. `continuity` — a previous committed consequence must be materially visible in the first third of the episode, and the chosen action must be reflected in the opening/summary.
 2. `threadMomentum` — at least one open thread must be resolved or materially reflected in the new narrative.
 3. `branchDistinctness` — choice labels/intents cannot be near-duplicates and all three state-delta signatures must differ.
 4. `consequenceSpecificity` — branch consequences must be sufficiently specific and materially different from each other.
 5. `repetitionControl` — the script must not collapse into repeated three-word sequences.
+6. `characterConsistency` — the canonical protagonist must remain visibly anchored in the scene/summary/branches instead of disappearing behind a replacement lead.
+7. `localeAlignment` — supported English/Vietnamese requests must produce visible language signal matching the requested locale across the narrative and branches.
+8. `sceneProgression` — the episode must establish a durable fact or open/resolve a canonical thread before branching, preventing structurally valid scene resets.
 
 A fixture passes only when the average score is at least 80 and every dimension is at least 60. These metrics are regression heuristics, not claims of objective literary quality.
 
@@ -36,7 +39,10 @@ The suite explicitly proves failure for:
 - an episode that ignores the prior committed consequence;
 - an unknown canonical thread key;
 - generic branch consequences;
-- a structurally valid but excessively repetitive script.
+- a structurally valid but excessively repetitive script;
+- a proposal that drops the canonical protagonist;
+- English narrative output for a Vietnamese locale;
+- an episode that adds no durable canonical progression before branching.
 
 Run the focused gate with:
 

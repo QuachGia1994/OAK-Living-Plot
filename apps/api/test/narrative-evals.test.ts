@@ -71,6 +71,52 @@ describe('narrative quality eval suite', () => {
     expect(report.dimensions.repetitionControl).toBeLessThan(60);
     expect(report.findings.some((finding) => finding.code === 'SCRIPT_EXCESSIVELY_REPETITIVE')).toBe(true);
   });
+
+  it('rejects an episode that drops the canonical protagonist from the visible scene', () => {
+    const fixture = structuredClone(NARRATIVE_FIXTURES[1]);
+    const protagonist = fixture.input.characters[0]?.name ?? '';
+    const removeName = (value: string) => value.replaceAll(protagonist, 'Someone');
+    fixture.proposal.script = removeName(fixture.proposal.script);
+    fixture.proposal.summary = removeName(fixture.proposal.summary);
+    fixture.proposal.choices.forEach((choice) => {
+      choice.label = removeName(choice.label);
+      choice.consequence = removeName(choice.consequence);
+    });
+
+    const report = evaluateNarrative(fixture.input, fixture.proposal);
+
+    expect(report.passed).toBe(false);
+    expect(report.dimensions.characterConsistency).toBeLessThan(60);
+    expect(report.findings.some((finding) => finding.code === 'PROTAGONIST_NOT_ANCHORED')).toBe(true);
+  });
+
+  it('rejects English output for a Vietnamese story locale', () => {
+    const fixture = structuredClone(NARRATIVE_FIXTURES.find((item) => item.input.locale.startsWith('vi')) ?? NARRATIVE_FIXTURES[0]);
+    fixture.proposal.script = unrelatedScript();
+    fixture.proposal.summary = 'The protagonist receives new information and must decide who to trust before the situation escalates.';
+    fixture.proposal.choices.forEach((choice, index) => {
+      choice.label = ['Confront the witness now', 'Investigate the hidden evidence', 'Ask an ally for help'][index] ?? choice.label;
+      choice.consequence = ['The confrontation exposes a new risk immediately.', 'The investigation reveals a clue that changes the timeline.', 'The ally agrees to help but demands a difficult favor.'][index] ?? choice.consequence;
+    });
+
+    const report = evaluateNarrative(fixture.input, fixture.proposal);
+
+    expect(report.passed).toBe(false);
+    expect(report.dimensions.localeAlignment).toBeLessThan(60);
+    expect(report.findings.some((finding) => finding.code === 'VIETNAMESE_OUTPUT_NOT_VISIBLE')).toBe(true);
+  });
+
+  it('rejects an episode that creates no durable canonical progression before branching', () => {
+    const fixture = structuredClone(NARRATIVE_FIXTURES[2]);
+    fixture.proposal.establishedFacts = [];
+    fixture.proposal.threadChanges = { open: [], resolve: [] };
+
+    const report = evaluateNarrative(fixture.input, fixture.proposal);
+
+    expect(report.passed).toBe(false);
+    expect(report.dimensions.sceneProgression).toBeLessThan(60);
+    expect(report.findings.some((finding) => finding.code === 'EPISODE_ADDS_NO_CANONICAL_PROGRESS')).toBe(true);
+  });
 });
 
 function unrelatedScript(): string {

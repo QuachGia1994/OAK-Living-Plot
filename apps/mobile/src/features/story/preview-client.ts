@@ -11,6 +11,7 @@ import type {
   StoryPlotSummary,
 } from './contracts';
 import { StoryClientError } from './contracts';
+import type { UiLocale } from '@/features/preferences/contracts';
 import { hasDraftErrors, normalizePlotDraft, validatePlotDraft } from './draft';
 
 export class PreviewStoryExperienceClient implements StoryExperienceClient {
@@ -19,7 +20,7 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
   private readonly histories = new Map<string, StoryHistoryItem[]>();
   private createdPlotCount = 0;
 
-  constructor() {
+  constructor(private readonly uiLocale: UiLocale = 'en') {
     const seeded = createSeedPlot();
     this.plots.set(seeded.id, seeded);
     this.histories.set(seeded.id, [historyItem(seeded.episode)]);
@@ -34,18 +35,13 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
         textLimit: 3,
         voiceRemaining: 1,
         voiceLimit: 1,
-        resetLabel: 'Resets at 00:00 UTC',
+        resetLabel: this.uiLocale === 'vi' ? 'Đặt lại lúc 00:00 UTC' : 'Resets at 00:00 UTC',
       },
       retention: {
         currentStreakDays: 2,
         choicesMade: 4,
         activePlots: active.length,
-        dailyPrompt: {
-          label: 'A message at the wrong time',
-          premise: 'A voice note arrives from someone who should have no way to contact you, and it contains one detail only you would recognize.',
-          mood: 'mysterious',
-          characterName: 'Mina',
-        },
+        dailyPrompt: previewDailyPrompt(this.uiLocale),
       },
     };
   }
@@ -60,7 +56,7 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
 
   async createPlot(draft: PlotDraft): Promise<StoryPlotSession> {
     const normalized = normalizePlotDraft(draft);
-    if (hasDraftErrors(validatePlotDraft(normalized))) {
+    if (hasDraftErrors(validatePlotDraft(normalized, this.uiLocale))) {
       throw new StoryClientError('invalid_input', 'The plot setup is incomplete.');
     }
 
@@ -158,6 +154,17 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
 }
 
 export const storyExperienceClient: StoryExperienceClient = new PreviewStoryExperienceClient();
+
+function previewDailyPrompt(uiLocale: UiLocale): StoryHomeSnapshot['retention']['dailyPrompt'] {
+  return {
+    label: uiLocale === 'vi' ? 'Tin nhắn sai thời điểm' : 'A message at the wrong time',
+    premise: uiLocale === 'vi'
+      ? 'Một tin nhắn thoại đến từ người lẽ ra không thể liên lạc với bạn, và nó chứa một chi tiết chỉ bạn mới nhận ra.'
+      : 'A voice note arrives from someone who should have no way to contact you, and it contains one detail only you would recognize.',
+    mood: 'mysterious',
+    characterName: 'Mina',
+  };
+}
 
 function createSeedPlot(): StoryPlotSession {
   const plotId = 'preview-midnight-message';

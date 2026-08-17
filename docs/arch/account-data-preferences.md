@@ -11,7 +11,7 @@ Migration `0008_user_preferences.sql` adds one owner-scoped preference row per i
 
 `GET /v1/preferences` returns defaults when a row does not exist. `POST /v1/preferences` validates every value and derives ownership from the authenticated internal user; client-supplied identity is ignored. Preferences do not rewrite existing plots. A plot's persisted `plots.locale` remains canonical for that story.
 
-The current beta stores the interface-language preference for future translated UI copy; the active behavior in this slice is the new-story locale and narrator default. Existing English product copy is not falsely presented as fully localized.
+The saved interface-language preference now drives the native product shell and core-loop copy in English or Vietnamese, including auth, home/onboarding, create, story controls, history, library, Plus, Settings/Data, validation, and narration controls. Generated episode text remains in the plot's own persisted story locale; switching interface language never rewrites canonical plot content. Daily-spark copy is returned in the saved interface locale, while the new-story locale and narrator remain separate preferences.
 
 ## Spoiler-safe native share
 Sharing is a client-only native Share action. Copy is deterministically built from the plot title, current episode number, and a bounded premise hook plus a generic Living Plot call-to-action.

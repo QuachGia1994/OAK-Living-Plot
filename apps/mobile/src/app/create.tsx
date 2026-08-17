@@ -3,8 +3,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { PlotDraft, StoryMood } from '@/features/story/contracts';
 import { StoryClientError } from '@/features/story/contracts';
-import { hasDraftErrors, normalizePlotDraft, storyMoodOptions, validatePlotDraft } from '@/features/story/draft';
+import { hasDraftErrors, normalizePlotDraft, storyMoodOptionsFor, validatePlotDraft } from '@/features/story/draft';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
+import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { createStoryRequestKey } from '@/features/story/request-key';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { ActionButton, BrandMark, Card, Eyebrow, Screen } from '@/ui/primitives';
@@ -20,6 +21,7 @@ export default function CreatePlotScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ premise?: string | string[]; mood?: string | string[]; characterName?: string | string[] }>();
   const auth = useMobileAuth();
+  const { locale, t } = useUiCopy();
   const storyExperienceClient = useStoryExperienceClient();
   const creationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
   const [draft, setDraft] = useState<PlotDraft>(() => ({
@@ -30,7 +32,8 @@ export default function CreatePlotScreen() {
   const [showValidation, setShowValidation] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const errors = validatePlotDraft(draft);
+  const errors = validatePlotDraft(draft, locale);
+  const moodOptions = storyMoodOptionsFor(locale);
 
   async function submit() {
     setShowValidation(true);
@@ -49,7 +52,7 @@ export default function CreatePlotScreen() {
       const plot = await storyExperienceClient.createPlot(normalizedDraft, attempt.key);
       router.replace({ pathname: '/story', params: { plotId: plot.id } });
     } catch (caught) {
-      setSubmitError(createErrorMessage(caught));
+      setSubmitError(createErrorMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -61,12 +64,12 @@ export default function CreatePlotScreen() {
       <Screen>
         <BrandMark />
         <Card>
-          <Eyebrow>Save your story</Eyebrow>
-          <Text style={styles.title}>{auth.isLoaded ? 'Sign in before starting a new plot.' : 'Opening your account…'}</Text>
-          <Text style={styles.subtitle}>Your stories and choices will stay available when you return on another device.</Text>
+          <Eyebrow>{t('Save your story', 'Lưu câu chuyện')}</Eyebrow>
+          <Text style={styles.title}>{auth.isLoaded ? t('Sign in before starting a new plot.', 'Đăng nhập trước khi bắt đầu câu chuyện mới.') : t('Opening your account…', 'Đang mở tài khoản…')}</Text>
+          <Text style={styles.subtitle}>{t('Your stories and choices will stay available when you return on another device.', 'Câu chuyện và lựa chọn của bạn vẫn còn khi quay lại trên thiết bị khác.')}</Text>
         </Card>
-        {auth.isLoaded ? <ActionButton label="Sign in with email code" onPress={() => router.replace('/auth')} /> : null}
-        <ActionButton label="Cancel" variant="ghost" onPress={() => router.replace('/')} />
+        {auth.isLoaded ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} onPress={() => router.replace('/auth')} /> : null}
+        <ActionButton label={sharedUiCopy.cancel[locale]} variant="ghost" onPress={() => router.replace('/')} />
       </Screen>
     );
   }
@@ -75,24 +78,24 @@ export default function CreatePlotScreen() {
     <Screen>
       <View style={styles.topBar}>
         <BrandMark />
-        <ActionButton label="Cancel" variant="ghost" onPress={() => router.back()} />
+        <ActionButton label={sharedUiCopy.cancel[locale]} variant="ghost" onPress={() => router.back()} />
       </View>
 
       <View style={styles.intro}>
-        <Eyebrow>New plot · 3 quick choices</Eyebrow>
-        <Text style={styles.title}>Give the drama one spark.</Text>
+        <Eyebrow>{t('New plot · 3 quick choices', 'Cốt truyện mới · 3 lựa chọn nhanh')}</Eyebrow>
+        <Text style={styles.title}>{t('Give the drama one spark.', 'Cho câu chuyện một tia lửa.')}</Text>
         <Text style={styles.subtitle}>
-          Tell us what is happening, pick the vibe, and name the main character. Episode 1 takes it from there.
+          {t('Tell us what is happening, pick the vibe, and name the main character. Episode 1 takes it from there.', 'Nói điều gì đang xảy ra, chọn không khí và đặt tên nhân vật chính. Tập 1 sẽ tiếp tục phần còn lại.')}
         </Text>
       </View>
 
       <Card>
-        <FieldHeader step="01" label="What is the situation?" hint="One or two sentences is enough" />
+        <FieldHeader step="01" label={t('What is the situation?', 'Tình huống là gì?')} hint={t('One or two sentences is enough', 'Một hoặc hai câu là đủ')} />
         <TextInput
           accessibilityLabel="Story premise"
           multiline
           maxLength={600}
-          placeholder="A junior chef learns the restaurant critic is the person who disappeared from her family ten years ago…"
+          placeholder={t('A junior chef learns the restaurant critic is the person who disappeared from her family ten years ago…', 'Một đầu bếp trẻ phát hiện vị khách phê bình nhà hàng chính là người đã biến mất khỏi gia đình cô mười năm trước…')}
           placeholderTextColor={colors.placeholder}
           style={[styles.textArea, showValidation && errors.premise && styles.inputError]}
           textAlignVertical="top"
@@ -106,9 +109,9 @@ export default function CreatePlotScreen() {
       </Card>
 
       <Card>
-        <FieldHeader step="02" label="Pick the vibe" hint="This shapes how the scene feels" />
+        <FieldHeader step="02" label={t('Pick the vibe', 'Chọn không khí')} hint={t('This shapes how the scene feels', 'Điều này định hình cảm xúc của cảnh')} />
         <View style={styles.moodGrid}>
-          {storyMoodOptions.map((option) => (
+          {moodOptions.map((option) => (
             <MoodOption
               key={option.value}
               selected={draft.mood === option.value}
@@ -122,7 +125,7 @@ export default function CreatePlotScreen() {
       </Card>
 
       <Card>
-        <FieldHeader step="03" label="Who is the main character?" hint="Just a name" />
+        <FieldHeader step="03" label={t('Who is the main character?', 'Nhân vật chính là ai?')} hint={t('Just a name', 'Chỉ cần một cái tên')} />
         <TextInput
           accessibilityLabel="Main character name"
           autoCapitalize="words"
@@ -139,25 +142,26 @@ export default function CreatePlotScreen() {
 
       {submitError ? (
         <View style={styles.submitError}>
-          <Text style={styles.submitErrorTitle}>Episode 1 could not start</Text>
+          <Text style={styles.submitErrorTitle}>{t('Episode 1 could not start', 'Không thể bắt đầu tập 1')}</Text>
           <Text style={styles.submitErrorBody}>{submitError}</Text>
         </View>
       ) : null}
 
       <View style={styles.submitBlock}>
-        <ActionButton label="Start episode 1" busy={busy} onPress={() => void submit()} />
-        <Text style={styles.submitNote}>Your first episode is short enough to finish in about a minute. Voice is optional.</Text>
+        <ActionButton label={t('Start episode 1', 'Bắt đầu tập 1')} busy={busy} onPress={() => void submit()} />
+        <Text style={styles.submitNote}>{t('Your first episode is short enough to finish in about a minute. Voice is optional.', 'Tập đầu đủ ngắn để xem trong khoảng một phút. Giọng đọc là tùy chọn.')}</Text>
       </View>
     </Screen>
   );
 }
 
-function createErrorMessage(error: unknown): string {
-  if (!(error instanceof StoryClientError)) return 'The first episode could not be prepared. Your setup is still here, so you can try again.';
-  if (error.code === 'quota_exceeded') return 'Today’s text episode allowance is exhausted. Your setup is saved here until the UTC reset.';
-  if (error.code === 'auth_required') return 'Your session expired. Sign in again before generating this plot.';
-  if (error.code === 'provider_unavailable') return 'The story engine is temporarily unavailable. Your setup is unchanged; try again later.';
-  if (error.code === 'choice_required') return 'This creation attempt no longer matches the server copy. Edit the setup or return home to resume the existing plot.';
+function createErrorMessage(error: unknown, locale: 'en' | 'vi'): string {
+  const vi = locale === 'vi';
+  if (!(error instanceof StoryClientError)) return vi ? 'Không thể chuẩn bị tập đầu. Thiết lập vẫn còn để bạn thử lại.' : 'The first episode could not be prepared. Your setup is still here, so you can try again.';
+  if (error.code === 'quota_exceeded') return vi ? 'Bạn đã dùng hết lượt tập chữ hôm nay. Thiết lập vẫn được giữ đến khi hạn mức UTC đặt lại.' : 'Today’s text episode allowance is exhausted. Your setup is saved here until the UTC reset.';
+  if (error.code === 'auth_required') return vi ? 'Phiên đăng nhập đã hết hạn. Đăng nhập lại trước khi tạo câu chuyện.' : 'Your session expired. Sign in again before generating this plot.';
+  if (error.code === 'provider_unavailable') return vi ? 'Bộ máy tạo truyện tạm thời không khả dụng. Thiết lập không thay đổi; hãy thử lại sau.' : 'The story engine is temporarily unavailable. Your setup is unchanged; try again later.';
+  if (error.code === 'choice_required') return vi ? 'Lần tạo này không còn khớp với bản trên máy chủ. Chỉnh thiết lập hoặc về trang chủ để tiếp tục câu chuyện hiện có.' : 'This creation attempt no longer matches the server copy. Edit the setup or return home to resume the existing plot.';
   return error.message;
 }
 

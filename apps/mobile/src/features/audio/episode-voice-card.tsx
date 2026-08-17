@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { StyleSheet, Text, View } from 'react-native';
+import { useUiCopy } from '@/features/localization/ui-copy';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
 import { createStoryRequestKey } from '@/features/story/request-key';
 import { ActionButton, Card, Eyebrow, Pill } from '@/ui/primitives';
@@ -11,6 +12,7 @@ import { useEpisodeAudioClient } from './audio-client-context';
 
 export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
   const client = useEpisodeAudioClient();
+  const { locale, t } = useUiCopy();
   const { preferences } = useUserPreferences();
   const voiceVariant = useMemo(() => preferences.narratorVariant, [preferences.narratorVariant]);
   const reservationKey = useRef(createStoryRequestKey('voice'));
@@ -34,7 +36,7 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
         })
         .catch((caught: unknown) => {
           if (!active) return;
-          setError(audioMessage(caught));
+          setError(audioMessage(caught, locale));
           setStatusRetryNeeded(true);
         });
     }, 1_800);
@@ -42,7 +44,7 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [asset, client]);
+  }, [asset, client, locale]);
 
   useEffect(() => {
     if (!asset || asset.status !== 'ready' || loadedAssetId.current === asset.id) return;
@@ -54,16 +56,16 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
         loadedAssetId.current = asset.id;
       })
       .catch((caught: unknown) => {
-        if (active) setError(audioMessage(caught));
+        if (active) setError(audioMessage(caught, locale));
       });
     return () => {
       active = false;
     };
-  }, [asset, client, player]);
+  }, [asset, client, locale, player]);
 
   async function requestVoice() {
     if (!client.configured) {
-      setError('Voice is not connected in this preview build yet. You can still read the full episode.');
+      setError(t('Voice is not connected in this preview build yet. You can still read the full episode.', 'Giọng đọc chưa được kết nối trong bản xem trước. Bạn vẫn có thể đọc toàn bộ tập.'));
       return;
     }
     if (asset?.status === 'failed') reservationKey.current = createStoryRequestKey('voice');
@@ -74,7 +76,7 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
       setAsset(await client.request(episodeId, voiceVariant, reservationKey.current));
     } catch (caught) {
       if (isDefiniteVoiceRequestFailure(caught)) reservationKey.current = createStoryRequestKey('voice');
-      setError(audioMessage(caught));
+      setError(audioMessage(caught, locale));
     } finally {
       setBusy(false);
     }
@@ -88,7 +90,7 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
       setAsset(await client.loadStatus(asset.id));
       setStatusRetryNeeded(false);
     } catch (caught) {
-      setError(audioMessage(caught));
+      setError(audioMessage(caught, locale));
       setStatusRetryNeeded(true);
     } finally {
       setBusy(false);
@@ -113,14 +115,14 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
     <Card style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Eyebrow>Episode voice</Eyebrow>
-          <Text style={styles.title}>Hear the scene narrated</Text>
+          <Eyebrow>{t('Episode voice', 'Giọng đọc tập')}</Eyebrow>
+          <Text style={styles.title}>{t('Hear the scene narrated', 'Nghe cảnh được kể lại')}</Text>
         </View>
-        <Pill tone={asset?.status === 'ready' ? 'success' : 'neutral'}>{voiceLabel(asset)}</Pill>
+        <Pill tone={asset?.status === 'ready' ? 'success' : 'neutral'}>{voiceLabel(asset, locale)}</Pill>
       </View>
 
       <Text style={styles.body}>
-        Generate narration once, then replay it anytime without using another fresh-voice slot.
+        {t('Generate narration once, then replay it anytime without using another fresh-voice slot.', 'Tạo giọng đọc một lần rồi phát lại bất kỳ lúc nào mà không dùng thêm lượt giọng mới.')}
       </Text>
 
       {asset?.status === 'ready' ? (
@@ -128,7 +130,7 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
           <View
             style={styles.track}
             accessibilityRole="progressbar"
-            accessibilityLabel="Voice playback progress"
+            accessibilityLabel={t('Voice playback progress', 'Tiến độ phát giọng đọc')}
             accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
           >
             <View style={[styles.trackFill, { width: `${Math.round(progress * 100)}%` }]} />
@@ -136,20 +138,20 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
           <Text style={styles.time}>{formatTime(playerStatus.currentTime)} / {formatTime(playerStatus.duration)}</Text>
           <View style={styles.actions}>
             <ActionButton
-              label={playerStatus.playing ? 'Pause voice' : 'Play voice'}
+              label={playerStatus.playing ? t('Pause voice', 'Tạm dừng giọng đọc') : t('Play voice', 'Phát giọng đọc')}
               variant="secondary"
               disabled={!playerStatus.isLoaded}
               onPress={togglePlayback}
               style={styles.flexButton}
             />
-            <ActionButton label="Replay" variant="ghost" disabled={!playerStatus.isLoaded} onPress={() => void replay()} />
+            <ActionButton label={t('Replay', 'Phát lại')} variant="ghost" disabled={!playerStatus.isLoaded} onPress={() => void replay()} />
           </View>
         </>
       ) : (
         <ActionButton
           label={asset && isPending(asset.status)
-            ? statusRetryNeeded ? 'Check voice status' : 'Preparing voice…'
-            : asset?.status === 'failed' ? 'Retry voice' : 'Generate voice'}
+            ? statusRetryNeeded ? t('Check voice status', 'Kiểm tra trạng thái giọng') : t('Preparing voice…', 'Đang chuẩn bị giọng…')
+            : asset?.status === 'failed' ? t('Retry voice', 'Thử lại giọng đọc') : t('Generate voice', 'Tạo giọng đọc')}
           variant="secondary"
           busy={busy}
           disabled={Boolean(asset && isPending(asset.status) && !statusRetryNeeded)}
@@ -166,11 +168,12 @@ function isPending(status: EpisodeAudioAsset['status']): boolean {
   return status === 'reserving' || status === 'queued' || status === 'processing' || status === 'staged';
 }
 
-function voiceLabel(asset: EpisodeAudioAsset | null): string {
-  if (!asset) return 'Optional';
-  if (asset.status === 'ready') return asset.cached ? 'Cached' : 'Ready';
-  if (asset.status === 'failed') return 'Retry available';
-  return 'Generating';
+function voiceLabel(asset: EpisodeAudioAsset | null, locale: 'en' | 'vi'): string {
+  const vi = locale === 'vi';
+  if (!asset) return vi ? 'Tùy chọn' : 'Optional';
+  if (asset.status === 'ready') return asset.cached ? (vi ? 'Đã lưu' : 'Cached') : (vi ? 'Sẵn sàng' : 'Ready');
+  if (asset.status === 'failed') return vi ? 'Có thể thử lại' : 'Retry available';
+  return vi ? 'Đang tạo' : 'Generating';
 }
 
 function isDefiniteVoiceRequestFailure(error: unknown): boolean {
@@ -179,11 +182,12 @@ function isDefiniteVoiceRequestFailure(error: unknown): boolean {
   );
 }
 
-function audioMessage(error: unknown): string {
-  if (!(error instanceof EpisodeAudioClientError)) return 'Voice could not be prepared. You can keep reading the episode normally.';
-  if (error.code === 'quota_exceeded') return 'You have used today’s fresh narration. Existing narration can still replay.';
-  if (error.code === 'auth_required') return 'Sign in again before generating narration.';
-  if (error.code === 'not_configured') return 'Voice is not connected in this preview build yet.';
+function audioMessage(error: unknown, locale: 'en' | 'vi'): string {
+  const vi = locale === 'vi';
+  if (!(error instanceof EpisodeAudioClientError)) return vi ? 'Không thể chuẩn bị giọng đọc. Bạn vẫn có thể đọc tập bình thường.' : 'Voice could not be prepared. You can keep reading the episode normally.';
+  if (error.code === 'quota_exceeded') return vi ? 'Bạn đã dùng lượt giọng mới hôm nay. Bản đã tạo vẫn có thể phát lại.' : 'You have used today’s fresh narration. Existing narration can still replay.';
+  if (error.code === 'auth_required') return vi ? 'Đăng nhập lại trước khi tạo giọng đọc.' : 'Sign in again before generating narration.';
+  if (error.code === 'not_configured') return vi ? 'Giọng đọc chưa được kết nối trong bản xem trước.' : 'Voice is not connected in this preview build yet.';
   return error.message;
 }
 

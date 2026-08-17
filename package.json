@@ -15,6 +15,12 @@
     "test": "npm run test --workspaces --if-present",
     "check": "npm run live:check:preview && npm run lint && npm run typecheck && npm run test",
     "live:check": "node scripts/check-live-readiness.mjs",
-    "live:check:preview": "node scripts/check-live-readiness.mjs --allow-missing"
+    "live:check:preview": "node scripts/check-live-readiness.mjs --allow-missing",
+    "live:smoke:health": "node scripts/live-beta-smoke.mjs --mode=health",
+    "live:smoke:core": "node scripts/live-beta-smoke.mjs --mode=core",
+    "live:smoke:voice": "node scripts/live-beta-smoke.mjs --mode=voice",
+    "live:smoke:billing": "node scripts/live-beta-smoke.mjs --mode=billing",
+    "live:smoke:all": "node scripts/live-beta-smoke.mjs --mode=all",
+    "retention:summary:dev": "npx wrangler d1 execute living-plot-dev --remote --env development --config apps/api/wrangler.jsonc --file scripts/retention-summary.sql"
   }
 }

@@ -6,7 +6,10 @@ export type NarrativeEvalDimension =
   | 'threadMomentum'
   | 'branchDistinctness'
   | 'consequenceSpecificity'
-  | 'repetitionControl';
+  | 'repetitionControl'
+  | 'characterConsistency'
+  | 'localeAlignment'
+  | 'sceneProgression';
 
 export interface NarrativeEvalFinding {
   dimension: NarrativeEvalDimension | 'structure';
@@ -27,6 +30,9 @@ const DIMENSIONS: NarrativeEvalDimension[] = [
   'branchDistinctness',
   'consequenceSpecificity',
   'repetitionControl',
+  'characterConsistency',
+  'localeAlignment',
+  'sceneProgression',
 ];
 
 export function evaluateNarrative(
@@ -54,6 +60,9 @@ export function evaluateNarrative(
     branchDistinctness: scoreBranchDistinctness(proposal, findings),
     consequenceSpecificity: scoreConsequences(proposal, findings),
     repetitionControl: scoreRepetition(proposal, findings),
+    characterConsistency: scoreCharacterConsistency(input, proposal, findings),
+    localeAlignment: scoreLocaleAlignment(input, proposal, findings),
+    sceneProgression: scoreSceneProgression(proposal, findings),
   };
   const score = Math.round(DIMENSIONS.reduce((sum, key) => sum + dimensions[key], 0) / DIMENSIONS.length);
   const passed = score >= 80 && DIMENSIONS.every((key) => dimensions[key] >= 60);
@@ -195,6 +204,71 @@ function scoreRepetition(proposal: EpisodeProposal, findings: NarrativeEvalFindi
   return 40;
 }
 
+function scoreCharacterConsistency(
+  input: EpisodeGenerationInput,
+  proposal: EpisodeProposal,
+  findings: NarrativeEvalFinding[],
+): number {
+  const protagonist = input.characters[0];
+  if (!protagonist?.name.trim()) return 100;
+  const storyText = [proposal.script, proposal.summary, ...proposal.choices.map((choice) => choice.label)].join(' ');
+  if (containsPhrase(storyText, protagonist.name)) return 100;
+  findings.push({
+    dimension: 'characterConsistency',
+    code: 'PROTAGONIST_NOT_ANCHORED',
+    message: 'The episode does not name the canonical protagonist in the scene, summary, or branch labels.',
+  });
+  return 40;
+}
+
+function scoreLocaleAlignment(
+  input: EpisodeGenerationInput,
+  proposal: EpisodeProposal,
+  findings: NarrativeEvalFinding[],
+): number {
+  const storyText = [proposal.script, proposal.summary, ...proposal.choices.flatMap((choice) => [choice.label, choice.consequence])].join(' ');
+  if (input.locale.toLocaleLowerCase().startsWith('vi')) {
+    const marks = storyText.match(/[ăâđêôơưàáạảãằắặẳẵầấậẩẫèéẹẻẽềếệểễìíịỉĩòóọỏõồốộổỗờớợởỡùúụủũừứựửữỳýỵỷỹ]/giu)?.length ?? 0;
+    if (marks >= 8) return 100;
+    if (marks >= 3) return 70;
+    findings.push({
+      dimension: 'localeAlignment',
+      code: 'VIETNAMESE_OUTPUT_NOT_VISIBLE',
+      message: 'A Vietnamese episode contains too little Vietnamese-language signal to match the requested locale.',
+    });
+    return 30;
+  }
+
+  if (input.locale.toLocaleLowerCase().startsWith('en')) {
+    const tokens = meaningfulTokens(storyText);
+    if (tokens.length === 0) return 0;
+    const asciiWords = tokens.filter((token) => /^[a-z0-9]+$/u.test(token)).length;
+    const ratio = asciiWords / tokens.length;
+    if (ratio >= 0.8) return 100;
+    if (ratio >= 0.6) return 70;
+    findings.push({
+      dimension: 'localeAlignment',
+      code: 'ENGLISH_OUTPUT_NOT_VISIBLE',
+      message: 'An English episode contains too little English-language signal to match the requested locale.',
+    });
+    return 40;
+  }
+  return 100;
+}
+
+function scoreSceneProgression(proposal: EpisodeProposal, findings: NarrativeEvalFinding[]): number {
+  const progresses = proposal.establishedFacts.length > 0 ||
+    proposal.threadChanges.open.length > 0 ||
+    proposal.threadChanges.resolve.length > 0;
+  if (progresses) return 100;
+  findings.push({
+    dimension: 'sceneProgression',
+    code: 'EPISODE_ADDS_NO_CANONICAL_PROGRESS',
+    message: 'The episode establishes no fact and opens or resolves no canonical thread before branching.',
+  });
+  return 40;
+}
+
 function firstThirdText(script: string): string {
   const tokens = script.trim().split(/\s+/u).filter(Boolean);
   return tokens.slice(0, Math.max(1, Math.ceil(tokens.length / 3))).join(' ');
@@ -241,6 +315,10 @@ function meaningfulTokens(value: string): string[] {
     .filter((token) => token.length > 1 && !stopwords.has(token));
 }
 
+function containsPhrase(text: string, phrase: string): boolean {
+  return text.normalize('NFKC').toLocaleLowerCase().includes(phrase.normalize('NFKC').toLocaleLowerCase());
+}
+
 function stateDeltaSignature(delta: EpisodeProposal['choices'][number]['stateDelta']): string {
   return JSON.stringify({
     relationships: delta.relationships.map((relationship) => ({
@@ -266,6 +344,9 @@ function emptyDimensions(): Record<NarrativeEvalDimension, number> {
     branchDistinctness: 0,
     consequenceSpecificity: 0,
     repetitionControl: 0,
+    characterConsistency: 0,
+    localeAlignment: 0,
+    sceneProgression: 0,
   };
 }
 

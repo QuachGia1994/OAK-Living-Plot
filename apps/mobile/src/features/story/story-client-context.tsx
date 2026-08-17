@@ -5,23 +5,32 @@ import type { StoryExperienceClient } from './contracts';
 import { AuthRequiredStoryExperienceClient, HttpStoryExperienceClient } from './http-client';
 import { PreviewStoryExperienceClient } from './preview-client';
 
-const previewClient = new PreviewStoryExperienceClient();
+const previewClients = new Map<'en' | 'vi', PreviewStoryExperienceClient>();
+const defaultPreviewClient = previewClientFor('en');
 const authRequiredClient = new AuthRequiredStoryExperienceClient();
-const StoryClientContext = createContext<StoryExperienceClient>(previewClient);
+const StoryClientContext = createContext<StoryExperienceClient>(defaultPreviewClient);
 
 export function StoryExperienceClientProvider({ children }: { children: ReactNode }) {
   const auth = useMobileAuth();
   const { preferences } = useUserPreferences();
   const apiBaseUrl = process.env.EXPO_PUBLIC_LIVING_PLOT_API_URL?.trim() ?? '';
   const client = useMemo<StoryExperienceClient>(() => {
-    if (!apiBaseUrl || !auth.configured) return previewClient;
+    if (!apiBaseUrl || !auth.configured) return previewClientFor(preferences.uiLocale);
     if (!auth.isLoaded || !auth.isSignedIn) return authRequiredClient;
     return new HttpStoryExperienceClient(apiBaseUrl, auth.getToken, fetch, preferences.storyLocale);
-  }, [apiBaseUrl, auth.configured, auth.getToken, auth.isLoaded, auth.isSignedIn, preferences.storyLocale]);
+  }, [apiBaseUrl, auth.configured, auth.getToken, auth.isLoaded, auth.isSignedIn, preferences.storyLocale, preferences.uiLocale]);
 
   return <StoryClientContext.Provider value={client}>{children}</StoryClientContext.Provider>;
 }
 
 export function useStoryExperienceClient(): StoryExperienceClient {
   return useContext(StoryClientContext);
+}
+
+function previewClientFor(locale: 'en' | 'vi'): PreviewStoryExperienceClient {
+  const existing = previewClients.get(locale);
+  if (existing) return existing;
+  const client = new PreviewStoryExperienceClient(locale);
+  previewClients.set(locale, client);
+  return client;
 }

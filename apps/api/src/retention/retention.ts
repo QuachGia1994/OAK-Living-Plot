@@ -1,38 +1,61 @@
 import type { LiveStoryDailyPrompt, LiveStoryRetention } from '../live-story/contracts';
+import type { UiLocale } from '../preferences/contracts';
 
 export interface RetentionActivityDay {
   utcDay: string;
   choicesMade: number;
 }
 
-const DAILY_PROMPTS: readonly LiveStoryDailyPrompt[] = [
+interface LocalizedDailyPrompt {
+  label: Record<UiLocale, string>;
+  premise: Record<UiLocale, string>;
+  mood: LiveStoryDailyPrompt['mood'];
+  characterName: string;
+}
+
+const DAILY_PROMPTS: readonly LocalizedDailyPrompt[] = [
   {
-    label: 'A message at the wrong time',
-    premise: 'A voice note arrives from someone who should have no way to contact you, and it contains one detail only you would recognize.',
+    label: { en: 'A message at the wrong time', vi: 'Tin nhắn sai thời điểm' },
+    premise: {
+      en: 'A voice note arrives from someone who should have no way to contact you, and it contains one detail only you would recognize.',
+      vi: 'Một tin nhắn thoại đến từ người lẽ ra không thể liên lạc với bạn, và nó chứa một chi tiết chỉ bạn mới nhận ra.',
+    },
     mood: 'mysterious',
     characterName: 'Mina',
   },
   {
-    label: 'One seat left',
-    premise: 'At a wedding dinner, the only empty seat is beside the person you promised yourself you would never speak to again.',
+    label: { en: 'One seat left', vi: 'Chỉ còn một chỗ trống' },
+    premise: {
+      en: 'At a wedding dinner, the only empty seat is beside the person you promised yourself you would never speak to again.',
+      vi: 'Trong bữa tiệc cưới, chỗ trống duy nhất nằm cạnh người mà bạn từng tự hứa sẽ không bao giờ nói chuyện lại.',
+    },
     mood: 'romantic',
     characterName: 'Kai',
   },
   {
-    label: 'The favor comes due',
-    premise: 'A friend who once saved your career asks for one favor that could destroy somebody else’s life.',
+    label: { en: 'The favor comes due', vi: 'Đến lúc trả món nợ ân tình' },
+    premise: {
+      en: 'A friend who once saved your career asks for one favor that could destroy somebody else’s life.',
+      vi: 'Một người bạn từng cứu sự nghiệp của bạn nhờ một việc có thể phá hủy cuộc đời của người khác.',
+    },
     mood: 'tense',
     characterName: 'Noah',
   },
   {
-    label: 'The room behind the wall',
-    premise: 'Renovation work reveals a sealed room in your childhood home, and your name is written on the inside of the door.',
+    label: { en: 'The room behind the wall', vi: 'Căn phòng sau bức tường' },
+    premise: {
+      en: 'Renovation work reveals a sealed room in your childhood home, and your name is written on the inside of the door.',
+      vi: 'Việc sửa nhà làm lộ một căn phòng bị niêm kín trong ngôi nhà thời thơ ấu, và tên bạn được viết ở mặt trong cánh cửa.',
+    },
     mood: 'mysterious',
     characterName: 'Linh',
   },
   {
-    label: 'A second chance with a cost',
-    premise: 'You are offered the exact opportunity you lost years ago, but accepting it means leaving one person behind tonight.',
+    label: { en: 'A second chance with a cost', vi: 'Cơ hội thứ hai có cái giá' },
+    premise: {
+      en: 'You are offered the exact opportunity you lost years ago, but accepting it means leaving one person behind tonight.',
+      vi: 'Bạn được trao lại đúng cơ hội đã đánh mất nhiều năm trước, nhưng nhận nó đồng nghĩa phải bỏ lại một người ngay tối nay.',
+    },
     mood: 'hopeful',
     characterName: 'Ari',
   },
@@ -42,6 +65,7 @@ export function buildRetentionSnapshot(
   days: readonly RetentionActivityDay[],
   activePlots: number,
   nowMs: number,
+  uiLocale: UiLocale = 'en',
 ): LiveStoryRetention {
   const normalized = [...days]
     .filter((day) => /^\d{4}-\d{2}-\d{2}$/u.test(day.utcDay) && Number.isInteger(day.choicesMade) && day.choicesMade > 0)
@@ -51,13 +75,19 @@ export function buildRetentionSnapshot(
     currentStreakDays: currentStreak(normalized.map((day) => day.utcDay), utcDay),
     choicesMade: normalized.reduce((total, day) => total + day.choicesMade, 0),
     activePlots,
-    dailyPrompt: promptForUtcDay(utcDay),
+    dailyPrompt: promptForUtcDay(utcDay, uiLocale),
   };
 }
 
-export function promptForUtcDay(utcDay: string): LiveStoryDailyPrompt {
+export function promptForUtcDay(utcDay: string, uiLocale: UiLocale = 'en'): LiveStoryDailyPrompt {
   const index = hash(utcDay) % DAILY_PROMPTS.length;
-  return DAILY_PROMPTS[index];
+  const prompt = DAILY_PROMPTS[index];
+  return {
+    label: prompt.label[uiLocale],
+    premise: prompt.premise[uiLocale],
+    mood: prompt.mood,
+    characterName: prompt.characterName,
+  };
 }
 
 function currentStreak(days: readonly string[], today: string): number {

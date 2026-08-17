@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
+import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { StoryHistorySnapshot } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
@@ -8,24 +9,25 @@ import { colors, spacing } from '@/ui/theme';
 
 export default function StoryHistoryScreen() {
   const router = useRouter();
+  const { locale, t } = useUiCopy();
   const params = useLocalSearchParams<{ plotId?: string | string[] }>();
   const plotId = useMemo(() => readParam(params.plotId), [params.plotId]);
   const client = useStoryExperienceClient();
   const [history, setHistory] = useState<StoryHistorySnapshot | null>(null);
-  const [error, setError] = useState<string | null>(plotId ? null : 'This history link is missing its plot identifier.');
+  const [error, setError] = useState<string | null>(plotId ? null : t('This history link is missing its plot identifier.', 'Liên kết lịch sử thiếu mã cốt truyện.'));
 
   const load = useCallback(async () => {
     if (!plotId) {
-      setError('This history link is missing its plot identifier.');
+      setError(t('This history link is missing its plot identifier.', 'Liên kết lịch sử thiếu mã cốt truyện.'));
       return;
     }
     setError(null);
     try {
       setHistory(await client.loadHistory(plotId));
     } catch {
-      setError('Canonical story history could not be loaded.');
+      setError(t('Canonical story history could not be loaded.', 'Không thể tải lịch sử câu chuyện chuẩn.'));
     }
-  }, [client, plotId]);
+  }, [client, plotId, t]);
 
   useEffect(() => {
     if (!plotId) return;
@@ -37,30 +39,30 @@ export default function StoryHistoryScreen() {
         setError(null);
       })
       .catch(() => {
-        if (active) setError('Canonical story history could not be loaded.');
+        if (active) setError(t('Canonical story history could not be loaded.', 'Không thể tải lịch sử câu chuyện chuẩn.'));
       });
     return () => { active = false; };
-  }, [client, plotId]);
+  }, [client, plotId, t]);
 
   return (
     <Screen>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton
-          label="Back to story"
+          label={t('Back to story', 'Quay lại câu chuyện')}
           variant="ghost"
           onPress={() => plotId ? router.replace({ pathname: '/story', params: { plotId } }) : router.replace('/')}
         />
       </View>
 
       <View style={styles.hero}>
-        <Eyebrow>Previously on Living Plot</Eyebrow>
-        <Text style={styles.title}>{history?.title ?? 'Story so far'}</Text>
-        <Text style={styles.body}>Every episode and choice you locked in is kept here, so you can remember how the drama got to this point.</Text>
+        <Eyebrow>{t('Previously on Living Plot', 'Trước đó trên Living Plot')}</Eyebrow>
+        <Text style={styles.title}>{history?.title ?? t('Story so far', 'Câu chuyện đến đây')}</Text>
+        <Text style={styles.body}>{t('Every episode and choice you locked in is kept here, so you can remember how the drama got to this point.', 'Mỗi tập và lựa chọn đã chốt đều được giữ ở đây để bạn nhớ drama đã đi đến điểm này thế nào.')}</Text>
       </View>
 
-      {error ? <ErrorState title="Recap unavailable" message={error} onRetry={() => void load()} /> : null}
-      {!history && !error ? <LoadingState label="Building your story recap…" /> : null}
+      {error ? <ErrorState title={t('Recap unavailable', 'Tóm tắt không khả dụng')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
+      {!history && !error ? <LoadingState label={t('Building your story recap…', 'Đang dựng lại tóm tắt câu chuyện…')} /> : null}
 
       {history ? (
         <View style={styles.timeline}>
@@ -68,17 +70,17 @@ export default function StoryHistoryScreen() {
             <Card key={item.episodeId}>
               <View style={styles.row}>
                 <Pill tone={item.status === 'choice_committed' ? 'success' : 'accent'}>EP {item.episodeNumber}</Pill>
-                <Text style={styles.status}>{item.status === 'choice_committed' ? 'Choice locked in' : 'Current episode'}</Text>
+                <Text style={styles.status}>{item.status === 'choice_committed' ? t('Choice locked in', 'Đã chốt lựa chọn') : t('Current episode', 'Tập hiện tại')}</Text>
               </View>
               <Text style={styles.episodeTitle}>{item.title}</Text>
               <Text style={styles.body}>{item.summary}</Text>
               {item.choiceLabel ? (
                 <View style={styles.choiceBlock}>
-                  <Text style={styles.choiceLabel}>Choice {item.choiceKey}: {item.choiceLabel}</Text>
+                  <Text style={styles.choiceLabel}>{t(`Choice ${item.choiceKey}:`, `Lựa chọn ${item.choiceKey}:`)} {item.choiceLabel}</Text>
                   {item.consequence ? <Text style={styles.consequence}>{item.consequence}</Text> : null}
                 </View>
               ) : (
-                <Text style={styles.pending}>You have not locked in a choice for this episode yet.</Text>
+                <Text style={styles.pending}>{t('You have not locked in a choice for this episode yet.', 'Bạn chưa chốt lựa chọn cho tập này.')}</Text>
               )}
             </Card>
           ))}

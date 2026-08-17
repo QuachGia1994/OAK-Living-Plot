@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
+import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { StoryLibrarySnapshot, StoryPlotSummary } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
@@ -8,6 +9,7 @@ import { colors, spacing } from '@/ui/theme';
 
 export default function StoryLibraryScreen() {
   const router = useRouter();
+  const { locale, t } = useUiCopy();
   const client = useStoryExperienceClient();
   const [snapshot, setSnapshot] = useState<StoryLibrarySnapshot | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -18,9 +20,9 @@ export default function StoryLibraryScreen() {
     try {
       setSnapshot(await client.loadLibrary());
     } catch {
-      setError('Your story library could not be loaded. Canonical plot state is unchanged.');
+      setError(t('Your story library could not be loaded. Canonical plot state is unchanged.', 'Không thể tải thư viện câu chuyện. Trạng thái cốt truyện chuẩn không thay đổi.'));
     }
-  }, [client]);
+  }, [client, t]);
 
   useEffect(() => {
     let active = true;
@@ -31,10 +33,10 @@ export default function StoryLibraryScreen() {
         setError(null);
       })
       .catch(() => {
-        if (active) setError('Your story library could not be loaded. Canonical plot state is unchanged.');
+        if (active) setError(t('Your story library could not be loaded. Canonical plot state is unchanged.', 'Không thể tải thư viện câu chuyện. Trạng thái cốt truyện chuẩn không thay đổi.'));
       });
     return () => { active = false; };
-  }, [client]);
+  }, [client, t]);
 
   async function change(plot: StoryPlotSummary, action: 'archive' | 'restore') {
     setBusyId(plot.id);
@@ -44,7 +46,7 @@ export default function StoryLibraryScreen() {
       else await client.restorePlot(plot.id);
       await load();
     } catch {
-      setError(`This plot could not be ${action === 'archive' ? 'archived' : 'restored'}.`);
+      setError(action === 'archive' ? t('This plot could not be paused.', 'Không thể tạm dừng cốt truyện này.') : t('This plot could not be restored.', 'Không thể khôi phục cốt truyện này.'));
     } finally {
       setBusyId(null);
     }
@@ -54,34 +56,36 @@ export default function StoryLibraryScreen() {
     <Screen>
       <View style={styles.topBar}>
         <BrandMark />
-        <ActionButton label="Home" variant="ghost" onPress={() => router.replace('/')} />
+        <ActionButton label={sharedUiCopy.home[locale]} variant="ghost" onPress={() => router.replace('/')} />
       </View>
       <View style={styles.hero}>
-        <Eyebrow>My stories</Eyebrow>
-        <Text style={styles.title}>Every plot you’ve started.</Text>
-        <Text style={styles.body}>Keep current dramas active, or pause older ones and bring them back whenever you want.</Text>
+        <Eyebrow>{t('My stories', 'Câu chuyện của tôi')}</Eyebrow>
+        <Text style={styles.title}>{t('Every plot you’ve started.', 'Mọi cốt truyện bạn đã bắt đầu.')}</Text>
+        <Text style={styles.body}>{t('Keep current dramas active, or pause older ones and bring them back whenever you want.', 'Giữ drama hiện tại hoạt động, hoặc tạm dừng chuyện cũ và khôi phục bất cứ lúc nào.')}</Text>
       </View>
 
-      {error ? <ErrorState title="My Stories could not update" message={error} onRetry={() => void load()} /> : null}
-      {!snapshot && !error ? <LoadingState label="Opening My Stories…" /> : null}
+      {error ? <ErrorState title={t('My Stories could not update', 'Không thể cập nhật Câu chuyện của tôi')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
+      {!snapshot && !error ? <LoadingState label={t('Opening My Stories…', 'Đang mở Câu chuyện của tôi…')} /> : null}
 
       {snapshot ? (
         <>
           <LibrarySection
-            title="Active"
+            title={t('Active', 'Đang hoạt động')}
             plots={snapshot.active}
-            empty="No active plots yet."
+            empty={t('No active plots yet.', 'Chưa có cốt truyện hoạt động.')}
             action="archive"
             busyId={busyId}
+            t={t}
             onOpen={(plot) => router.push({ pathname: '/story', params: { plotId: plot.id } })}
             onChange={change}
           />
           <LibrarySection
-            title="Paused"
+            title={t('Paused', 'Đã tạm dừng')}
             plots={snapshot.archived}
-            empty="No paused stories."
+            empty={t('No paused stories.', 'Không có câu chuyện tạm dừng.')}
             action="restore"
             busyId={busyId}
+            t={t}
             onOpen={(plot) => router.push({ pathname: '/story', params: { plotId: plot.id, readOnly: '1' } })}
             onChange={change}
           />
@@ -91,12 +95,15 @@ export default function StoryLibraryScreen() {
   );
 }
 
+type Translate = (en: string, vi: string) => string;
+
 function LibrarySection({
   title,
   plots,
   empty,
   action,
   busyId,
+  t,
   onOpen,
   onChange,
 }: {
@@ -105,6 +112,7 @@ function LibrarySection({
   empty: string;
   action: 'archive' | 'restore';
   busyId: string | null;
+  t: Translate;
   onOpen: (plot: StoryPlotSummary) => void;
   onChange: (plot: StoryPlotSummary, action: 'archive' | 'restore') => void;
 }) {
@@ -124,10 +132,10 @@ function LibrarySection({
           <Text style={styles.plotTitle}>{plot.title}</Text>
           <Text style={styles.body} numberOfLines={2}>{plot.resumeLine}</Text>
           <View style={styles.actions}>
-            <View style={styles.actionGrow}><ActionButton label={action === 'archive' ? 'Continue' : 'Read latest'} variant="secondary" onPress={() => onOpen(plot)} /></View>
+            <View style={styles.actionGrow}><ActionButton label={action === 'archive' ? t('Continue', 'Tiếp tục') : t('Read latest', 'Đọc tập mới nhất')} variant="secondary" onPress={() => onOpen(plot)} /></View>
             <View style={styles.actionGrow}>
               <ActionButton
-                label={action === 'archive' ? 'Pause' : 'Restore'}
+                label={action === 'archive' ? t('Pause', 'Tạm dừng') : t('Restore', 'Khôi phục')}
                 variant="ghost"
                 busy={busyId === plot.id}
                 disabled={busyId !== null && busyId !== plot.id}

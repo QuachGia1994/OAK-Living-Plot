@@ -144,23 +144,33 @@ export function MotionReveal({ children, delay = 0 }: { children: ReactNode; del
   );
 }
 
-export function LoadingState({ label = 'Loading your story…' }: { label?: string }) {
+export function LoadingState({ label = 'Loading your story…', detail }: { label?: string; detail?: string }) {
   return (
     <View style={styles.stateWrap} accessibilityRole="progressbar" accessibilityLabel={label} accessibilityLiveRegion="polite">
       <ActivityIndicator size="large" color={colors.accent} />
       <Text style={styles.stateTitle}>{label}</Text>
-      <Text style={styles.stateBody}>Living Plot keeps the story state separate from the waiting screen.</Text>
+      {detail ? <Text style={styles.stateBody}>{detail}</Text> : null}
     </View>
   );
 }
 
-export function ErrorState({ title, message, onRetry }: { title: string; message: string; onRetry?: () => void }) {
+export function ErrorState({
+  title,
+  message,
+  onRetry,
+  retryLabel = 'Try again',
+}: {
+  title: string;
+  message: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+}) {
   return (
     <View accessibilityLiveRegion="assertive">
       <Card style={styles.errorCard}>
-      <Text style={styles.stateTitle}>{title}</Text>
-      <Text style={styles.stateBody}>{message}</Text>
-        {onRetry ? <ActionButton label="Try again" variant="secondary" onPress={onRetry} /> : null}
+        <Text style={styles.stateTitle}>{title}</Text>
+        <Text style={styles.stateBody}>{message}</Text>
+        {onRetry ? <ActionButton label={retryLabel} variant="secondary" onPress={onRetry} /> : null}
       </Card>
     </View>
   );

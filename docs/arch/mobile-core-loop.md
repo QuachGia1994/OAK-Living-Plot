@@ -6,7 +6,7 @@
 The Expo client owns presentation, transient selection/loading state, native audio playback, and navigation. Canonical plot, episode, choice, quota, entitlement, audio lifecycle, and retention history remain backend-owned.
 
 ## Routes
-- `/` presents recent/resumable plots, canonical quota projection, choice momentum, the UTC daily spark, and start/resume actions.
+- `/` presents recent/resumable plots, canonical quota projection, choice momentum, the UTC daily spark, and start/resume actions. A user with no active plots receives the daily spark as the fastest first-run path with all three setup decisions prefilled before the explicit generation action.
 - `/create` collects only premise, mood, and one main character. Daily-spark route params may prefill these fields, but the user may edit them before generation.
 - `/story?plotId=...` reads the latest canonical episode, selects/commits exactly one of three choices, displays the committed consequence, requests the continuation, and optionally generates/plays private narration.
 - `/plus` presents the Free/Plus quota hypothesis and the configured RevenueCat store mode without treating store state as entitlement authority.
@@ -44,6 +44,9 @@ The R2 object key and provider voice ID never reach mobile.
 ## Retention UX
 Home receives retention metadata derived from canonical choice history. It shows a descriptive choice streak, total committed choices, active plot count, per-plot `Previously:` resume lines, and one deterministic UTC daily spark. Streaks have no quota, pricing, or access effect.
 
+## Localization and first run
+The saved `uiLocale` (`en`/`vi`) drives core native product copy independently from each plot's persisted story locale. Validation, mood labels, auth, navigation/actions, library/history, Plus, Settings/Data, voice controls, and daily-spark copy switch with the UI preference; canonical episode text is never translated in place. A new user with no active plot sees a prefilled daily-spark path first and can still choose custom creation, so onboarding removes setup decisions without auto-generating or creating a hidden mutation.
+
 ## Visual system
 The mobile design stays dependency-light and token-driven:
 - cinematic dark surfaces and warm decision accent;
@@ -54,4 +57,4 @@ The mobile design stays dependency-light and token-driven:
 - Safe Area handling at the root and screen level.
 
 ## Verification
-Mobile tests cover setup validation, preview semantics, authenticated story DTO parsing, fresh bearer tokens, retry-key reuse, canonical resync after conflict, retention parsing, private audio request/status/playback-source authorization, RevenueCat Test Store selection, and backend entitlement refresh behavior. TypeScript, lint, Expo native prebuild/release build, and GitHub CI remain release gates.
+Mobile tests cover setup/localization validation, preview semantics, authenticated story DTO parsing, fresh bearer tokens, retry-key reuse, canonical resync after conflict, retention parsing, private audio request/status/playback-source authorization, RevenueCat Test Store selection, and backend entitlement refresh behavior. GitHub quality now also applies local D1 migrations and a Cloudflare development dry-run; iOS production export and Android native release APK are separate CI gates.

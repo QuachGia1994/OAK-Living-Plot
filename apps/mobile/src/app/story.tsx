@@ -5,6 +5,7 @@ import { EpisodeVoiceCard } from '@/features/audio/episode-voice-card';
 import type { StoryChoice, StoryPlotSession } from '@/features/story/contracts';
 import { StoryClientError } from '@/features/story/contracts';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
+import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeShareText } from '@/features/share/story-share';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
@@ -14,6 +15,7 @@ import { colors, radius, spacing } from '@/ui/theme';
 export default function StoryScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
+  const { locale, t } = useUiCopy();
   const storyExperienceClient = useStoryExperienceClient();
   const params = useLocalSearchParams<{ plotId?: string | string[]; readOnly?: string | string[] }>();
   const plotId = useMemo(() => readParam(params.plotId), [params.plotId]);
@@ -26,7 +28,7 @@ export default function StoryScreen() {
 
   const load = useCallback(async () => {
     if (!plotId) {
-      setError('This story link is missing its plot identifier.');
+      setError(t('This story link is missing its plot identifier.', 'Liên kết câu chuyện thiếu mã cốt truyện.'));
       setLoading(false);
       return;
     }
@@ -36,11 +38,11 @@ export default function StoryScreen() {
     try {
       setSession(await storyExperienceClient.loadPlot(plotId));
     } catch (caught) {
-      setError(messageForError(caught, 'This story could not be resumed.'));
+      setError(messageForError(caught, locale, t('This story could not be resumed.', 'Không thể tiếp tục câu chuyện này.')));
     } finally {
       setLoading(false);
     }
-  }, [plotId, storyExperienceClient]);
+  }, [locale, plotId, storyExperienceClient, t]);
 
   const refresh = useCallback(async () => {
     if (!plotId || (auth.configured && (!auth.isLoaded || !auth.isSignedIn))) return;
@@ -48,9 +50,9 @@ export default function StoryScreen() {
       setSession(await storyExperienceClient.loadPlot(plotId));
       setError(null);
     } catch (caught) {
-      setError(messageForError(caught, 'This story could not be refreshed.'));
+      setError(messageForError(caught, locale, t('This story could not be refreshed.', 'Không thể làm mới câu chuyện này.')));
     }
-  }, [auth.configured, auth.isLoaded, auth.isSignedIn, plotId, storyExperienceClient]);
+  }, [auth.configured, auth.isLoaded, auth.isSignedIn, locale, plotId, storyExperienceClient, t]);
 
   useRefreshOnForeground(refresh);
 
@@ -66,7 +68,7 @@ export default function StoryScreen() {
       })
       .catch((caught: unknown) => {
         if (!active) return;
-        setError(messageForError(caught, 'This story could not be resumed.'));
+        setError(messageForError(caught, locale, t('This story could not be resumed.', 'Không thể tiếp tục câu chuyện này.')));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -74,7 +76,7 @@ export default function StoryScreen() {
     return () => {
       active = false;
     };
-  }, [auth.configured, auth.isLoaded, auth.isSignedIn, plotId, storyExperienceClient]);
+  }, [auth.configured, auth.isLoaded, auth.isSignedIn, locale, plotId, storyExperienceClient, t]);
 
   async function commitChoice() {
     if (!session || !selectedChoiceId) return;
@@ -89,7 +91,7 @@ export default function StoryScreen() {
       setSession(updated);
       setSelectedChoiceId(null);
     } catch (caught) {
-      setError(messageForError(caught, 'The choice could not be committed. Try again without changing your selection.'));
+      setError(messageForError(caught, locale, t('The choice could not be committed. Try again without changing your selection.', 'Không thể chốt lựa chọn. Hãy thử lại mà không đổi lựa chọn.')));
     } finally {
       setBusyAction(null);
     }
@@ -103,7 +105,7 @@ export default function StoryScreen() {
       setSession(await storyExperienceClient.requestNextEpisode(session.id));
       setSelectedChoiceId(null);
     } catch (caught) {
-      setError(messageForError(caught, 'The next episode could not be prepared. Your committed choice is still safe.'));
+      setError(messageForError(caught, locale, t('The next episode could not be prepared. Your committed choice is still safe.', 'Không thể chuẩn bị tập tiếp theo. Lựa chọn đã chốt vẫn an toàn.')));
     } finally {
       setBusyAction(null);
     }
@@ -114,11 +116,11 @@ export default function StoryScreen() {
       <Screen>
         <BrandMark />
         <ErrorState
-          title={auth.isLoaded ? 'Sign in to continue this story' : 'Opening your account…'}
-          message="Sign in so Living Plot can remember your past choices and continue from the right scene."
+          title={auth.isLoaded ? t('Sign in to continue this story', 'Đăng nhập để tiếp tục câu chuyện') : t('Opening your account…', 'Đang mở tài khoản…')}
+          message={t('Sign in so Living Plot can remember your past choices and continue from the right scene.', 'Đăng nhập để Living Plot nhớ các lựa chọn trước và tiếp tục đúng cảnh.')}
         />
-        {auth.isLoaded ? <ActionButton label="Sign in with email code" onPress={() => router.replace('/auth')} /> : null}
-        <ActionButton label="Back to home" variant="ghost" onPress={() => router.replace('/')} />
+        {auth.isLoaded ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} onPress={() => router.replace('/auth')} /> : null}
+        <ActionButton label={t('Back to home', 'Về trang chủ')} variant="ghost" onPress={() => router.replace('/')} />
       </Screen>
     );
   }
@@ -127,8 +129,8 @@ export default function StoryScreen() {
     return (
       <Screen>
         <BrandMark />
-        <ErrorState title="Story unavailable" message="This story link is missing its plot identifier." />
-        <ActionButton label="Back to home" variant="ghost" onPress={() => router.replace('/')} />
+        <ErrorState title={t('Story unavailable', 'Câu chuyện không khả dụng')} message={t('This story link is missing its plot identifier.', 'Liên kết câu chuyện thiếu mã cốt truyện.')} />
+        <ActionButton label={t('Back to home', 'Về trang chủ')} variant="ghost" onPress={() => router.replace('/')} />
       </Screen>
     );
   }
@@ -137,7 +139,7 @@ export default function StoryScreen() {
     return (
       <Screen>
         <BrandMark />
-        <LoadingState label="Opening your latest episode…" />
+        <LoadingState label={t('Opening your latest episode…', 'Đang mở tập mới nhất…')} />
       </Screen>
     );
   }
@@ -146,8 +148,8 @@ export default function StoryScreen() {
     return (
       <Screen>
         <BrandMark />
-        <ErrorState title="Story unavailable" message={error ?? 'This story could not be loaded.'} onRetry={() => void load()} />
-        <ActionButton label="Back to home" variant="ghost" onPress={() => router.replace('/')} />
+        <ErrorState title={t('Story unavailable', 'Câu chuyện không khả dụng')} message={error ?? t('This story could not be loaded.', 'Không thể tải câu chuyện này.')} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} />
+        <ActionButton label={t('Back to home', 'Về trang chủ')} variant="ghost" onPress={() => router.replace('/')} />
       </Screen>
     );
   }
@@ -162,28 +164,28 @@ export default function StoryScreen() {
         <BrandMark />
         <View style={styles.topActions}>
           <ActionButton
-            label="Share"
+            label={t('Share', 'Chia sẻ')}
             variant="ghost"
             onPress={() => void Share.share({ message: buildSpoilerSafeShareText({ title: session.title, episodeNumber: episode.number, premise: session.premise }) })}
           />
-          <ActionButton label="History" variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
-          <ActionButton label="All plots" variant="ghost" onPress={() => router.replace('/')} />
+          <ActionButton label={t('History', 'Lịch sử')} variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
+          <ActionButton label={t('All plots', 'Tất cả cốt truyện')} variant="ghost" onPress={() => router.replace('/')} />
         </View>
       </View>
 
       <View style={styles.plotHeader}>
         <View style={styles.plotMetaRow}>
           <Pill tone={awaitingChoice ? 'accent' : 'success'}>
-            {awaitingChoice ? 'Your move' : 'Choice locked in'}
+            {awaitingChoice ? t('Your move', 'Lượt của bạn') : t('Choice locked in', 'Đã chốt lựa chọn')}
           </Pill>
-          <Text style={styles.episodeNumber}>EPISODE {episode.number}</Text>
+          <Text style={styles.episodeNumber}>EP {episode.number}</Text>
         </View>
         <Text style={styles.plotTitle}>{session.title}</Text>
         <Text style={styles.plotMeta}>{session.characterName} · {session.mood}</Text>
       </View>
 
       <View style={styles.episodeBlock}>
-        <Eyebrow>Episode {episode.number}</Eyebrow>
+        <Eyebrow>{t(`Episode ${episode.number}`, `Tập ${episode.number}`)}</Eyebrow>
         <Text style={styles.episodeTitle}>{episode.title}</Text>
         <Text style={styles.episodeBody}>{episode.body}</Text>
       </View>
@@ -192,27 +194,28 @@ export default function StoryScreen() {
 
       {error ? (
         <ErrorState
-          title="That action didn’t finish"
+          title={t('That action didn’t finish', 'Thao tác chưa hoàn tất')}
           message={error}
+          retryLabel={sharedUiCopy.tryAgain[locale]}
           onRetry={selectedChoiceId ? () => void commitChoice() : undefined}
         />
       ) : null}
 
       {readOnly ? (
         <Card style={styles.readOnlyCard}>
-          <Eyebrow>Archived story</Eyebrow>
-          <Text style={styles.readOnlyTitle}>This story is paused.</Text>
-          <Text style={styles.commitEmpty}>Restore it from My Stories when you want to make another choice or continue the next episode.</Text>
-          <ActionButton label="Open story library" variant="secondary" onPress={() => router.push('/library')} />
+          <Eyebrow>{t('Archived story', 'Câu chuyện đã tạm dừng')}</Eyebrow>
+          <Text style={styles.readOnlyTitle}>{t('This story is paused.', 'Câu chuyện này đang tạm dừng.')}</Text>
+          <Text style={styles.commitEmpty}>{t('Restore it from My Stories when you want to make another choice or continue the next episode.', 'Khôi phục từ Câu chuyện của tôi khi bạn muốn chọn tiếp hoặc sang tập mới.')}</Text>
+          <ActionButton label={t('Open story library', 'Mở thư viện câu chuyện')} variant="secondary" onPress={() => router.push('/library')} />
         </Card>
       ) : awaitingChoice ? (
         <View style={styles.choiceSection}>
           <View style={styles.choiceHeading}>
             <View style={styles.choiceHeadingText}>
-              <Eyebrow>Choose the next turn</Eyebrow>
-              <Text style={styles.choiceTitle}>What should {session.characterName} do?</Text>
+              <Eyebrow>{t('Choose the next turn', 'Chọn bước ngoặt tiếp theo')}</Eyebrow>
+              <Text style={styles.choiceTitle}>{t(`What should ${session.characterName} do?`, `${session.characterName} nên làm gì?`)}</Text>
             </View>
-            <Pill>Choose 1 of 3</Pill>
+            <Pill>{t('Choose 1 of 3', 'Chọn 1 trong 3')}</Pill>
           </View>
 
           <View style={styles.choiceList}>
@@ -222,6 +225,7 @@ export default function StoryScreen() {
                 choice={choice}
                 selected={choice.id === selectedChoiceId}
                 disabled={busyAction !== null}
+                t={t}
                 onPress={() => setSelectedChoiceId(choice.id)}
               />
             ))}
@@ -230,15 +234,15 @@ export default function StoryScreen() {
           <Card style={styles.commitCard}>
             {selectedChoice ? (
               <>
-                <Text style={styles.commitLabel}>Your pick</Text>
+                <Text style={styles.commitLabel}>{t('Your pick', 'Lựa chọn của bạn')}</Text>
                 <Text style={styles.commitChoice}>{selectedChoice.label}</Text>
-                <Text style={styles.commitIntent}>Intent: {selectedChoice.intent}</Text>
+                <Text style={styles.commitIntent}>{t('Intent:', 'Ý định:')} {selectedChoice.intent}</Text>
               </>
             ) : (
-              <Text style={styles.commitEmpty}>Pick A, B or C. You can still change your mind before locking it in.</Text>
+              <Text style={styles.commitEmpty}>{t('Pick A, B or C. You can still change your mind before locking it in.', 'Chọn A, B hoặc C. Bạn vẫn có thể đổi ý trước khi chốt.')}</Text>
             )}
             <ActionButton
-              label="Lock in this choice"
+              label={t('Lock in this choice', 'Chốt lựa chọn này')}
               busy={busyAction === 'commit'}
               disabled={!selectedChoice}
               onPress={() => void commitChoice()}
@@ -248,17 +252,17 @@ export default function StoryScreen() {
       ) : (
         <View style={styles.consequenceSection}>
           <Card style={styles.consequenceCard}>
-            <Eyebrow>The consequence</Eyebrow>
-            <Text style={styles.consequenceTitle}>That choice changed what happens next.</Text>
+            <Eyebrow>{t('The consequence', 'Hậu quả')}</Eyebrow>
+            <Text style={styles.consequenceTitle}>{t('That choice changed what happens next.', 'Lựa chọn đó đã thay đổi điều xảy ra tiếp theo.')}</Text>
             <Text style={styles.consequenceBody}>{episode.committedConsequence}</Text>
           </Card>
           <ActionButton
-            label={`Continue to episode ${episode.number + 1}`}
+            label={t(`Continue to episode ${episode.number + 1}`, `Tiếp tục tới tập ${episode.number + 1}`)}
             busy={busyAction === 'next'}
             onPress={() => void requestNextEpisode()}
           />
           <Text style={styles.nextNote}>
-            The next episode continues directly from the consequence you just created.
+            {t('The next episode continues directly from the consequence you just created.', 'Tập tiếp theo tiếp tục trực tiếp từ hậu quả bạn vừa tạo ra.')}
           </Text>
         </View>
       )}
@@ -266,21 +270,25 @@ export default function StoryScreen() {
   );
 }
 
+type Translate = (en: string, vi: string) => string;
+
 function ChoiceCard({
   choice,
   selected,
   disabled,
+  t,
   onPress,
 }: {
   choice: StoryChoice;
   selected: boolean;
   disabled: boolean;
+  t: Translate;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Choice ${choice.key}: ${choice.label}`}
+      accessibilityLabel={t(`Choice ${choice.key}: ${choice.label}`, `Lựa chọn ${choice.key}: ${choice.label}`)}
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -306,14 +314,15 @@ function readParam(value: string | string[] | undefined): string | null {
   return value?.trim() || null;
 }
 
-function messageForError(error: unknown, fallback: string): string {
+function messageForError(error: unknown, locale: 'en' | 'vi', fallback: string): string {
   if (!(error instanceof StoryClientError)) return fallback;
-  if (error.code === 'choice_conflict') return 'A different choice is already canonical for this episode. Resume to see it.';
-  if (error.code === 'choice_required') return 'Choose and commit one action before requesting the next episode.';
-  if (error.code === 'not_found') return 'This plot or choice no longer matches the current story state.';
-  if (error.code === 'auth_required') return 'Sign in again before continuing this canonical story.';
-  if (error.code === 'quota_exceeded') return 'Today’s text episode allowance is exhausted. It resets at 00:00 UTC.';
-  if (error.code === 'provider_unavailable') return 'Story generation is temporarily unavailable. Your canonical state is unchanged.';
+  const vi = locale === 'vi';
+  if (error.code === 'choice_conflict') return vi ? 'Một lựa chọn khác đã là bản chuẩn của tập này. Tải lại để xem.' : 'A different choice is already canonical for this episode. Resume to see it.';
+  if (error.code === 'choice_required') return vi ? 'Chọn và chốt một hành động trước khi yêu cầu tập tiếp theo.' : 'Choose and commit one action before requesting the next episode.';
+  if (error.code === 'not_found') return vi ? 'Cốt truyện hoặc lựa chọn này không còn khớp trạng thái hiện tại.' : 'This plot or choice no longer matches the current story state.';
+  if (error.code === 'auth_required') return vi ? 'Đăng nhập lại trước khi tiếp tục câu chuyện chuẩn.' : 'Sign in again before continuing this canonical story.';
+  if (error.code === 'quota_exceeded') return vi ? 'Bạn đã dùng hết lượt tập chữ hôm nay. Hạn mức đặt lại lúc 00:00 UTC.' : 'Today’s text episode allowance is exhausted. It resets at 00:00 UTC.';
+  if (error.code === 'provider_unavailable') return vi ? 'Tạo truyện tạm thời không khả dụng. Trạng thái chuẩn của bạn không thay đổi.' : 'Story generation is temporarily unavailable. Your canonical state is unchanged.';
   return fallback;
 }
 

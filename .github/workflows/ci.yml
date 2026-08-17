@@ -36,6 +36,41 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Apply D1 migrations locally
+        run: npm --workspace @living-plot/api run db:migrate:local
+
+      - name: Validate Cloudflare development bundle
+        run: npx wrangler deploy --dry-run --env development
+        working-directory: apps/api
+
+  ios-static:
+    if: github.event_name != 'pull_request'
+    needs: quality
+    runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      EXPO_PUBLIC_LIVING_PLOT_API_URL: ${{ vars.EXPO_PUBLIC_LIVING_PLOT_API_URL }}
+      EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY }}
+      EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY }}
+      EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY }}
+      NODE_ENV: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Export iOS production bundle
+        run: npx expo export --platform ios --output-dir dist-ios
+        working-directory: apps/mobile
+
   android-apk:
     if: github.event_name != 'pull_request'
     needs: quality

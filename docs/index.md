@@ -8,16 +8,16 @@
 - [Phase 1 episode publication boundary](arch/episode-publication.md) — atomic D1 publish, generation-key idempotency, and optimistic version guards.
 - [Phase 1 choice-commit boundary](arch/choice-commit.md) — canonical state v2, choice idempotency, state application, and commit concurrency.
 - [Phase 1 quota ledger](arch/quota-ledger.md) — UTC daily limits, atomic reservations, terminal transitions, and reconciliation.
-- [Phase 1 mobile core loop](arch/mobile-core-loop.md) — Expo onboarding, episode, exactly-three-choice, consequence, next-episode, and resume UI boundary.
+- [Phase 1 mobile core loop](arch/mobile-core-loop.md) — Expo localized first-run, episode, exactly-three-choice, consequence, next-episode, and resume UI boundary.
 - [Phase 1 TTS and private audio](arch/tts-audio.md) — Google OAuth/TTS, Queue/DLQ processing, voice quota, and private R2 delivery.
 - [Phase 1 RevenueCat entitlements](arch/revenuecat-entitlements.md) — verified webhook/provider sync, D1 Free/Plus authority, and mobile paywall/restore trust boundary.
 - [Phase 1 analytics and AI cost telemetry](arch/analytics-cost.md) — privacy-safe Analytics Engine schema, fail-open semantics, retry-aware Gemini token usage, and exact nano-USD rate-card arithmetic.
-- [Phase 1 narrative quality evaluations](arch/narrative-evals.md) — deterministic continuity/branch/consequence/repetition fixtures and adversarial regression thresholds.
+- [Phase 1 narrative quality evaluations](arch/narrative-evals.md) — deterministic continuity/thread/branch/consequence/repetition/protagonist/locale/progression fixtures and adversarial regression thresholds.
 - [Phase 1 mobile auth and live story](arch/mobile-auth-live-story.md) — Clerk email OTP, internal identity, protected core-loop HTTP routes, retry convergence, and shared billing trust chain.
 - [Phase 1 retention loop](arch/retention.md) — canonical choice-history streaks, resume context, deterministic UTC daily sparks, and anti-dark-pattern guardrails.
 - [Phase 1 story library and history](arch/story-library-history.md) — reversible archive/restore lifecycle, owner-scoped library, and canonical read-only recap.
 - [Phase 1 mobile resilience and accessibility](arch/mobile-resilience.md) — bounded authenticated networking, safe GET retry, foreground refresh, UI recovery, and accessibility behavior.
-- [Phase 1 preferences and account data](arch/account-data-preferences.md) — story/narrator defaults, spoiler-safe sharing, portable export, fail-closed application-data erasure, and safe diagnostics.
+- [Phase 1 preferences and account data](arch/account-data-preferences.md) — EN/VI interface plus story/narrator defaults, spoiler-safe sharing, portable export, fail-closed application-data erasure, and safe diagnostics.
 - [Live development setup](ref/live-development.md) — secret-safe readiness checks, non-production Cloudflare environment, and mobile/provider configuration.
 - [Foundation implementation slice 1](plan/done/foundation-slice1.md) — completed workspace/CI foundation and verification evidence.
 - [D1 implementation slice 2](plan/done/d1-slice2.md) — completed D1/domain baseline and verification evidence.
@@ -48,3 +48,4 @@
 - [Account export slice 28](plan/done/account-export-slice28.md) — completed owner-scoped portable application-data export with explicit privacy exclusions.
 - [Account erasure slice 29](plan/done/account-erasure-slice29.md) — completed R2-first fail-closed Living Plot application-data deletion.
 - [Release-candidate diagnostics slice 30](plan/done/release-candidate-diagnostics-slice30.md) — completed safe runtime/privacy diagnostics surface without secret or story-content disclosure.
+- [Live beta slices 31–40](plan/done/live-beta-slices31-40.md) — localized/onboarding/narrative/retention/live-smoke/CI release-candidate batch with unavailable provider proof explicitly blocked.

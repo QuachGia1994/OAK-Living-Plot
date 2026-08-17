@@ -21,8 +21,10 @@ describe('retention snapshot', () => {
     expect(buildRetentionSnapshot([{ utcDay: '2026-08-15', choicesMade: 1 }], 1, now).currentStreakDays).toBe(0);
   });
 
-  it('uses a deterministic UTC daily prompt', () => {
+  it('uses a deterministic UTC daily prompt in the requested UI locale', () => {
     expect(promptForUtcDay('2026-08-17')).toEqual(promptForUtcDay('2026-08-17'));
     expect(promptForUtcDay('2026-08-17').premise.length).toBeGreaterThan(20);
+    expect(promptForUtcDay('2026-08-17', 'vi').label).not.toBe(promptForUtcDay('2026-08-17', 'en').label);
+    expect(buildRetentionSnapshot([], 0, now, 'vi').dailyPrompt).toEqual(promptForUtcDay('2026-08-17', 'vi'));
   });
 });

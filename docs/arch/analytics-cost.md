@@ -53,7 +53,10 @@ Slice 23 adds a second bounded event family for the Phase 1 value test. Events a
 - `plot_restored`;
 - `voice_requested` after new voice work is successfully queued.
 
-Product points contain only event name plus optional bounded mood, Free/Plus tier, and episode number. They contain no user/plot/episode/choice ID, premise, prompt, script, choice label, consequence, auth data, or credential. Product telemetry uses the same Analytics Engine binding and is fail-open.
+Product points contain only event name plus optional bounded mood, Free/Plus tier, episode number, and an episode-depth bucket (`episode_1`, `episodes_2_3`, `episodes_4_7`, `episode_8_plus`). They contain no user/plot/episode/choice ID, premise, prompt, script, choice label, consequence, auth data, or credential. Product telemetry uses the same Analytics Engine binding and is fail-open.
+
+## Retention aggregate
+`scripts/retention-summary.sql` computes aggregate activation/depth plus exact D1/D7 return counts from canonical D1 timestamps. The query may join on internal user IDs inside D1, but its output contains metric names and counts only; identifiers never leave the database. `npm run retention:summary:dev` intentionally targets the development D1 and requires real Cloudflare development resources/credentials before it can run remotely.
 
 ## Failure semantics
 Provider HTTP/network failures do not invent token usage or cost. Unknown model pricing or unsafe numeric input is dropped rather than estimated. Analytics Engine exceptions are swallowed at the observational boundary so generation results are unchanged.
@@ -61,4 +64,4 @@ Provider HTTP/network failures do not invent token usage or cost. Unknown model 
 A successful provider response with invalid story structure is still costed because tokens were consumed before validation rejected it. The existing aggregate token usage returned by `StoryGenerator` remains unchanged for downstream publication metadata.
 
 ## Deferred
-Remote Analytics Engine querying/dashboarding, remote Worker provisioning/deployment, and production cost-budget alerting remain later work.
+Remote Analytics Engine dashboarding, production Worker provisioning/deployment, and production cost-budget alerting remain later work.
