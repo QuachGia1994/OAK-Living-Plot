@@ -30,7 +30,7 @@ Copy `apps/mobile/.env.example` to a local `.env` and set the Clerk publishable 
 
 Start the local Worker. Copy `apps/api/.dev.vars.example` to an untracked `.dev.vars` file when exercising protected/provider routes. Clerk and Gemini values are required for their live paths; Google TTS additionally requires the service-account email and PKCS#8 private key. RevenueCat backend sync requires the server REST key, Plus entitlement identifier, webhook Authorization value, and HMAC signing secret. Automated provider tests inject boundaries and do not require live credentials. Run `npm run live:check:preview` to see which live values are absent without printing their contents; `npm run live:check` is the strict credential-readiness gate. Non-production remote setup is documented in `docs/ref/live-development.md`.
 
-The Worker also binds the `living_plot_events` Analytics Engine dataset. Story-generation telemetry contains provider/model/outcome, provider-reported token counts, pricing revision, and integer nano-USD cost only; it contains no story text or user identifier and is never an authorization or quota source.
+The Worker also binds the `living_plot_events` Analytics Engine dataset. Story-generation telemetry contains provider/model/outcome, provider-reported token counts, pricing revision, and integer nano-USD cost only. Product funnel telemetry records only newly canonical bounded events such as plot creation, committed choice, next episode, archive/restore, and fresh voice request. Neither telemetry family contains story text or user identifiers, and neither is an authorization or quota source.
 
 ```bash
 npm --workspace @living-plot/api run dev
@@ -43,6 +43,8 @@ npm --workspace @living-plot/api run db:migrate:local
 ```
 
 Focused narrative evaluation remains available with `npm --workspace @living-plot/api run eval:narrative`.
+
+The native client also exposes a reversible Story Library and a read-only Story So Far timeline. Authenticated GETs use bounded timeout/abort behavior and may retry once; POST mutations are never automatically retried.
 
 ## GitHub Android preview build
 

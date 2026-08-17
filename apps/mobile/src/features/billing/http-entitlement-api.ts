@@ -1,36 +1,40 @@
 import type { BackendEntitlement, EntitlementApi } from './contracts';
 import { BillingClientError } from './contracts';
+import { AuthenticatedJsonTransport, HttpTransportError, type FetchLike, type JsonHttpResponse } from '../../lib/http-transport';
 
 export class HttpEntitlementApi implements EntitlementApi {
-  constructor(private readonly apiBaseUrl: string) {}
+  constructor(
+    private readonly apiBaseUrl: string,
+    private readonly fetcher: FetchLike = fetch,
+    private readonly timeoutMs = 12_000,
+  ) {}
 
   async loadEntitlement(bearerToken: string): Promise<BackendEntitlement> {
     if (!this.apiBaseUrl.trim() || !bearerToken.trim()) {
       throw new BillingClientError('invalid_session', 'Backend URL and bearer token are required.');
     }
 
-    let response: Response;
+    const transport = new AuthenticatedJsonTransport(
+      this.apiBaseUrl,
+      async () => bearerToken,
+      this.fetcher,
+      this.timeoutMs,
+    );
+    let response: JsonHttpResponse;
     try {
-      response = await fetch(`${this.apiBaseUrl.replace(/\/$/, '')}/v1/entitlement`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${bearerToken}` },
-      });
-    } catch {
-      throw new BillingClientError('backend_unavailable', 'The entitlement server could not be reached.');
+      response = await transport.request('/v1/entitlement', 'GET');
+    } catch (error) {
+      throw new BillingClientError(
+        'backend_unavailable',
+        error instanceof HttpTransportError && error.code === 'timeout'
+          ? 'The entitlement server took too long to respond.'
+          : 'The entitlement server could not be reached.',
+      );
     }
+    if (!response.ok) throw new BillingClientError('backend_unavailable', 'The entitlement server rejected the refresh request.');
+    if (!response.jsonValid) throw new BillingClientError('backend_unavailable', 'The entitlement response is invalid.');
 
-    if (!response.ok) {
-      throw new BillingClientError('backend_unavailable', 'The entitlement server rejected the refresh request.');
-    }
-
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      throw new BillingClientError('backend_unavailable', 'The entitlement response is invalid.');
-    }
-
-    const entitlement = parseEntitlement(payload);
+    const entitlement = parseEntitlement(response.payload);
     if (!entitlement) {
       throw new BillingClientError('backend_unavailable', 'The entitlement response is invalid.');
     }

@@ -3,7 +3,10 @@ import type {
   StoryChoice,
   StoryEpisode,
   StoryExperienceClient,
+  StoryHistoryItem,
+  StoryHistorySnapshot,
   StoryHomeSnapshot,
+  StoryLibrarySnapshot,
   StoryPlotSession,
   StoryPlotSummary,
 } from './contracts';
@@ -12,16 +15,20 @@ import { hasDraftErrors, normalizePlotDraft, validatePlotDraft } from './draft';
 
 export class PreviewStoryExperienceClient implements StoryExperienceClient {
   private readonly plots = new Map<string, StoryPlotSession>();
+  private readonly archivedPlotIds = new Set<string>();
+  private readonly histories = new Map<string, StoryHistoryItem[]>();
   private createdPlotCount = 0;
 
   constructor() {
     const seeded = createSeedPlot();
     this.plots.set(seeded.id, seeded);
+    this.histories.set(seeded.id, [historyItem(seeded.episode)]);
   }
 
   async loadHome(): Promise<StoryHomeSnapshot> {
+    const active = [...this.plots.values()].filter((plot) => !this.archivedPlotIds.has(plot.id));
     return {
-      recentPlots: [...this.plots.values()].map(toSummary).reverse(),
+      recentPlots: active.map(toSummary).reverse(),
       quota: {
         textRemaining: 2,
         textLimit: 3,
@@ -32,7 +39,7 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
       retention: {
         currentStreakDays: 2,
         choicesMade: 4,
-        activePlots: this.plots.size,
+        activePlots: active.length,
         dailyPrompt: {
           label: 'A message at the wrong time',
           premise: 'A voice note arrives from someone who should have no way to contact you, and it contains one detail only you would recognize.',
@@ -40,6 +47,14 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
           characterName: 'Mina',
         },
       },
+    };
+  }
+
+  async loadLibrary(): Promise<StoryLibrarySnapshot> {
+    const summaries = [...this.plots.values()].map(toSummary).reverse();
+    return {
+      active: summaries.filter((plot) => !this.archivedPlotIds.has(plot.id)),
+      archived: summaries.filter((plot) => this.archivedPlotIds.has(plot.id)),
     };
   }
 
@@ -60,6 +75,7 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
       episode: buildFirstEpisode(plotId, normalized),
     };
     this.plots.set(plotId, session);
+    this.histories.set(plotId, [historyItem(session.episode)]);
     return cloneSession(session);
   }
 
@@ -67,8 +83,26 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
     return cloneSession(this.requirePlot(plotId));
   }
 
-  async commitChoice(plotId: string, episodeId: string, choiceId: string): Promise<StoryPlotSession> {
+  async loadHistory(plotId: string): Promise<StoryHistorySnapshot> {
     const plot = this.requirePlot(plotId);
+    const items = this.histories.get(plotId) ?? [historyItem(plot.episode)];
+    return { plotId, title: plot.title, items: items.map((item) => ({ ...item })) };
+  }
+
+  async archivePlot(plotId: string): Promise<StoryPlotSummary> {
+    const plot = this.requirePlot(plotId);
+    this.archivedPlotIds.add(plotId);
+    return toSummary(plot);
+  }
+
+  async restorePlot(plotId: string): Promise<StoryPlotSummary> {
+    const plot = this.requirePlot(plotId);
+    this.archivedPlotIds.delete(plotId);
+    return toSummary(plot);
+  }
+
+  async commitChoice(plotId: string, episodeId: string, choiceId: string): Promise<StoryPlotSession> {
+    const plot = this.requireActivePlot(plotId);
     const episode = plot.episode;
     if (episode.id !== episodeId) throw new StoryClientError('not_found', 'This episode is no longer current.');
 
@@ -86,18 +120,34 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
       committedChoiceId: choice.id,
       committedConsequence: choice.consequence,
     };
+    this.replaceCurrentHistory(plotId, historyItem(plot.episode));
     return cloneSession(plot);
   }
 
   async requestNextEpisode(plotId: string): Promise<StoryPlotSession> {
-    const plot = this.requirePlot(plotId);
+    const plot = this.requireActivePlot(plotId);
     if (plot.episode.status !== 'choice_committed' || !plot.episode.committedConsequence) {
       throw new StoryClientError('choice_required', 'Choose what happens before continuing.');
     }
 
     const previous = plot.episode;
     plot.episode = buildContinuationEpisode(plot, previous);
+    const items = this.histories.get(plotId) ?? [];
+    items.push(historyItem(plot.episode));
+    this.histories.set(plotId, items);
     return cloneSession(plot);
+  }
+
+  private replaceCurrentHistory(plotId: string, item: StoryHistoryItem): void {
+    const items = this.histories.get(plotId) ?? [];
+    if (items.length === 0) items.push(item);
+    else items[items.length - 1] = item;
+    this.histories.set(plotId, items);
+  }
+
+  private requireActivePlot(plotId: string): StoryPlotSession {
+    if (this.archivedPlotIds.has(plotId)) throw new StoryClientError('not_found', 'Archived stories are read-only until restored.');
+    return this.requirePlot(plotId);
   }
 
   private requirePlot(plotId: string): StoryPlotSession {
@@ -201,6 +251,25 @@ function toSummary(plot: StoryPlotSession): StoryPlotSummary {
       ? plot.episode.committedConsequence ?? plot.episode.summary
       : plot.episode.summary,
   };
+}
+
+function historyItem(episode: StoryEpisode): StoryHistoryItem {
+  const item: StoryHistoryItem = {
+    episodeId: episode.id,
+    episodeNumber: episode.number,
+    title: episode.title,
+    summary: episode.summary,
+    status: episode.status,
+  };
+  if (episode.committedChoiceId) {
+    const choice = episode.choices.find((candidate) => candidate.id === episode.committedChoiceId);
+    if (choice) {
+      item.choiceKey = choice.key;
+      item.choiceLabel = choice.label;
+    }
+  }
+  if (episode.committedConsequence) item.consequence = episode.committedConsequence;
+  return item;
 }
 
 function titleFromPremise(premise: string): string {

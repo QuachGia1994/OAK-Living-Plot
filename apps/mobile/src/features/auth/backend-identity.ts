@@ -1,21 +1,30 @@
-export type TokenProvider = () => Promise<string | null>;
-type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+import { AuthenticatedJsonTransport, HttpTransportError, type FetchLike, type JsonHttpResponse, type TokenProvider } from '../../lib/http-transport';
+
+export type { TokenProvider } from '../../lib/http-transport';
 
 export async function loadBackendUserId(
   apiBaseUrl: string,
   tokenProvider: TokenProvider,
   fetcher: FetchLike = fetch,
+  timeoutMs = 12_000,
 ): Promise<string> {
-  const base = apiBaseUrl.trim().replace(/\/$/, '');
-  if (!base) throw new Error('Living Plot API URL is not configured.');
-  const token = await tokenProvider();
-  if (!token) throw new Error('Signed-in session token is unavailable.');
-  const response = await fetcher(`${base}/v1/me`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const transport = new AuthenticatedJsonTransport(apiBaseUrl, tokenProvider, fetcher, timeoutMs);
+  let response: JsonHttpResponse;
+  try {
+    response = await transport.request('/v1/me', 'GET');
+  } catch (error) {
+    if (error instanceof HttpTransportError && error.code === 'auth_required') {
+      throw new Error('Signed-in session token is unavailable.');
+    }
+    throw new Error(
+      error instanceof HttpTransportError && error.code === 'timeout'
+        ? 'Living Plot identity request timed out.'
+        : 'Living Plot identity could not be resolved.',
+    );
+  }
   if (!response.ok) throw new Error('Living Plot identity could not be resolved.');
-  const payload: unknown = await response.json();
+  if (!response.jsonValid) throw new Error('Living Plot identity response is invalid.');
+  const payload = response.payload;
   if (!isRecord(payload) || !isRecord(payload.user) || typeof payload.user.id !== 'string' || !payload.user.id.trim()) {
     throw new Error('Living Plot identity response is invalid.');
   }

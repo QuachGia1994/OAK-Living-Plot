@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import type { StoryHomeSnapshot, StoryPlotSummary } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
+import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, MotionReveal, Pill, Screen } from '@/ui/primitives';
 import { colors, radius, spacing } from '@/ui/theme';
 
@@ -23,6 +24,8 @@ export default function HomeScreen() {
       setError('Recent stories could not be loaded. Your canonical story data is never replaced by this screen state.');
     }
   }, [auth.configured, auth.isLoaded, auth.isSignedIn, storyExperienceClient]);
+
+  useRefreshOnForeground(load);
 
   useEffect(() => {
     if (auth.configured && (!auth.isLoaded || !auth.isSignedIn)) return;
@@ -53,12 +56,11 @@ export default function HomeScreen() {
       <Screen>
         <BrandMark />
         <View style={styles.hero}>
-          <Eyebrow>Canonical story identity</Eyebrow>
-          <Text style={styles.heroTitle}>Your choices should follow you, not this device.</Text>
-          <Text style={styles.heroBody}>Sign in with one email code to create and resume server-owned Living Plot stories.</Text>
-          <ActionButton label="Sign in or create account" onPress={() => router.push('/auth')} />
+          <Eyebrow>Your stories, remembered</Eyebrow>
+          <Text style={styles.heroTitle}>Pick what happens. Come back for the consequence.</Text>
+          <Text style={styles.heroBody}>Sign in with one email code so your stories and choices stay with you across devices.</Text>
+          <ActionButton label="Continue with email" onPress={() => router.push('/auth')} />
         </View>
-        <Text style={styles.previewNote}>Local preview mode is used only when Clerk/API configuration is intentionally absent.</Text>
       </Screen>
     );
   }
@@ -80,13 +82,16 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.hero}>
-        <Eyebrow>Interactive mini-drama</Eyebrow>
-        <Text style={styles.heroTitle}>A short story that remembers what you choose.</Text>
+        <Eyebrow>60–90 second interactive drama</Eyebrow>
+        <Text style={styles.heroTitle}>Your choice writes the next scene.</Text>
         <Text style={styles.heroBody}>
-          Start with one situation. Every episode ends with three different actions, and the consequence carries forward.
+          Create a situation, watch a short AI drama unfold, then choose one of three paths. The next episode remembers what you did.
         </Text>
-        <ActionButton label="Start a new story" onPress={() => router.push('/create')} />
+        <ActionButton label="Create my first plot" onPress={() => router.push('/create')} />
+        <ActionButton label="My stories" variant="secondary" onPress={() => router.push('/library')} />
       </View>
+
+      <HowItWorks />
 
       {error ? <ErrorState title="Couldn’t load your stories" message={error} onRetry={() => void load()} /> : null}
 
@@ -103,11 +108,11 @@ export default function HomeScreen() {
             }} />
           </MotionReveal>
           <QuotaCard snapshot={snapshot} />
-          <ActionButton label="See Living Plot Plus" variant="secondary" onPress={() => router.push('/plus')} />
+          <ActionButton label="Unlock more episodes" variant="secondary" onPress={() => router.push('/plus')} />
           <View style={styles.sectionHeader}>
             <View>
-              <Eyebrow>Continue</Eyebrow>
-              <Text style={styles.sectionTitle}>Recent plots</Text>
+              <Eyebrow>Continue the drama</Eyebrow>
+              <Text style={styles.sectionTitle}>Pick up where you left off</Text>
             </View>
             <Text style={styles.sectionMeta}>{snapshot.recentPlots.length} active</Text>
           </View>
@@ -116,8 +121,8 @@ export default function HomeScreen() {
             {snapshot.recentPlots.length === 0 ? (
               <Card>
                 <Eyebrow>No active plots</Eyebrow>
-                <Text style={styles.emptyTitle}>Your first consequence starts with one decision.</Text>
-                <Text style={styles.plotPremise}>Start a plot or use today’s spark. Nothing is generated until you ask for episode one.</Text>
+                <Text style={styles.emptyTitle}>No stories yet.</Text>
+                <Text style={styles.plotPremise}>Start with a situation, choose a mood and name the main character. Episode 1 does the rest.</Text>
               </Card>
             ) : snapshot.recentPlots.map((plot) => (
               <RecentPlotCard
@@ -130,10 +135,33 @@ export default function HomeScreen() {
         </>
       ) : null}
 
-      <Text style={styles.previewNote}>
-        {auth.configured ? 'Live mode: Clerk session → internal Living Plot user → canonical D1 story state.' : 'Preview mode: add Clerk and API public configuration to switch to canonical server stories.'}
-      </Text>
+      {!auth.configured ? <Text style={styles.previewNote}>Preview build · all core screens are available without signing in.</Text> : null}
     </Screen>
+  );
+}
+
+function HowItWorks() {
+  return (
+    <Card style={styles.howCard}>
+      <Eyebrow>How Living Plot works</Eyebrow>
+      <View style={styles.howSteps}>
+        <HowStep number="1" title="Set the spark" body="Give us the situation, mood and one main character." />
+        <HowStep number="2" title="Watch the episode" body="AI turns it into a short, dramatic scene you can read or hear." />
+        <HowStep number="3" title="Choose the consequence" body="Pick A, B or C. The next episode continues from that exact decision." />
+      </View>
+    </Card>
+  );
+}
+
+function HowStep({ number, title, body }: { number: string; title: string; body: string }) {
+  return (
+    <View style={styles.howStep}>
+      <View style={styles.howNumber}><Text style={styles.howNumberText}>{number}</Text></View>
+      <View style={styles.howCopy}>
+        <Text style={styles.howTitle}>{title}</Text>
+        <Text style={styles.howBody}>{body}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -143,12 +171,12 @@ function RetentionCard({ snapshot }: { snapshot: StoryHomeSnapshot }) {
     <Card style={styles.retentionCard}>
       <View style={styles.retentionHeader}>
         <View style={styles.retentionCopy}>
-          <Eyebrow>Your plot momentum</Eyebrow>
-          <Text style={styles.retentionTitle}>{retention.currentStreakDays > 0 ? `${retention.currentStreakDays}-day choice streak` : 'Make one meaningful choice today'}</Text>
+          <Eyebrow>Your momentum</Eyebrow>
+          <Text style={styles.retentionTitle}>{retention.currentStreakDays > 0 ? `${retention.currentStreakDays}-day story streak` : 'One choice starts the streak'}</Text>
         </View>
         <Pill tone={retention.currentStreakDays > 0 ? 'success' : 'neutral'}>{retention.choicesMade} choices</Pill>
       </View>
-      <Text style={styles.retentionBody}>{retention.activePlots} active {retention.activePlots === 1 ? 'plot' : 'plots'}. Streaks come only from committed canonical choices.</Text>
+      <Text style={styles.retentionBody}>{retention.activePlots} active {retention.activePlots === 1 ? 'story' : 'stories'} · {retention.choicesMade} decisions made.</Text>
     </Card>
   );
 }
@@ -174,8 +202,8 @@ function QuotaCard({ snapshot }: { snapshot: StoryHomeSnapshot }) {
     <Card style={styles.quotaCard}>
       <View style={styles.quotaHeader}>
         <View>
-          <Eyebrow>Server plan</Eyebrow>
-          <Text style={styles.quotaTitle}>Today’s story budget</Text>
+          <Eyebrow>Today</Eyebrow>
+          <Text style={styles.quotaTitle}>Your episode allowance</Text>
         </View>
         <Pill tone="accent">{quota.resetLabel}</Pill>
       </View>
@@ -183,7 +211,7 @@ function QuotaCard({ snapshot }: { snapshot: StoryHomeSnapshot }) {
         <QuotaMetric label="Text episodes" value={`${quota.textRemaining} / ${quota.textLimit} left`} />
         <QuotaMetric label="Fresh voice" value={`${quota.voiceRemaining} / ${quota.voiceLimit} left`} />
       </View>
-      <Text style={styles.quotaFootnote}>Display only. The backend quota ledger remains authoritative.</Text>
+      <Text style={styles.quotaFootnote}>Fresh voice is optional. Replaying existing narration does not use another voice slot.</Text>
     </Card>
   );
 }
@@ -240,6 +268,14 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     maxWidth: 560,
   },
+  howCard: { backgroundColor: colors.surfaceQuiet },
+  howSteps: { gap: spacing.md },
+  howStep: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  howNumber: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.accent },
+  howNumberText: { color: colors.accentInk, fontSize: 13, fontWeight: '900' },
+  howCopy: { flex: 1, gap: spacing.xs },
+  howTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
+  howBody: { color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
   retentionCard: {
     backgroundColor: colors.surfaceSuccess,
     borderColor: colors.borderSuccess,

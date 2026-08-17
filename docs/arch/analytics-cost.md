@@ -1,6 +1,6 @@
 # Phase 1 analytics and AI cost telemetry
 
-> updated 2026-08-16 · 0.0.0
+> updated 2026-08-17 · 0.0.0
 
 ## Boundary
 Workers Analytics Engine is observational only. Telemetry cannot authorize a request, grant an entitlement, reserve quota, publish an episode, commit a choice, or become canonical story state. A telemetry write failure is deliberately fail-open for product behavior.
@@ -43,10 +43,22 @@ Cost is calculated as integer nano-USD to avoid floating-point currency rounding
 
 This is exact against the recorded rate-card revision and provider-reported token counts. It is not a claim that account-level credits or a free-tier allowance cannot reduce the final Google invoice. A model, serving tier, or rate change requires a new pricing revision before the new rate is used.
 
+## Product funnel events
+Slice 23 adds a second bounded event family for the Phase 1 value test. Events are emitted only when canonical work is newly created, not when an idempotent replay returns existing state:
+
+- `plot_created`;
+- `choice_committed`;
+- `next_episode_published`;
+- `plot_archived`;
+- `plot_restored`;
+- `voice_requested` after new voice work is successfully queued.
+
+Product points contain only event name plus optional bounded mood, Free/Plus tier, and episode number. They contain no user/plot/episode/choice ID, premise, prompt, script, choice label, consequence, auth data, or credential. Product telemetry uses the same Analytics Engine binding and is fail-open.
+
 ## Failure semantics
 Provider HTTP/network failures do not invent token usage or cost. Unknown model pricing or unsafe numeric input is dropped rather than estimated. Analytics Engine exceptions are swallowed at the observational boundary so generation results are unchanged.
 
 A successful provider response with invalid story structure is still costed because tokens were consumed before validation rejected it. The existing aggregate token usage returned by `StoryGenerator` remains unchanged for downstream publication metadata.
 
 ## Deferred
-Mobile funnel analytics, remote Analytics Engine querying/dashboarding, remote Worker provisioning/deployment, and production cost-budget alerting remain later work.
+Remote Analytics Engine querying/dashboarding, remote Worker provisioning/deployment, and production cost-budget alerting remain later work.

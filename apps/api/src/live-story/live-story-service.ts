@@ -8,11 +8,16 @@ import { D1QuotaLedger } from '../quota/d1-quota-ledger';
 import type { QuotaError } from '../quota/contracts';
 import { quotaPolicyFor } from '../quota/policy';
 import { buildRetentionSnapshot } from '../retention/retention';
+import type { ProductEventTelemetry, ProductTelemetrySink } from '../telemetry/product-events';
+import { NOOP_PRODUCT_TELEMETRY } from '../telemetry/product-events';
 import type {
   LiveStoryCommitInput,
   LiveStoryCreateInput,
   LiveStoryGenerateInput,
+  LiveStoryHistory,
   LiveStoryHome,
+  LiveStoryLibrary,
+  LiveStoryPlotSummary,
   LiveStoryResult,
   LiveStorySession,
 } from './contracts';
@@ -31,6 +36,7 @@ export class LiveStoryService {
     private readonly db: D1Database,
     private readonly generator: StoryGenerator,
     private readonly clock: Clock = Date.now,
+    private readonly productTelemetry: ProductTelemetrySink = NOOP_PRODUCT_TELEMETRY,
   ) {
     this.stories = new D1LiveStoryRepository(db);
     this.entitlements = new D1EntitlementRepository(db, clock);
@@ -90,6 +96,25 @@ export class LiveStoryService {
     return { ok: true, value: stored.session };
   }
 
+  async loadLibrary(userId: string): Promise<LiveStoryResult<LiveStoryLibrary>> {
+    if (!userId.trim()) return invalidInput('User identifier is required.');
+    return { ok: true, value: await this.stories.loadLibrary(userId) };
+  }
+
+  async loadHistory(userId: string, plotId: string): Promise<LiveStoryResult<LiveStoryHistory>> {
+    if (!userId.trim() || !plotId.trim()) return invalidInput('User and plot identifiers are required.');
+    const history = await this.stories.loadHistory(userId, plotId);
+    return history ? { ok: true, value: history } : notFound();
+  }
+
+  async archivePlot(userId: string, plotId: string): Promise<LiveStoryResult<LiveStoryPlotSummary>> {
+    return this.setLifecycleStatus(userId, plotId, 'archived');
+  }
+
+  async restorePlot(userId: string, plotId: string): Promise<LiveStoryResult<LiveStoryPlotSummary>> {
+    return this.setLifecycleStatus(userId, plotId, 'active');
+  }
+
   async generateNext(input: LiveStoryGenerateInput): Promise<LiveStoryResult<LiveStorySession>> {
     if (!validKey(input.generationKey) || !input.userId.trim() || !input.plotId.trim()) {
       return invalidInput('User, plot, and generation key are required.');
@@ -106,7 +131,44 @@ export class LiveStoryService {
     const result = await this.choices.commit({ ...input, expectedStateVersion: expected });
     if (!result.ok) return mapChoiceError(result.error);
     const stored = await this.stories.loadSession(input.userId, input.plotId);
-    return stored ? { ok: true, value: stored.session } : persistenceError('Committed story could not be reloaded.');
+    if (!stored) return persistenceError('Committed story could not be reloaded.');
+    if (!result.value.replayed) {
+      this.recordProductEvent({
+        event: 'choice_committed',
+        mood: stored.session.mood,
+        episodeNumber: stored.session.episode.number,
+      });
+    }
+    return { ok: true, value: stored.session };
+  }
+
+  private async setLifecycleStatus(
+    userId: string,
+    plotId: string,
+    target: 'active' | 'archived',
+  ): Promise<LiveStoryResult<LiveStoryPlotSummary>> {
+    if (!userId.trim() || !plotId.trim()) return invalidInput('User and plot identifiers are required.');
+    const changed = await this.stories.setLifecycleStatus(userId, plotId, target, this.clock());
+    if (changed === 'not_found') return notFound();
+    if (changed === 'invalid_status') return invalidInput('Completed plots cannot change lifecycle status.');
+    const summary = await this.stories.loadSummary(userId, plotId);
+    if (!summary) return persistenceError('Updated plot could not be reloaded.');
+    if (changed === 'updated') {
+      this.recordProductEvent({
+        event: target === 'archived' ? 'plot_archived' : 'plot_restored',
+        mood: summary.mood,
+        episodeNumber: summary.episodeNumber,
+      });
+    }
+    return { ok: true, value: summary };
+  }
+
+  private recordProductEvent(event: ProductEventTelemetry): void {
+    try {
+      this.productTelemetry.recordProductEvent(event);
+    } catch {
+      // Product analytics is observational and must never change canonical story behavior.
+    }
   }
 
   private async generateForPlot(userId: string, plotId: string, generationKey: string): Promise<LiveStoryResult<LiveStorySession>> {
@@ -132,7 +194,15 @@ export class LiveStoryService {
       generation: generated.value,
     });
     if (!published.ok) return this.resolvePublicationFailure(userId, plotId, generationKey, published.error);
-    return this.consumeAndReload(userId, plotId, generationKey, published.value.id);
+    const settled = await this.consumeAndReload(userId, plotId, generationKey, published.value.id);
+    if (settled.ok && !published.value.replayed) {
+      this.recordProductEvent({
+        event: published.value.episodeNumber === 1 ? 'plot_created' : 'next_episode_published',
+        mood: settled.value.mood,
+        episodeNumber: published.value.episodeNumber,
+      });
+    }
+    return settled;
   }
 
   private async reserveTextQuota(userId: string, generationKey: string): Promise<LiveStoryResult<true>> {

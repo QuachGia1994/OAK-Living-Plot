@@ -65,11 +65,22 @@ interface ActionButtonProps extends Omit<PressableProps, 'children' | 'style'> {
   style?: StyleProp<ViewStyle>;
 }
 
-export function ActionButton({ label, variant = 'primary', busy = false, disabled, style, ...props }: ActionButtonProps) {
+export function ActionButton({
+  label,
+  variant = 'primary',
+  busy = false,
+  disabled,
+  style,
+  accessibilityLabel,
+  accessibilityState,
+  ...props
+}: ActionButtonProps) {
   const isDisabled = Boolean(disabled || busy);
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy }}
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.button,
@@ -135,7 +146,7 @@ export function MotionReveal({ children, delay = 0 }: { children: ReactNode; del
 
 export function LoadingState({ label = 'Loading your story…' }: { label?: string }) {
   return (
-    <View style={styles.stateWrap}>
+    <View style={styles.stateWrap} accessibilityRole="progressbar" accessibilityLabel={label} accessibilityLiveRegion="polite">
       <ActivityIndicator size="large" color={colors.accent} />
       <Text style={styles.stateTitle}>{label}</Text>
       <Text style={styles.stateBody}>Living Plot keeps the story state separate from the waiting screen.</Text>
@@ -145,11 +156,13 @@ export function LoadingState({ label = 'Loading your story…' }: { label?: stri
 
 export function ErrorState({ title, message, onRetry }: { title: string; message: string; onRetry?: () => void }) {
   return (
-    <Card style={styles.errorCard}>
+    <View accessibilityLiveRegion="assertive">
+      <Card style={styles.errorCard}>
       <Text style={styles.stateTitle}>{title}</Text>
       <Text style={styles.stateBody}>{message}</Text>
-      {onRetry ? <ActionButton label="Try again" variant="secondary" onPress={onRetry} /> : null}
-    </Card>
+        {onRetry ? <ActionButton label="Try again" variant="secondary" onPress={onRetry} /> : null}
+      </Card>
+    </View>
   );
 }
 

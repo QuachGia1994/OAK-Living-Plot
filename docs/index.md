@@ -15,6 +15,8 @@
 - [Phase 1 narrative quality evaluations](arch/narrative-evals.md) — deterministic continuity/branch/consequence/repetition fixtures and adversarial regression thresholds.
 - [Phase 1 mobile auth and live story](arch/mobile-auth-live-story.md) — Clerk email OTP, internal identity, protected core-loop HTTP routes, retry convergence, and shared billing trust chain.
 - [Phase 1 retention loop](arch/retention.md) — canonical choice-history streaks, resume context, deterministic UTC daily sparks, and anti-dark-pattern guardrails.
+- [Phase 1 story library and history](arch/story-library-history.md) — reversible archive/restore lifecycle, owner-scoped library, and canonical read-only recap.
+- [Phase 1 mobile resilience and accessibility](arch/mobile-resilience.md) — bounded authenticated networking, safe GET retry, foreground refresh, UI recovery, and accessibility behavior.
 - [Live development setup](ref/live-development.md) — secret-safe readiness checks, non-production Cloudflare environment, and mobile/provider configuration.
 - [Foundation implementation slice 1](plan/done/foundation-slice1.md) — completed workspace/CI foundation and verification evidence.
 - [D1 implementation slice 2](plan/done/d1-slice2.md) — completed D1/domain baseline and verification evidence.
@@ -35,3 +37,8 @@
 - [RevenueCat Test Store slice 18](plan/done/revenuecat-test-store-slice18.md) — completed Test Store selection boundary while preserving backend entitlement authority.
 - [Production UI pass slice 19](plan/done/production-ui-slice19.md) — completed semantic-token, reduced-motion, empty/error, audio, and store-status presentation pass.
 - [Retention loop slice 20](plan/done/retention-slice20.md) — completed canonical-history streak, resume line, and UTC daily-spark retention loop.
+- [Plot library lifecycle slice 21](plan/done/plot-library-slice21.md) — completed reversible owner-scoped archive/restore and mobile library UX.
+- [Canonical story history slice 22](plan/done/story-history-slice22.md) — completed ordered episode/choice recap without raw internal state exposure.
+- [Product funnel telemetry slice 23](plan/done/product-funnel-telemetry-slice23.md) — completed replay-safe non-identifying Analytics Engine canonical events.
+- [Mobile network resilience slice 24](plan/done/network-resilience-slice24.md) — completed timeout/abort, safe GET retry, and no automatic mutation retry.
+- [Native beta hardening slice 25](plan/done/beta-hardening-slice25.md) — completed UI crash recovery, foreground read refresh, and accessibility hardening.

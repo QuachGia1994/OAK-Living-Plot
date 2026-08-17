@@ -61,7 +61,7 @@ export function EpisodeVoiceCard({ episodeId, locale }: { episodeId: string; loc
 
   async function requestVoice() {
     if (!client.configured) {
-      setError('Live voice needs Clerk plus the Living Plot API. Story text remains fully usable in preview mode.');
+      setError('Voice is not connected in this preview build yet. You can still read the full episode.');
       return;
     }
     if (asset?.status === 'failed') reservationKey.current = createStoryRequestKey('voice');
@@ -111,19 +111,24 @@ export function EpisodeVoiceCard({ episodeId, locale }: { episodeId: string; loc
     <Card style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Eyebrow>Private voice</Eyebrow>
-          <Text style={styles.title}>Listen to this episode</Text>
+          <Eyebrow>Episode voice</Eyebrow>
+          <Text style={styles.title}>Hear the scene narrated</Text>
         </View>
         <Pill tone={asset?.status === 'ready' ? 'success' : 'neutral'}>{voiceLabel(asset)}</Pill>
       </View>
 
       <Text style={styles.body}>
-        Fresh narration uses server voice quota. Replaying cached audio does not spend another generation slot.
+        Generate narration once, then replay it anytime without using another fresh-voice slot.
       </Text>
 
       {asset?.status === 'ready' ? (
         <>
-          <View style={styles.track}>
+          <View
+            style={styles.track}
+            accessibilityRole="progressbar"
+            accessibilityLabel="Voice playback progress"
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
+          >
             <View style={[styles.trackFill, { width: `${Math.round(progress * 100)}%` }]} />
           </View>
           <Text style={styles.time}>{formatTime(playerStatus.currentTime)} / {formatTime(playerStatus.duration)}</Text>
@@ -150,7 +155,7 @@ export function EpisodeVoiceCard({ episodeId, locale }: { episodeId: string; loc
         />
       )}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={styles.error} accessibilityLiveRegion="assertive">{error}</Text> : null}
     </Card>
   );
 }
@@ -178,10 +183,10 @@ function isDefiniteVoiceRequestFailure(error: unknown): boolean {
 }
 
 function audioMessage(error: unknown): string {
-  if (!(error instanceof EpisodeAudioClientError)) return 'Voice could not be prepared. The text episode is unchanged.';
-  if (error.code === 'quota_exceeded') return 'Today’s fresh voice allowance is used up. Cached voice can still replay.';
-  if (error.code === 'auth_required') return 'Sign in again before using private voice audio.';
-  if (error.code === 'not_configured') return 'Live voice is unavailable in preview mode.';
+  if (!(error instanceof EpisodeAudioClientError)) return 'Voice could not be prepared. You can keep reading the episode normally.';
+  if (error.code === 'quota_exceeded') return 'You have used today’s fresh narration. Existing narration can still replay.';
+  if (error.code === 'auth_required') return 'Sign in again before generating narration.';
+  if (error.code === 'not_configured') return 'Voice is not connected in this preview build yet.';
   return error.message;
 }
 

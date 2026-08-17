@@ -61,9 +61,9 @@ export default function CreatePlotScreen() {
       <Screen>
         <BrandMark />
         <Card>
-          <Eyebrow>Canonical story identity</Eyebrow>
-          <Text style={styles.title}>{auth.isLoaded ? 'Sign in before creating a live story.' : 'Loading secure session…'}</Text>
-          <Text style={styles.subtitle}>Authenticated stories are owned by your internal Living Plot account and enforced by the backend.</Text>
+          <Eyebrow>Save your story</Eyebrow>
+          <Text style={styles.title}>{auth.isLoaded ? 'Sign in before starting a new plot.' : 'Opening your account…'}</Text>
+          <Text style={styles.subtitle}>Your stories and choices will stay available when you return on another device.</Text>
         </Card>
         {auth.isLoaded ? <ActionButton label="Sign in with email code" onPress={() => router.replace('/auth')} /> : null}
         <ActionButton label="Cancel" variant="ghost" onPress={() => router.replace('/')} />
@@ -79,15 +79,15 @@ export default function CreatePlotScreen() {
       </View>
 
       <View style={styles.intro}>
-        <Eyebrow>New plot · 3 decisions</Eyebrow>
+        <Eyebrow>New plot · 3 quick choices</Eyebrow>
         <Text style={styles.title}>Give the drama one spark.</Text>
         <Text style={styles.subtitle}>
-          Premise, mood, one main character. Everything else can emerge from the story.
+          Tell us what is happening, pick the vibe, and name the main character. Episode 1 takes it from there.
         </Text>
       </View>
 
       <Card>
-        <FieldHeader step="01" label="What is happening?" hint="Required · 12–600 characters" />
+        <FieldHeader step="01" label="What is the situation?" hint="One or two sentences is enough" />
         <TextInput
           accessibilityLabel="Story premise"
           multiline
@@ -106,7 +106,7 @@ export default function CreatePlotScreen() {
       </Card>
 
       <Card>
-        <FieldHeader step="02" label="Choose the mood" hint="One tap" />
+        <FieldHeader step="02" label="Pick the vibe" hint="This shapes how the scene feels" />
         <View style={styles.moodGrid}>
           {storyMoodOptions.map((option) => (
             <MoodOption
@@ -122,7 +122,7 @@ export default function CreatePlotScreen() {
       </Card>
 
       <Card>
-        <FieldHeader step="03" label="Who are we following?" hint="One character is enough" />
+        <FieldHeader step="03" label="Who is the main character?" hint="Just a name" />
         <TextInput
           accessibilityLabel="Main character name"
           autoCapitalize="words"
@@ -139,14 +139,14 @@ export default function CreatePlotScreen() {
 
       {submitError ? (
         <View style={styles.submitError}>
-          <Text style={styles.submitErrorTitle}>Generation preview failed</Text>
+          <Text style={styles.submitErrorTitle}>Episode 1 could not start</Text>
           <Text style={styles.submitErrorBody}>{submitError}</Text>
         </View>
       ) : null}
 
       <View style={styles.submitBlock}>
-        <ActionButton label="Generate episode 1" busy={busy} onPress={() => void submit()} />
-        <Text style={styles.submitNote}>Text arrives first. Private voice stays optional after the episode is ready.</Text>
+        <ActionButton label="Start episode 1" busy={busy} onPress={() => void submit()} />
+        <Text style={styles.submitNote}>Your first episode is short enough to finish in about a minute. Voice is optional.</Text>
       </View>
     </Screen>
   );

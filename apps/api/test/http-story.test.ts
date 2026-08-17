@@ -11,6 +11,7 @@ import type { EpisodeGenerationInput, EpisodeProposal, StoryGenerator } from '..
 import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
 import { handleRequest } from '../src/http/app';
+import type { ProductEventTelemetry, ProductTelemetrySink } from '../src/telemetry/product-events';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
 
 const runtimeEnv = env as unknown as AppEnv;
@@ -134,6 +135,122 @@ describe('authenticated live story HTTP loop', () => {
     expect(await attacker.json()).toEqual({ error: 'not_found' });
   });
 
+  it('archives and restores an owned plot idempotently while keeping archived stories read-only', async () => {
+    const generator = new FakeStoryGenerator();
+    const created = await storyRequest('/v1/story/plots', 'POST', createBody(), 'clerk-owner', generator);
+    const story = (await created.json() as StoryEnvelope).story;
+
+    const archived = await storyRequest(`/v1/story/plots/${story.id}/archive`, 'POST', undefined, 'clerk-owner', generator);
+    const archivedAgain = await storyRequest(`/v1/story/plots/${story.id}/archive`, 'POST', undefined, 'clerk-owner', generator);
+    expect(archived.status).toBe(200);
+    expect(archivedAgain.status).toBe(200);
+
+    const home = await storyRequest('/v1/story/home', 'GET', undefined, 'clerk-owner', generator);
+    expect((await home.json() as HomeEnvelope).home.recentPlots).toHaveLength(0);
+
+    const library = await storyRequest('/v1/story/library', 'GET', undefined, 'clerk-owner', generator);
+    const libraryBody = await library.json() as LibraryEnvelope;
+    expect(libraryBody.library.active).toHaveLength(0);
+    expect(libraryBody.library.archived[0]).toMatchObject({ id: story.id, episodeNumber: 1 });
+
+    const blockedChoice = await storyRequest(
+      `/v1/story/plots/${story.id}/episodes/${story.episode.id}/choices/${story.episode.choices[0].id}`,
+      'POST',
+      undefined,
+      'clerk-owner',
+      generator,
+    );
+    expect(blockedChoice.status).toBe(404);
+
+    const attackerRestore = await storyRequest(`/v1/story/plots/${story.id}/restore`, 'POST', undefined, 'clerk-attacker', generator);
+    expect(attackerRestore.status).toBe(404);
+
+    const restored = await storyRequest(`/v1/story/plots/${story.id}/restore`, 'POST', undefined, 'clerk-owner', generator);
+    expect(restored.status).toBe(200);
+    const restoredHome = await storyRequest('/v1/story/home', 'GET', undefined, 'clerk-owner', generator);
+    expect((await restoredHome.json() as HomeEnvelope).home.recentPlots[0]?.id).toBe(story.id);
+  });
+
+  it('returns ordered read-only story history with canonical choice consequences', async () => {
+    const generator = new FakeStoryGenerator();
+    const created = await storyRequest('/v1/story/plots', 'POST', createBody(), 'clerk-owner', generator);
+    const first = (await created.json() as StoryEnvelope).story;
+    const choice = first.episode.choices[1];
+    await storyRequest(
+      `/v1/story/plots/${first.id}/episodes/${first.episode.id}/choices/${choice.id}`,
+      'POST',
+      undefined,
+      'clerk-owner',
+      generator,
+    );
+    await storyRequest(
+      `/v1/story/plots/${first.id}/episodes`,
+      'POST',
+      { generationKey: 'generation-history-002' },
+      'clerk-owner',
+      generator,
+    );
+
+    const response = await storyRequest(`/v1/story/plots/${first.id}/history`, 'GET', undefined, 'clerk-owner', generator);
+    expect(response.status).toBe(200);
+    const body = await response.json() as HistoryEnvelope;
+    expect(body.history.items).toHaveLength(2);
+    expect(body.history.items[0]).toMatchObject({
+      episodeNumber: 1,
+      status: 'choice_committed',
+      choiceKey: choice.key,
+      choiceLabel: choice.label,
+      consequence: choice.consequence,
+    });
+    expect(body.history.items[1]).toMatchObject({ episodeNumber: 2, status: 'awaiting_choice' });
+    expect(body.history.items[1]).not.toHaveProperty('consequence');
+
+    const attacker = await storyRequest(`/v1/story/plots/${first.id}/history`, 'GET', undefined, 'clerk-attacker', generator);
+    expect(attacker.status).toBe(404);
+  });
+
+  it('records only new canonical product mutations and remains fail-open when telemetry throws', async () => {
+    const generator = new FakeStoryGenerator();
+    const events: ProductEventTelemetry[] = [];
+    const sink: ProductTelemetrySink = { recordProductEvent(event) { events.push(structuredClone(event)); } };
+    const created = await storyRequest('/v1/story/plots', 'POST', createBody(), 'clerk-owner', generator, sink);
+    const first = (await created.json() as StoryEnvelope).story;
+    await storyRequest('/v1/story/plots', 'POST', createBody(), 'clerk-owner', generator, sink);
+    await storyRequest(
+      `/v1/story/plots/${first.id}/episodes/${first.episode.id}/choices/${first.episode.choices[0].id}`,
+      'POST',
+      undefined,
+      'clerk-owner',
+      generator,
+      sink,
+    );
+    await storyRequest(
+      `/v1/story/plots/${first.id}/episodes/${first.episode.id}/choices/${first.episode.choices[0].id}`,
+      'POST',
+      undefined,
+      'clerk-owner',
+      generator,
+      sink,
+    );
+    await storyRequest(`/v1/story/plots/${first.id}/archive`, 'POST', undefined, 'clerk-owner', generator, sink);
+    await storyRequest(`/v1/story/plots/${first.id}/archive`, 'POST', undefined, 'clerk-owner', generator, sink);
+    await storyRequest(`/v1/story/plots/${first.id}/restore`, 'POST', undefined, 'clerk-owner', generator, sink);
+
+    expect(events.map((event) => event.event)).toEqual(['plot_created', 'choice_committed', 'plot_archived', 'plot_restored']);
+    expect(events.every((event) => !('userId' in event) && !('plotId' in event) && !('premise' in event))).toBe(true);
+
+    const throwingSink: ProductTelemetrySink = { recordProductEvent() { throw new Error('analytics unavailable'); } };
+    const second = await storyRequest(
+      '/v1/story/plots',
+      'POST',
+      { ...createBody(), creationKey: 'creation-live-throw', generationKey: 'generation-live-throw' },
+      'clerk-other',
+      new FakeStoryGenerator(),
+      throwingSink,
+    );
+    expect(second.status).toBe(201);
+  });
+
   it('releases text quota when the story provider fails', async () => {
     const generator: StoryGenerator = {
       async generate() {
@@ -232,11 +349,13 @@ async function storyRequest(
   body: unknown,
   subject: string | null,
   generator: StoryGenerator,
+  productTelemetry?: ProductTelemetrySink,
 ): Promise<Response> {
   return handleRequest(request(path, method, body), testEnv, {
     sessionVerifier: verifier(subject),
     storyGenerator: generator,
     storyClock: () => nowMs,
+    productTelemetry,
   });
 }
 
@@ -261,7 +380,7 @@ interface StoryEnvelope {
       number: number;
       status: 'awaiting_choice' | 'choice_committed';
       committedChoiceId?: string;
-      choices: Array<{ id: string; key: string; consequence: string }>;
+      choices: Array<{ id: string; key: string; label: string; consequence: string }>;
     };
   };
 }
@@ -276,5 +395,24 @@ interface HomeEnvelope {
       activePlots: number;
       dailyPrompt: { label: string; premise: string; mood: string; characterName: string };
     };
+  };
+}
+
+interface LibraryEnvelope {
+  library: {
+    active: Array<{ id: string; episodeNumber: number }>;
+    archived: Array<{ id: string; episodeNumber: number }>;
+  };
+}
+
+interface HistoryEnvelope {
+  history: {
+    items: Array<{
+      episodeNumber: number;
+      status: string;
+      choiceKey?: string;
+      choiceLabel?: string;
+      consequence?: string;
+    }>;
   };
 }

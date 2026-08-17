@@ -73,6 +73,28 @@ export interface LiveStoryHome {
   retention: LiveStoryRetention;
 }
 
+export interface LiveStoryLibrary {
+  active: LiveStoryPlotSummary[];
+  archived: LiveStoryPlotSummary[];
+}
+
+export interface LiveStoryHistoryItem {
+  episodeId: string;
+  episodeNumber: number;
+  title: string;
+  summary: string;
+  status: 'awaiting_choice' | 'choice_committed';
+  choiceKey?: 'A' | 'B' | 'C';
+  choiceLabel?: string;
+  consequence?: string;
+}
+
+export interface LiveStoryHistory {
+  plotId: string;
+  title: string;
+  items: LiveStoryHistoryItem[];
+}
+
 export interface LiveStoryCreateInput {
   userId: string;
   creationKey: string;

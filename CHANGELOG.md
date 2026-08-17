@@ -37,6 +37,11 @@ All notable changes to Living Plot will be documented in this file.
 - RevenueCat Test Store public-key selection for native purchase-flow validation while D1 remains entitlement authority.
 - Reduced-motion-aware mobile entrance motion, semantic visual tokens, richer empty/error/store/audio states, and removal of raw TSX color values.
 - Choice-history retention metadata with UTC streaks, per-plot resume context, and deterministic daily story sparks that prefill the existing create flow.
+- Reversible owner-scoped Story Library archive/restore lifecycle with archived plots kept readable and mutation-locked until restore.
+- Canonical Story So Far history reconstructed from persisted episode summaries and committed choice consequences.
+- Replay-safe privacy-preserving product funnel Analytics Engine events for newly canonical story/lifecycle/voice actions.
+- Shared authenticated mobile HTTP transport with bounded timeout/abort, one safe GET retry with fresh tokens, and no automatic POST retry.
+- Root native UI error recovery, foreground read-only home/story refresh, and expanded busy/error/choice/audio accessibility semantics.
 
 ### Changed
 - Pinned project orchestration and default implementation to GPT-5.6 Sol; GPT-5.6 Luna is used only when the user explicitly requests a worker handoff.

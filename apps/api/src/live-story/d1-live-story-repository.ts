@@ -6,6 +6,9 @@ import type {
   LiveStoryChoice,
   LiveStoryCreateInput,
   LiveStoryEpisode,
+  LiveStoryHistory,
+  LiveStoryHistoryItem,
+  LiveStoryLibrary,
   LiveStoryMood,
   LiveStoryPlotSummary,
   LiveStoryResult,
@@ -66,6 +69,17 @@ interface PreviousRow {
   consequence: string;
 }
 
+interface HistoryRow {
+  episode_id: string;
+  episode_number: number;
+  title: string;
+  summary: string;
+  status: 'ready' | 'completed';
+  choice_key: string | null;
+  choice_label: string | null;
+  consequence: string | null;
+}
+
 export interface StoredLiveSession {
   session: LiveStorySession;
   generationKey: string | null;
@@ -95,18 +109,59 @@ export class D1LiveStoryRepository {
     return this.buildSession(plot, character, episode);
   }
 
+  async loadSummary(userId: string, plotId: string): Promise<LiveStoryPlotSummary | null> {
+    const stored = await this.loadSession(userId, plotId);
+    return stored ? toPlotSummary(stored.session) : null;
+  }
+
   async listOwnedPlots(userId: string, limit = 20): Promise<LiveStoryPlotSummary[]> {
-    const rows = await this.db
+    return this.listOwnedPlotsByStatus(userId, 'active', limit);
+  }
+
+  async loadLibrary(userId: string, limit = 50): Promise<LiveStoryLibrary> {
+    const [active, archived] = await Promise.all([
+      this.listOwnedPlotsByStatus(userId, 'active', limit),
+      this.listOwnedPlotsByStatus(userId, 'archived', limit),
+    ]);
+    return { active, archived };
+  }
+
+  async setLifecycleStatus(
+    userId: string,
+    plotId: string,
+    target: 'active' | 'archived',
+    updatedAt: number,
+  ): Promise<'updated' | 'unchanged' | 'not_found' | 'invalid_status'> {
+    const row = await this.db
+      .prepare('SELECT status FROM plots WHERE id = ? AND user_id = ?')
+      .bind(plotId, userId)
+      .first<{ status: 'active' | 'completed' | 'archived' }>();
+    if (!row) return 'not_found';
+    if (row.status === target) return 'unchanged';
+    if (row.status === 'completed') return 'invalid_status';
+    await this.db
+      .prepare('UPDATE plots SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?')
+      .bind(target, updatedAt, plotId, userId)
+      .run();
+    return 'updated';
+  }
+
+  async loadHistory(userId: string, plotId: string): Promise<LiveStoryHistory | null> {
+    const plot = await this.loadPlot(userId, plotId);
+    if (!plot) return null;
+    const result = await this.db
       .prepare(
-        `SELECT p.id FROM plots p
-         WHERE p.user_id = ? AND p.status = 'active'
-           AND EXISTS (SELECT 1 FROM episodes e WHERE e.plot_id = p.id)
-         ORDER BY p.updated_at DESC, p.id DESC LIMIT ?`,
+        `SELECT e.id AS episode_id, e.episode_number, e.title, e.summary, e.status,
+                ec.choice_key, ec.label AS choice_label, cc.consequence
+         FROM episodes e
+         LEFT JOIN choice_commits cc ON cc.episode_id = e.id
+         LEFT JOIN episode_choices ec ON ec.id = cc.choice_id AND ec.episode_id = e.id
+         WHERE e.plot_id = ?
+         ORDER BY e.episode_number ASC`,
       )
-      .bind(userId, limit)
-      .all<{ id: string }>();
-    const sessions = await Promise.all(rows.results.map((row) => this.loadSession(userId, row.id)));
-    return sessions.filter(isStoredSession).map((stored) => toPlotSummary(stored.session));
+      .bind(plotId)
+      .all<HistoryRow>();
+    return { plotId: plot.id, title: plot.title, items: result.results.map(toHistoryItem) };
   }
 
   async loadRetentionActivity(userId: string): Promise<RetentionActivityDay[]> {
@@ -154,11 +209,29 @@ export class D1LiveStoryRepository {
       .prepare(
         `SELECT e.state_version_after_publish AS version
          FROM episodes e JOIN plots p ON p.id = e.plot_id
-         WHERE e.id = ? AND e.plot_id = ? AND p.user_id = ?`,
+         WHERE e.id = ? AND e.plot_id = ? AND p.user_id = ? AND p.status = 'active'`,
       )
       .bind(episodeId, plotId, userId)
       .first<{ version: number | null }>();
     return row?.version ?? null;
+  }
+
+  private async listOwnedPlotsByStatus(
+    userId: string,
+    status: 'active' | 'archived',
+    limit: number,
+  ): Promise<LiveStoryPlotSummary[]> {
+    const rows = await this.db
+      .prepare(
+        `SELECT p.id FROM plots p
+         WHERE p.user_id = ? AND p.status = ?
+           AND EXISTS (SELECT 1 FROM episodes e WHERE e.plot_id = p.id)
+         ORDER BY p.updated_at DESC, p.id DESC LIMIT ?`,
+      )
+      .bind(userId, status, limit)
+      .all<{ id: string }>();
+    const sessions = await Promise.all(rows.results.map((row) => this.loadSession(userId, row.id)));
+    return sessions.filter(isStoredSession).map((stored) => toPlotSummary(stored.session));
   }
 
   private async insertCandidate(input: LiveStoryCreateInput, plotId: string, characterId: string): Promise<void> {
@@ -347,6 +420,20 @@ function toPlotSummary(session: LiveStorySession): LiveStoryPlotSummary {
       ? session.episode.committedConsequence ?? session.episode.summary
       : session.episode.summary,
   };
+}
+
+function toHistoryItem(row: HistoryRow): LiveStoryHistoryItem {
+  const item: LiveStoryHistoryItem = {
+    episodeId: row.episode_id,
+    episodeNumber: row.episode_number,
+    title: row.title,
+    summary: row.summary,
+    status: row.status === 'completed' ? 'choice_committed' : 'awaiting_choice',
+  };
+  if (row.choice_key === 'A' || row.choice_key === 'B' || row.choice_key === 'C') item.choiceKey = row.choice_key;
+  if (row.choice_label) item.choiceLabel = row.choice_label;
+  if (row.consequence) item.consequence = row.consequence;
+  return item;
 }
 
 function toGenerationCharacter(row: CharacterRow) {

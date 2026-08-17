@@ -75,10 +75,36 @@ export interface StoryHomeSnapshot {
   retention: RetentionDisplay;
 }
 
+export interface StoryLibrarySnapshot {
+  active: StoryPlotSummary[];
+  archived: StoryPlotSummary[];
+}
+
+export interface StoryHistoryItem {
+  episodeId: string;
+  episodeNumber: number;
+  title: string;
+  summary: string;
+  status: 'awaiting_choice' | 'choice_committed';
+  choiceKey?: 'A' | 'B' | 'C';
+  choiceLabel?: string;
+  consequence?: string;
+}
+
+export interface StoryHistorySnapshot {
+  plotId: string;
+  title: string;
+  items: StoryHistoryItem[];
+}
+
 export interface StoryExperienceClient {
   loadHome(): Promise<StoryHomeSnapshot>;
+  loadLibrary(): Promise<StoryLibrarySnapshot>;
   createPlot(draft: PlotDraft, creationKey?: string): Promise<StoryPlotSession>;
   loadPlot(plotId: string): Promise<StoryPlotSession>;
+  loadHistory(plotId: string): Promise<StoryHistorySnapshot>;
+  archivePlot(plotId: string): Promise<StoryPlotSummary>;
+  restorePlot(plotId: string): Promise<StoryPlotSummary>;
   commitChoice(plotId: string, episodeId: string, choiceId: string): Promise<StoryPlotSession>;
   requestNextEpisode(plotId: string): Promise<StoryPlotSession>;
 }

@@ -5,19 +5,20 @@ import type {
   EpisodeAudioStatus,
 } from './contracts';
 import { EpisodeAudioClientError } from './contracts';
-
-type TokenProvider = () => Promise<string | null>;
-type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+import { AuthenticatedJsonTransport, HttpTransportError, type FetchLike, type TokenProvider } from '../../lib/http-transport';
 
 export class HttpEpisodeAudioClient implements EpisodeAudioClient {
   readonly configured: boolean;
+  private readonly transport: AuthenticatedJsonTransport;
 
   constructor(
-    private readonly apiBaseUrl: string,
-    private readonly tokenProvider: TokenProvider,
-    private readonly fetcher: FetchLike = fetch,
+    apiBaseUrl: string,
+    tokenProvider: TokenProvider,
+    fetcher: FetchLike = fetch,
+    timeoutMs = 12_000,
   ) {
     this.configured = Boolean(apiBaseUrl.trim());
+    this.transport = new AuthenticatedJsonTransport(apiBaseUrl, tokenProvider, fetcher, timeoutMs);
   }
 
   async request(episodeId: string, voiceVariant: string, reservationKey: string): Promise<EpisodeAudioAsset> {
@@ -33,51 +34,23 @@ export class HttpEpisodeAudioClient implements EpisodeAudioClient {
   }
 
   async playbackSource(assetId: string): Promise<EpisodeAudioPlaybackSource> {
-    const base = this.baseUrl();
-    const token = await this.requireToken();
-    return {
-      uri: `${base}/v1/audio/${encodeURIComponent(assetId)}`,
-      headers: { Authorization: `Bearer ${token}` },
-    };
-  }
-
-  private async requestJson(path: string, method: string, body?: unknown): Promise<unknown> {
-    const base = this.baseUrl();
-    const token = await this.requireToken();
-    let response: Response;
     try {
-      response = await this.fetcher(`${base}${path}`, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-    } catch {
-      throw new EpisodeAudioClientError('backend_unavailable', 'Voice service could not be reached.');
+      return await this.transport.authorizedSource(`/v1/audio/${encodeURIComponent(assetId)}`);
+    } catch (error) {
+      throw mapTransportError(error);
     }
+  }
 
-    let payload: unknown = null;
+  private async requestJson(path: string, method: 'GET' | 'POST', body?: unknown): Promise<unknown> {
     try {
-      payload = await response.json();
-    } catch {
-      if (response.ok) throw new EpisodeAudioClientError('backend_unavailable', 'Voice service returned an invalid response.');
+      const response = await this.transport.request(path, method, body);
+      if (!response.jsonValid && response.ok) throw invalidResponse();
+      if (!response.ok) throw mapAudioHttpError(response.status, response.payload);
+      return response.payload;
+    } catch (error) {
+      if (error instanceof EpisodeAudioClientError) throw error;
+      throw mapTransportError(error);
     }
-    if (!response.ok) throw mapAudioHttpError(response.status, payload);
-    return payload;
-  }
-
-  private baseUrl(): string {
-    const base = this.apiBaseUrl.trim().replace(/\/$/u, '');
-    if (!base) throw new EpisodeAudioClientError('not_configured', 'Live voice requires the Living Plot API URL.');
-    return base;
-  }
-
-  private async requireToken(): Promise<string> {
-    const token = await this.tokenProvider();
-    if (!token?.trim()) throw new EpisodeAudioClientError('auth_required', 'Sign in before generating or playing private voice audio.');
-    return token;
   }
 }
 
@@ -111,6 +84,22 @@ function parseAudioEnvelope(payload: unknown): EpisodeAudioAsset {
     cached: audio.cached,
     failureCode: audio.failureCode,
   };
+}
+
+function mapTransportError(error: unknown): EpisodeAudioClientError {
+  if (!(error instanceof HttpTransportError)) {
+    return new EpisodeAudioClientError('backend_unavailable', 'Voice service could not be reached.');
+  }
+  if (error.code === 'not_configured') {
+    return new EpisodeAudioClientError('not_configured', 'Live voice requires the Living Plot API URL.');
+  }
+  if (error.code === 'auth_required') {
+    return new EpisodeAudioClientError('auth_required', 'Sign in before generating or playing private voice audio.');
+  }
+  return new EpisodeAudioClientError(
+    'backend_unavailable',
+    error.code === 'timeout' ? 'Voice service took too long to respond.' : 'Voice service could not be reached.',
+  );
 }
 
 function mapAudioHttpError(status: number, payload: unknown): EpisodeAudioClientError {

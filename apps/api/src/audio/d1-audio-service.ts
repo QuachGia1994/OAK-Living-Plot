@@ -1,4 +1,5 @@
 import { D1QuotaLedger } from '../quota/d1-quota-ledger';
+import { NOOP_PRODUCT_TELEMETRY, type ProductTelemetrySink } from '../telemetry/product-events';
 import { approvedVoice } from '../tts/voice-registry';
 import type {
   AudioAssetSnapshot,
@@ -28,6 +29,7 @@ export class D1AudioService {
     private readonly db: D1Database,
     private readonly queue: AudioQueue,
     private readonly quota: D1QuotaLedger = new D1QuotaLedger(db),
+    private readonly productTelemetry: ProductTelemetrySink = NOOP_PRODUCT_TELEMETRY,
   ) {}
 
   async request(input: AudioRequestInput): Promise<AudioRequestResult> {
@@ -147,6 +149,11 @@ export class D1AudioService {
       return { ok: false, error: { code: 'queue_unavailable', message: 'Voice generation could not be queued.' } };
     }
 
+    try {
+      this.productTelemetry.recordProductEvent({ event: 'voice_requested', tier: input.tier });
+    } catch {
+      // Product analytics is observational and cannot fail a queued voice request.
+    }
     return { ok: true, value: toSnapshot(queued) };
   }
 

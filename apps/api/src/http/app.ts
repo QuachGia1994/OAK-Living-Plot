@@ -12,6 +12,8 @@ import type { LiveStoryError, LiveStoryMood } from '../live-story/contracts';
 import { LiveStoryService } from '../live-story/live-story-service';
 import { D1StoryRepository } from '../persistence/d1-story-repository';
 import { D1UserRepository } from '../persistence/d1-user-repository';
+import { CloudflareProductTelemetrySink } from '../telemetry/cloudflare-product-telemetry';
+import type { ProductTelemetrySink } from '../telemetry/product-events';
 
 export interface RequestDependencies {
   sessionVerifier?: SessionVerifier;
@@ -20,6 +22,7 @@ export interface RequestDependencies {
   revenueCatWebhookClock?: () => number;
   storyGenerator?: StoryGenerator;
   storyClock?: () => number;
+  productTelemetry?: ProductTelemetrySink;
 }
 
 export async function handleRequest(
@@ -68,7 +71,8 @@ export async function handleRequest(
     return json({ entitlement: clientEntitlement(await entitlements.getEntitlement(user.id)) });
   }
 
-  const audio = new D1AudioService(env.DB, dependencies.audioQueue ?? env.TTS_QUEUE);
+  const productTelemetry = dependencies.productTelemetry ?? new CloudflareProductTelemetrySink(env.ANALYTICS);
+  const audio = new D1AudioService(env.DB, dependencies.audioQueue ?? env.TTS_QUEUE, undefined, productTelemetry);
   if (route.kind === 'episode_audio') {
     const entitlement = await entitlements.getEntitlement(user.id);
     return handleAudioRequest(request, audio, user.id, route.episodeId, entitlement.tier);
@@ -79,8 +83,12 @@ export async function handleRequest(
 
 type StoryRoute =
   | { kind: 'story_home' }
+  | { kind: 'story_library' }
   | { kind: 'story_collection' }
   | { kind: 'story_plot'; plotId: string }
+  | { kind: 'story_history'; plotId: string }
+  | { kind: 'story_archive'; plotId: string }
+  | { kind: 'story_restore'; plotId: string }
   | { kind: 'story_generate'; plotId: string }
   | { kind: 'story_choice'; plotId: string; episodeId: string; choiceId: string };
 
@@ -97,12 +105,19 @@ function matchProtectedRoute(pathname: string): ProtectedRoute | null {
   if (pathname === '/v1/me') return { kind: 'me' };
   if (pathname === '/v1/entitlement') return { kind: 'entitlement' };
   if (pathname === '/v1/story/home') return { kind: 'story_home' };
+  if (pathname === '/v1/story/library') return { kind: 'story_library' };
   if (pathname === '/v1/story/plots') return { kind: 'story_collection' };
 
   const storyChoice = matchIds(pathname, /^\/v1\/story\/plots\/([^/]+)\/episodes\/([^/]+)\/choices\/([^/]+)$/);
   if (storyChoice) return { kind: 'story_choice', plotId: storyChoice[0], episodeId: storyChoice[1], choiceId: storyChoice[2] };
   const storyGenerate = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)\/episodes$/);
   if (storyGenerate) return { kind: 'story_generate', plotId: storyGenerate };
+  const storyHistory = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)\/history$/);
+  if (storyHistory) return { kind: 'story_history', plotId: storyHistory };
+  const storyArchive = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)\/archive$/);
+  if (storyArchive) return { kind: 'story_archive', plotId: storyArchive };
+  const storyRestore = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)\/restore$/);
+  if (storyRestore) return { kind: 'story_restore', plotId: storyRestore };
   const storyPlot = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)$/);
   if (storyPlot) return { kind: 'story_plot', plotId: storyPlot };
   const plot = matchId(pathname, /^\/v1\/plots\/([^/]+)$/);
@@ -139,7 +154,10 @@ function matchIds(pathname: string, pattern: RegExp): [string, string, string] |
 }
 
 function methodAllowed(route: ProtectedRoute, method: string): boolean {
-  if (route.kind === 'episode_audio' || route.kind === 'story_collection' || route.kind === 'story_generate' || route.kind === 'story_choice') {
+  if (
+    route.kind === 'episode_audio' || route.kind === 'story_collection' || route.kind === 'story_generate' ||
+    route.kind === 'story_choice' || route.kind === 'story_archive' || route.kind === 'story_restore'
+  ) {
     return method === 'POST';
   }
   return method === 'GET';
@@ -160,9 +178,14 @@ async function handleStoryRoute(
     env.DB,
     dependencies.storyGenerator ?? createStoryGenerator(env),
     dependencies.storyClock,
+    dependencies.productTelemetry ?? new CloudflareProductTelemetrySink(env.ANALYTICS),
   );
   if (route.kind === 'story_home') return liveStoryResponse(await service.loadHome(userId), 'home');
+  if (route.kind === 'story_library') return liveStoryResponse(await service.loadLibrary(userId), 'library');
   if (route.kind === 'story_plot') return liveStoryResponse(await service.loadPlot(userId, route.plotId), 'story');
+  if (route.kind === 'story_history') return liveStoryResponse(await service.loadHistory(userId, route.plotId), 'history');
+  if (route.kind === 'story_archive') return liveStoryResponse(await service.archivePlot(userId, route.plotId), 'plot');
+  if (route.kind === 'story_restore') return liveStoryResponse(await service.restorePlot(userId, route.plotId), 'plot');
   if (route.kind === 'story_choice') {
     return liveStoryResponse(await service.commitChoice({ userId, plotId: route.plotId, episodeId: route.episodeId, choiceId: route.choiceId }), 'story');
   }
@@ -210,7 +233,10 @@ function isLiveStoryMood(value: unknown): value is LiveStoryMood {
   return value === 'tense' || value === 'romantic' || value === 'mysterious' || value === 'hopeful';
 }
 
-function liveStoryResponse<T>(result: { ok: true; value: T } | { ok: false; error: LiveStoryError }, key: 'home' | 'story'): Response {
+function liveStoryResponse<T>(
+  result: { ok: true; value: T } | { ok: false; error: LiveStoryError },
+  key: 'home' | 'story' | 'library' | 'history' | 'plot',
+): Response {
   if (!result.ok) return liveStoryErrorResponse(result.error);
   return json({ [key]: result.value });
 }

@@ -10,6 +10,7 @@ import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
 import { handleRequest } from '../src/http/app';
 import { D1UserRepository } from '../src/persistence/d1-user-repository';
+import type { ProductEventTelemetry, ProductTelemetrySink } from '../src/telemetry/product-events';
 import type { SpeechSynthesizer } from '../src/tts/contracts';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
 
@@ -60,6 +61,29 @@ describe('audio HTTP boundary', () => {
     expect(body.audio).not.toHaveProperty('providerVoiceId');
     expect(queue.messages).toEqual([{ assetId: body.audio.id }]);
     expect(owner.id).toBeTruthy();
+  });
+
+  it('records one fresh voice product event and does not count pending replay twice', async () => {
+    await seedOwnerWithEpisodes(1);
+    const queue = fakeQueue();
+    const events: ProductEventTelemetry[] = [];
+    const productTelemetry: ProductTelemetrySink = { recordProductEvent(event) { events.push(structuredClone(event)); } };
+
+    const first = await handleRequest(postAudio('episode-1', 'voice-http-event-1'), testEnv, {
+      sessionVerifier: verifier('clerk-owner'),
+      audioQueue: queue,
+      productTelemetry,
+    });
+    const replay = await handleRequest(postAudio('episode-1', 'voice-http-event-2'), testEnv, {
+      sessionVerifier: verifier('clerk-owner'),
+      audioQueue: queue,
+      productTelemetry,
+    });
+
+    expect(first.status).toBe(202);
+    expect(replay.status).toBe(202);
+    expect(events).toEqual([{ event: 'voice_requested', tier: 'free' }]);
+    expect(queue.messages).toHaveLength(1);
   });
 
   it('does not reveal another user episode', async () => {

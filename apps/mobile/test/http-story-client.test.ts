@@ -31,6 +31,7 @@ describe('HttpStoryExperienceClient', () => {
       Response.json({ error: 'quota_exceeded' }, { status: 429 }),
       Response.json({ error: 'unauthorized' }, { status: 401 }),
       Response.json({ error: 'provider_unavailable' }, { status: 503 }),
+      Response.json({ error: 'provider_unavailable' }, { status: 503 }),
     ];
     const client = new HttpStoryExperienceClient('https://api.test', async () => 'token', async () => responses.shift()!);
 
@@ -101,6 +102,44 @@ describe('HttpStoryExperienceClient', () => {
     expect(home.retention).toMatchObject({ currentStreakDays: 2, choicesMade: 5, activePlots: 1 });
   });
 
+  it('parses library/history and uses explicit lifecycle mutation endpoints', async () => {
+    const now = Date.parse('2026-08-17T01:00:00.000Z');
+    const calls: { url: string; method: string }[] = [];
+    const fetcher = vi.fn<TestFetch>(async (input, init) => {
+      const url = String(input);
+      calls.push({ url, method: init?.method ?? 'GET' });
+      if (url.endsWith('/v1/story/library')) {
+        return Response.json({ library: { active: [plotSummaryPayload(now)], archived: [] } });
+      }
+      if (url.endsWith('/history')) {
+        return Response.json({ history: {
+          plotId: 'plot-1',
+          title: 'The Message',
+          items: [
+            { episodeId: 'episode-1', episodeNumber: 1, title: 'First turn', summary: 'Mina chose.', status: 'choice_committed', choiceKey: 'A', choiceLabel: 'Tell the truth', consequence: 'Trust changes.' },
+            { episodeId: 'episode-2', episodeNumber: 2, title: 'Second turn', summary: 'A new problem appears.', status: 'awaiting_choice' },
+          ],
+        } });
+      }
+      return Response.json({ plot: plotSummaryPayload(now) });
+    });
+    const client = new HttpStoryExperienceClient('https://api.test', async () => 'token', fetcher, 'en-US', () => now);
+
+    const library = await client.loadLibrary();
+    const history = await client.loadHistory('plot-1');
+    const archived = await client.archivePlot('plot-1');
+    const restored = await client.restorePlot('plot-1');
+
+    expect(library.active[0]).toMatchObject({ id: 'plot-1', updatedLabel: 'Just now' });
+    expect(history.items).toHaveLength(2);
+    expect(history.items[0]).toMatchObject({ choiceKey: 'A', consequence: 'Trust changes.' });
+    expect(archived.id).toBe('plot-1');
+    expect(restored.id).toBe('plot-1');
+    expect(calls.at(-2)?.method).toBe('POST');
+    expect(calls.at(-2)?.url).toContain('/archive');
+    expect(calls.at(-1)?.url).toContain('/restore');
+  });
+
   it('rejects malformed server story data instead of creating client canonical state', async () => {
     const client = new HttpStoryExperienceClient(
       'https://api.test',
@@ -115,6 +154,20 @@ describe('HttpStoryExperienceClient', () => {
 });
 
 type TestFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
+function plotSummaryPayload(updatedAt: number) {
+  return {
+    id: 'plot-1',
+    title: 'The Message',
+    premise: 'Mina receives an impossible message.',
+    mood: 'mysterious',
+    characterName: 'Mina',
+    updatedAt,
+    episodeNumber: 2,
+    status: 'ready_for_next',
+    resumeLine: 'Mina learned who sent the message.',
+  };
+}
 
 function storyPayload(overrides: { status?: 'awaiting_choice' | 'choice_committed'; committedChoiceId?: string } = {}) {
   return {

@@ -76,6 +76,33 @@ describe('PreviewStoryExperienceClient', () => {
     expect(next.episode.choices).toHaveLength(3);
   });
 
+  it('archives read-only plots reversibly and preserves canonical preview history', async () => {
+    const client = new PreviewStoryExperienceClient();
+    const plot = await client.createPlot({
+      premise: 'A stage actor receives tomorrow’s review before opening night begins.',
+      mood: 'tense',
+      characterName: 'Nhi',
+    });
+    const choice = plot.episode.choices[0];
+    await client.commitChoice(plot.id, plot.episode.id, choice.id);
+    await client.requestNextEpisode(plot.id);
+
+    const current = await client.loadPlot(plot.id);
+    const history = await client.loadHistory(plot.id);
+    expect(history.items).toHaveLength(2);
+    expect(history.items[0]).toMatchObject({ choiceKey: choice.key, consequence: choice.consequence });
+    expect(history.items[1]).toMatchObject({ status: 'awaiting_choice' });
+
+    await client.archivePlot(plot.id);
+    const archived = await client.loadLibrary();
+    expect(archived.archived.some((item) => item.id === plot.id)).toBe(true);
+    await expect(client.commitChoice(plot.id, current.episode.id, current.episode.choices[0].id)).rejects.toMatchObject({ code: 'not_found' });
+
+    await client.restorePlot(plot.id);
+    const restored = await client.loadLibrary();
+    expect(restored.active.some((item) => item.id === plot.id)).toBe(true);
+  });
+
   it('resume returns the current unresolved episode unchanged', async () => {
     const client = new PreviewStoryExperienceClient();
     const home = await client.loadHome();

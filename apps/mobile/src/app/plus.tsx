@@ -74,9 +74,9 @@ export default function PlusScreen() {
     <Screen>
       <BrandMark />
       <View style={styles.hero}>
-        <Eyebrow>OAK Living Plot Plus</Eyebrow>
-        <Text style={styles.title}>More story. More voice. Same canonical memory.</Text>
-        <Text style={styles.body}>Plus raises the server-enforced daily allowance without creating an unlimited-AI promise.</Text>
+        <Eyebrow>Living Plot Plus</Eyebrow>
+        <Text style={styles.title}>More episodes when the cliffhanger hits.</Text>
+        <Text style={styles.body}>For people who want to keep a story moving instead of stopping after the free daily episodes.</Text>
       </View>
 
       <Card>
@@ -84,18 +84,18 @@ export default function PlusScreen() {
           <Pill tone="accent">PLUS</Pill>
           <Pill tone={storeMode === 'test_store' ? 'success' : 'neutral'}>{storeModeLabel(storeMode)}</Pill>
         </View>
-        <Text style={styles.planTitle}>20 text episodes + 10 fresh voiced episodes / UTC day</Text>
-        <Text style={styles.body}>Free remains 3 text + 1 fresh voice. Cached audio replay does not spend a new voice generation slot.</Text>
-        <Text style={styles.storeNote}>{storeMode === 'test_store' ? 'Test Store is enabled for purchase-flow validation without shipping to an app store.' : storeMode === 'platform_store' ? 'This build uses the platform RevenueCat SDK key.' : 'Store purchase actions stay unavailable until a Test Store or platform public key is configured.'}</Text>
+        <Text style={styles.planTitle}>20 story episodes + 10 fresh narrated episodes each day</Text>
+        <Text style={styles.body}>Free includes 3 story episodes and 1 fresh narration per day. Replaying narration you already generated is always free.</Text>
+        <Text style={styles.storeNote}>{storeMode === 'test_store' ? 'Preview purchase mode is enabled in this development build.' : storeMode === 'platform_store' ? 'Purchases are connected for this platform.' : 'Purchases are not connected in this preview build yet.'}</Text>
         {entitlement ? <Pill tone={entitlement.plusActive ? 'success' : 'neutral'}>Backend: {entitlement.tier.toUpperCase()}</Pill> : null}
       </Card>
 
       {!session ? (
         <ErrorState
-          title="Canonical store identity unavailable"
+          title="Sign in before upgrading"
           message={auth.configured && auth.isSignedIn
-            ? "Your internal Living Plot user ID is still being resolved from the backend. Retry shortly."
-            : "Sign in first. RevenueCat is configured only with the internal Living Plot user ID resolved from /v1/me."}
+            ? "Your account is still opening. Try again in a moment."
+            : "Living Plot Plus needs a signed-in account so purchases can follow you across devices."}
         />
       ) : null}
 

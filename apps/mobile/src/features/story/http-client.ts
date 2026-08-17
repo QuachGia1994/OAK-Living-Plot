@@ -3,33 +3,43 @@ import type {
   StoryChoice,
   StoryEpisode,
   StoryExperienceClient,
+  StoryHistorySnapshot,
   StoryHomeSnapshot,
+  StoryLibrarySnapshot,
   StoryMood,
   StoryPlotSession,
   StoryPlotSummary,
 } from './contracts';
 import { StoryClientError } from './contracts';
 import { createStoryRequestKey } from './request-key';
-
-type TokenProvider = () => Promise<string | null>;
-type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+import { AuthenticatedJsonTransport, HttpTransportError, type FetchLike, type TokenProvider } from '../../lib/http-transport';
 
 export class HttpStoryExperienceClient implements StoryExperienceClient {
   private readonly createGenerationKeys = new Map<string, string>();
   private readonly nextGenerationKeys = new Map<string, string>();
+  private readonly transport: AuthenticatedJsonTransport;
 
   constructor(
-    private readonly apiBaseUrl: string,
-    private readonly tokenProvider: TokenProvider,
-    private readonly fetcher: FetchLike = fetch,
+    apiBaseUrl: string,
+    tokenProvider: TokenProvider,
+    fetcher: FetchLike = fetch,
     private readonly locale = 'en-US',
     private readonly clock: () => number = Date.now,
-  ) {}
+    timeoutMs = 12_000,
+  ) {
+    this.transport = new AuthenticatedJsonTransport(apiBaseUrl, tokenProvider, fetcher, timeoutMs);
+  }
 
   async loadHome(): Promise<StoryHomeSnapshot> {
     const payload = await this.request('/v1/story/home', 'GET');
     if (!isRecord(payload) || !isRecord(payload.home)) throw invalidBackendResponse();
     return parseHome(payload.home, this.clock());
+  }
+
+  async loadLibrary(): Promise<StoryLibrarySnapshot> {
+    const payload = await this.request('/v1/story/library', 'GET');
+    if (!isRecord(payload) || !isRecord(payload.library)) throw invalidBackendResponse();
+    return parseLibrary(payload.library, this.clock());
   }
 
   async createPlot(draft: PlotDraft, creationKey = createStoryRequestKey('creation')): Promise<StoryPlotSession> {
@@ -54,6 +64,20 @@ export class HttpStoryExperienceClient implements StoryExperienceClient {
 
   async loadPlot(plotId: string): Promise<StoryPlotSession> {
     return parseStoryEnvelope(await this.request(`/v1/story/plots/${encodeURIComponent(plotId)}`, 'GET'));
+  }
+
+  async loadHistory(plotId: string): Promise<StoryHistorySnapshot> {
+    const payload = await this.request(`/v1/story/plots/${encodeURIComponent(plotId)}/history`, 'GET');
+    if (!isRecord(payload) || !isRecord(payload.history)) throw invalidBackendResponse();
+    return parseHistory(payload.history);
+  }
+
+  async archivePlot(plotId: string): Promise<StoryPlotSummary> {
+    return this.changeLifecycle(plotId, 'archive');
+  }
+
+  async restorePlot(plotId: string): Promise<StoryPlotSummary> {
+    return this.changeLifecycle(plotId, 'restore');
   }
 
   async commitChoice(plotId: string, episodeId: string, choiceId: string): Promise<StoryPlotSession> {
@@ -89,34 +113,30 @@ export class HttpStoryExperienceClient implements StoryExperienceClient {
     }
   }
 
-  private async request(path: string, method: string, body?: unknown): Promise<unknown> {
-    const base = this.apiBaseUrl.trim().replace(/\/$/, '');
-    if (!base) throw new StoryClientError('backend_unavailable', 'Living Plot API URL is not configured.');
-    const token = await this.tokenProvider();
-    if (!token) throw new StoryClientError('auth_required', 'Sign in before using canonical Living Plot stories.');
+  private async changeLifecycle(plotId: string, action: 'archive' | 'restore'): Promise<StoryPlotSummary> {
+    const payload = await this.request(`/v1/story/plots/${encodeURIComponent(plotId)}/${action}`, 'POST');
+    if (!isRecord(payload) || !isRecord(payload.plot)) throw invalidBackendResponse();
+    return parsePlotSummary(payload.plot, this.clock());
+  }
 
-    let response: Response;
+  private async request(path: string, method: 'GET' | 'POST', body?: unknown): Promise<unknown> {
     try {
-      response = await this.fetcher(`${base}${path}`, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-    } catch {
-      throw new StoryClientError('backend_unavailable', 'The Living Plot server could not be reached.');
+      const response = await this.transport.request(path, method, body);
+      if (!response.jsonValid && response.ok) throw invalidBackendResponse();
+      if (!response.ok) throw mapHttpError(response.status, response.payload);
+      return response.payload;
+    } catch (error) {
+      if (error instanceof StoryClientError) throw error;
+      if (error instanceof HttpTransportError && error.code === 'auth_required') {
+        throw new StoryClientError('auth_required', 'Sign in before using canonical Living Plot stories.');
+      }
+      throw new StoryClientError(
+        'backend_unavailable',
+        error instanceof HttpTransportError && error.code === 'timeout'
+          ? 'The Living Plot server took too long to respond.'
+          : 'The Living Plot server could not be reached.',
+      );
     }
-
-    let payload: unknown = null;
-    try {
-      payload = await response.json();
-    } catch {
-      if (response.ok) throw invalidBackendResponse();
-    }
-    if (!response.ok) throw mapHttpError(response.status, payload);
-    return payload;
   }
 }
 
@@ -125,8 +145,12 @@ export class AuthRequiredStoryExperienceClient implements StoryExperienceClient 
     throw new StoryClientError('auth_required', 'Sign in before using canonical Living Plot stories.');
   }
   async loadHome(): Promise<StoryHomeSnapshot> { return this.fail(); }
+  async loadLibrary(): Promise<StoryLibrarySnapshot> { return this.fail(); }
   async createPlot(): Promise<StoryPlotSession> { return this.fail(); }
   async loadPlot(): Promise<StoryPlotSession> { return this.fail(); }
+  async loadHistory(): Promise<StoryHistorySnapshot> { return this.fail(); }
+  async archivePlot(): Promise<StoryPlotSummary> { return this.fail(); }
+  async restorePlot(): Promise<StoryPlotSummary> { return this.fail(); }
   async commitChoice(): Promise<StoryPlotSession> { return this.fail(); }
   async requestNextEpisode(): Promise<StoryPlotSession> { return this.fail(); }
 }
@@ -196,6 +220,51 @@ function parseHome(value: Record<string, unknown>, nowMs: number): StoryHomeSnap
       resetLabel: resetLabel(quota.resetAt),
     },
     retention: parseRetention(value.retention),
+  };
+}
+
+function parseLibrary(value: Record<string, unknown>, nowMs: number): StoryLibrarySnapshot {
+  if (!Array.isArray(value.active) || !Array.isArray(value.archived)) throw invalidBackendResponse();
+  return {
+    active: value.active.map((plot) => parsePlotSummary(plot, nowMs)),
+    archived: value.archived.map((plot) => parsePlotSummary(plot, nowMs)),
+  };
+}
+
+function parseHistory(value: Record<string, unknown>): StoryHistorySnapshot {
+  if (typeof value.plotId !== 'string' || typeof value.title !== 'string' || !Array.isArray(value.items)) {
+    throw invalidBackendResponse();
+  }
+  return {
+    plotId: value.plotId,
+    title: value.title,
+    items: value.items.map((item) => {
+      if (
+        !isRecord(item) || typeof item.episodeId !== 'string' || !Number.isInteger(item.episodeNumber) ||
+        typeof item.title !== 'string' || typeof item.summary !== 'string' ||
+        (item.status !== 'awaiting_choice' && item.status !== 'choice_committed')
+      ) throw invalidBackendResponse();
+      const parsed = {
+        episodeId: item.episodeId,
+        episodeNumber: Number(item.episodeNumber),
+        title: item.title,
+        summary: item.summary,
+        status: item.status,
+      } as StoryHistorySnapshot['items'][number];
+      if (item.choiceKey !== undefined) {
+        if (!isChoiceKey(item.choiceKey)) throw invalidBackendResponse();
+        parsed.choiceKey = item.choiceKey;
+      }
+      if (item.choiceLabel !== undefined) {
+        if (typeof item.choiceLabel !== 'string') throw invalidBackendResponse();
+        parsed.choiceLabel = item.choiceLabel;
+      }
+      if (item.consequence !== undefined) {
+        if (typeof item.consequence !== 'string') throw invalidBackendResponse();
+        parsed.consequence = item.consequence;
+      }
+      return parsed;
+    }),
   };
 }
 

@@ -6,6 +6,7 @@ import type { StoryChoice, StoryPlotSession } from '@/features/story/contracts';
 import { StoryClientError } from '@/features/story/contracts';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
+import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
 import { colors, radius, spacing } from '@/ui/theme';
 
@@ -13,8 +14,9 @@ export default function StoryScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
   const storyExperienceClient = useStoryExperienceClient();
-  const params = useLocalSearchParams<{ plotId?: string | string[] }>();
+  const params = useLocalSearchParams<{ plotId?: string | string[]; readOnly?: string | string[] }>();
   const plotId = useMemo(() => readParam(params.plotId), [params.plotId]);
+  const readOnly = useMemo(() => readParam(params.readOnly) === '1', [params.readOnly]);
   const [session, setSession] = useState<StoryPlotSession | null>(null);
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,7 +24,7 @@ export default function StoryScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-  if (!plotId) {
+    if (!plotId) {
       setError('This story link is missing its plot identifier.');
       setLoading(false);
       return;
@@ -38,6 +40,18 @@ export default function StoryScreen() {
       setLoading(false);
     }
   }, [plotId, storyExperienceClient]);
+
+  const refresh = useCallback(async () => {
+    if (!plotId || (auth.configured && (!auth.isLoaded || !auth.isSignedIn))) return;
+    try {
+      setSession(await storyExperienceClient.loadPlot(plotId));
+      setError(null);
+    } catch (caught) {
+      setError(messageForError(caught, 'This story could not be refreshed.'));
+    }
+  }, [auth.configured, auth.isLoaded, auth.isSignedIn, plotId, storyExperienceClient]);
+
+  useRefreshOnForeground(refresh);
 
   useEffect(() => {
     if (!plotId || (auth.configured && (!auth.isLoaded || !auth.isSignedIn))) return;
@@ -99,8 +113,8 @@ export default function StoryScreen() {
       <Screen>
         <BrandMark />
         <ErrorState
-          title={auth.isLoaded ? 'Sign in to resume this story' : 'Loading secure session…'}
-          message="Canonical story memory is available only through your authenticated Living Plot account."
+          title={auth.isLoaded ? 'Sign in to continue this story' : 'Opening your account…'}
+          message="Sign in so Living Plot can remember your past choices and continue from the right scene."
         />
         {auth.isLoaded ? <ActionButton label="Sign in with email code" onPress={() => router.replace('/auth')} /> : null}
         <ActionButton label="Back to home" variant="ghost" onPress={() => router.replace('/')} />
@@ -122,7 +136,7 @@ export default function StoryScreen() {
     return (
       <Screen>
         <BrandMark />
-        <LoadingState label="Resuming the latest canonical episode…" />
+        <LoadingState label="Opening your latest episode…" />
       </Screen>
     );
   }
@@ -145,13 +159,16 @@ export default function StoryScreen() {
     <Screen>
       <View style={styles.topBar}>
         <BrandMark />
-        <ActionButton label="All plots" variant="ghost" onPress={() => router.replace('/')} />
+        <View style={styles.topActions}>
+          <ActionButton label="History" variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
+          <ActionButton label="All plots" variant="ghost" onPress={() => router.replace('/')} />
+        </View>
       </View>
 
       <View style={styles.plotHeader}>
         <View style={styles.plotMetaRow}>
           <Pill tone={awaitingChoice ? 'accent' : 'success'}>
-            {awaitingChoice ? 'Awaiting your choice' : 'Choice committed'}
+            {awaitingChoice ? 'Your move' : 'Choice locked in'}
           </Pill>
           <Text style={styles.episodeNumber}>EPISODE {episode.number}</Text>
         </View>
@@ -175,12 +192,19 @@ export default function StoryScreen() {
         />
       ) : null}
 
-      {awaitingChoice ? (
+      {readOnly ? (
+        <Card style={styles.readOnlyCard}>
+          <Eyebrow>Archived story</Eyebrow>
+          <Text style={styles.readOnlyTitle}>This story is paused.</Text>
+          <Text style={styles.commitEmpty}>Restore it from My Stories when you want to make another choice or continue the next episode.</Text>
+          <ActionButton label="Open story library" variant="secondary" onPress={() => router.push('/library')} />
+        </Card>
+      ) : awaitingChoice ? (
         <View style={styles.choiceSection}>
           <View style={styles.choiceHeading}>
             <View style={styles.choiceHeadingText}>
-              <Eyebrow>The decision</Eyebrow>
-              <Text style={styles.choiceTitle}>What does {session.characterName} do?</Text>
+              <Eyebrow>Choose the next turn</Eyebrow>
+              <Text style={styles.choiceTitle}>What should {session.characterName} do?</Text>
             </View>
             <Pill>Choose 1 of 3</Pill>
           </View>
@@ -200,15 +224,15 @@ export default function StoryScreen() {
           <Card style={styles.commitCard}>
             {selectedChoice ? (
               <>
-                <Text style={styles.commitLabel}>Selected path</Text>
+                <Text style={styles.commitLabel}>Your pick</Text>
                 <Text style={styles.commitChoice}>{selectedChoice.label}</Text>
                 <Text style={styles.commitIntent}>Intent: {selectedChoice.intent}</Text>
               </>
             ) : (
-              <Text style={styles.commitEmpty}>Select one action above. Nothing changes until you commit it.</Text>
+              <Text style={styles.commitEmpty}>Pick A, B or C. You can still change your mind before locking it in.</Text>
             )}
             <ActionButton
-              label="Commit this choice"
+              label="Lock in this choice"
               busy={busyAction === 'commit'}
               disabled={!selectedChoice}
               onPress={() => void commitChoice()}
@@ -218,17 +242,17 @@ export default function StoryScreen() {
       ) : (
         <View style={styles.consequenceSection}>
           <Card style={styles.consequenceCard}>
-            <Eyebrow>Now canonical</Eyebrow>
-            <Text style={styles.consequenceTitle}>Your choice changed the story.</Text>
+            <Eyebrow>The consequence</Eyebrow>
+            <Text style={styles.consequenceTitle}>That choice changed what happens next.</Text>
             <Text style={styles.consequenceBody}>{episode.committedConsequence}</Text>
           </Card>
           <ActionButton
-            label={`Generate episode ${episode.number + 1}`}
+            label={`Continue to episode ${episode.number + 1}`}
             busy={busyAction === 'next'}
             onPress={() => void requestNextEpisode()}
           />
           <Text style={styles.nextNote}>
-            The next episode is built from the committed consequence, not from an untrusted local selection.
+            The next episode continues directly from the consequence you just created.
           </Text>
         </View>
       )}
@@ -293,6 +317,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   plotHeader: {
     gap: spacing.sm,
     paddingTop: spacing.md,
@@ -441,6 +466,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
   },
+  readOnlyCard: { backgroundColor: colors.surfaceQuiet },
+  readOnlyTitle: { color: colors.ink, fontSize: 22, lineHeight: 28, fontWeight: '900' },
   consequenceSection: {
     gap: spacing.md,
   },

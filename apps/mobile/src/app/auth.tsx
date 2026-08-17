@@ -15,9 +15,9 @@ export default function AuthScreen() {
       <Screen>
         <BrandMark />
         <Card>
-          <Eyebrow>Local preview</Eyebrow>
-          <Text style={styles.title}>Clerk is not configured.</Text>
-          <Text style={styles.body}>Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to switch this build from deterministic preview stories to authenticated canonical stories.</Text>
+          <Eyebrow>Preview build</Eyebrow>
+          <Text style={styles.title}>Sign-in is not connected in this preview.</Text>
+          <Text style={styles.body}>You can still explore the complete story flow. Account sign-in will be available once the live service is connected.</Text>
         </Card>
         <ActionButton label="Back to preview" onPress={() => router.replace('/')} />
       </Screen>
@@ -104,12 +104,12 @@ function ClerkEmailOtpForm() {
     <Screen>
       <BrandMark />
       <View style={styles.intro}>
-        <Eyebrow>Canonical story identity</Eyebrow>
-        <Text style={styles.title}>{verifying ? 'Check your email.' : 'Sign in or create your account.'}</Text>
+        <Eyebrow>Keep your stories with you</Eyebrow>
+        <Text style={styles.title}>{verifying ? 'Check your email.' : 'Continue with email.'}</Text>
         <Text style={styles.body}>
           {verifying
             ? `Enter the one-time code sent to ${email.trim()}.`
-            : 'One email code signs you in. If the account does not exist yet, the verified email transfers to sign-up without exposing account existence first.'}
+            : 'One email code is enough. Your plots, choices and story progress stay linked to your account.'}
         </Text>
       </View>
 
@@ -121,7 +121,7 @@ function ClerkEmailOtpForm() {
             autoCorrect={false}
             keyboardType="email-address"
             placeholder="you@example.com"
-            placeholderTextColor="#666169"
+            placeholderTextColor={colors.placeholder}
             style={styles.input}
             value={email}
             onChangeText={setEmail}
@@ -133,7 +133,7 @@ function ClerkEmailOtpForm() {
             autoCapitalize="none"
             keyboardType="number-pad"
             placeholder="123456"
-            placeholderTextColor="#666169"
+            placeholderTextColor={colors.placeholder}
             style={styles.input}
             value={code}
             onChangeText={setCode}
