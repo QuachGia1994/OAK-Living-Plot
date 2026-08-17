@@ -103,12 +103,29 @@ jobs:
         run: npx expo prebuild --platform ios --clean --no-install
         working-directory: apps/mobile
 
-      - name: Pin RevenueCat iOS sources locally
+      - name: Prepare pinned RevenueCat specs repo
         working-directory: apps/mobile
         run: |
-          git clone --depth 1 --branch 18.30.0 https://github.com/RevenueCat/purchases-hybrid-common.git ios/vendor/purchases-hybrid-common
-          git clone --depth 1 --branch 5.83.1 https://github.com/RevenueCat/purchases-ios.git ios/vendor/purchases-ios
-          node ../../scripts/patch-ios-revenuecat-local-pods.mjs ios/Podfile
+          set -euo pipefail
+          specs_repo="$RUNNER_TEMP/living-plot-podspecs"
+          sources_root="$RUNNER_TEMP/living-plot-revenuecat-sources"
+          mkdir -p "$specs_repo/Specs/PurchasesHybridCommon/18.30.0"
+          mkdir -p "$specs_repo/Specs/PurchasesHybridCommonUI/18.30.0"
+          mkdir -p "$specs_repo/Specs/RevenueCat/5.83.1"
+          mkdir -p "$specs_repo/Specs/RevenueCatUI/5.83.1"
+          mkdir -p "$sources_root"
+          git clone --depth 1 --branch 18.30.0 https://github.com/RevenueCat/purchases-hybrid-common.git "$sources_root/purchases-hybrid-common"
+          git clone --depth 1 --branch 5.83.1 https://github.com/RevenueCat/purchases-ios.git "$sources_root/purchases-ios"
+          cp "$sources_root/purchases-hybrid-common/PurchasesHybridCommon.podspec" "$specs_repo/Specs/PurchasesHybridCommon/18.30.0/"
+          cp "$sources_root/purchases-hybrid-common/PurchasesHybridCommonUI.podspec" "$specs_repo/Specs/PurchasesHybridCommonUI/18.30.0/"
+          cp "$sources_root/purchases-ios/RevenueCat.podspec" "$specs_repo/Specs/RevenueCat/5.83.1/"
+          cp "$sources_root/purchases-ios/RevenueCatUI.podspec" "$specs_repo/Specs/RevenueCatUI/5.83.1/"
+          git -C "$specs_repo" init -q
+          git -C "$specs_repo" config user.name "Living Plot CI"
+          git -C "$specs_repo" config user.email "ci@livingplot.invalid"
+          git -C "$specs_repo" add Specs
+          git -C "$specs_repo" commit -qm "Pin RevenueCat podspecs"
+          node ../../scripts/patch-ios-pod-source.mjs ios/Podfile "file://$specs_repo"
 
       - name: Install CocoaPods
         working-directory: apps/mobile/ios
