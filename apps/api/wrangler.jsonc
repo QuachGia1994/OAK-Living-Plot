@@ -54,12 +54,14 @@
         {
           "binding": "DB",
           "database_name": "living-plot-dev",
+          "database_id": "bbd5a628-cf93-4ffa-a459-2368025b4067",
           "migrations_dir": "migrations"
         }
       ],
       "r2_buckets": [
         {
-          "binding": "AUDIO_BUCKET"
+          "binding": "AUDIO_BUCKET",
+          "bucket_name": "living-plot-audio-dev"
         }
       ],
       "analytics_engine_datasets": [

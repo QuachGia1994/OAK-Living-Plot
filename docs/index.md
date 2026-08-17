@@ -19,6 +19,7 @@
 - [Phase 1 mobile resilience and accessibility](arch/mobile-resilience.md) — bounded authenticated networking, safe GET retry, foreground refresh, UI recovery, and accessibility behavior.
 - [Phase 1 preferences and account data](arch/account-data-preferences.md) — EN/VI interface plus story/narrator defaults, spoiler-safe sharing, portable export, fail-closed application-data erasure, and safe diagnostics.
 - [Live development setup](ref/live-development.md) — secret-safe readiness checks, non-production Cloudflare environment, and mobile/provider configuration.
+- [Closed Beta RC runbook](ref/beta-rc-runbook.md) — current development provisioning, provider blockers, abuse/cost guardrails, live bring-up order, and exact-SHA release verification.
 - [Huashu-inspired mobile redesign](plan/huashu-redesign.md) — production React Native adaptation of the Cinematic Editorial visual system across the Phase 1 mobile surfaces.
 - [Foundation implementation slice 1](plan/done/foundation-slice1.md) — completed workspace/CI foundation and verification evidence.
 - [D1 implementation slice 2](plan/done/d1-slice2.md) — completed D1/domain baseline and verification evidence.
@@ -50,3 +51,4 @@
 - [Account erasure slice 29](plan/done/account-erasure-slice29.md) — completed R2-first fail-closed Living Plot application-data deletion.
 - [Release-candidate diagnostics slice 30](plan/done/release-candidate-diagnostics-slice30.md) — completed safe runtime/privacy diagnostics surface without secret or story-content disclosure.
 - [Live beta slices 31–40](plan/done/live-beta-slices31-40.md) — localized/onboarding/narrative/retention/live-smoke/CI release-candidate batch with unavailable provider proof explicitly blocked.
+- [Closed Beta RC stages 41–50](plan/done/beta-rc-stages41-50.md) — native UX hardening, Cloudflare dev provisioning, RC security/cost guardrails, and explicit external provider gates.

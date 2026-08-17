@@ -16,6 +16,7 @@ export default function HomeScreen() {
   const storyExperienceClient = useStoryExperienceClient();
   const [snapshot, setSnapshot] = useState<StoryHomeSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const firstRun = snapshot?.recentPlots.length === 0;
 
   const load = useCallback(async () => {
     if (auth.configured && (!auth.isLoaded || !auth.isSignedIn)) return;
@@ -28,6 +29,11 @@ export default function HomeScreen() {
   }, [auth.configured, auth.isLoaded, auth.isSignedIn, storyExperienceClient, t]);
 
   useRefreshOnForeground(load);
+
+  function openDailySpark(source: StoryHomeSnapshot) {
+    const prompt = source.retention.dailyPrompt;
+    router.push({ pathname: '/create', params: { premise: prompt.premise, mood: prompt.mood, characterName: prompt.characterName } });
+  }
 
   useEffect(() => {
     if (auth.configured && (!auth.isLoaded || !auth.isSignedIn)) return;
@@ -89,59 +95,61 @@ export default function HomeScreen() {
         <Text style={styles.heroBody}>
           {t('Create a situation, watch a short AI drama unfold, then choose one of three paths. The next episode remembers what you did.', 'Tạo một tình huống, xem drama AI ngắn diễn ra rồi chọn một trong ba hướng. Tập tiếp theo ghi nhớ điều bạn đã làm.')}
         </Text>
-        <ActionButton label={t('Create a custom plot', 'Tạo cốt truyện riêng')} onPress={() => router.push('/create')} />
-        <ActionButton label={t('My stories', 'Câu chuyện của tôi')} variant="secondary" onPress={() => router.push('/library')} />
+        {firstRun && snapshot ? (
+          <>
+            <ActionButton label={t('Start today’s story', 'Bắt đầu câu chuyện hôm nay')} onPress={() => openDailySpark(snapshot)} />
+            <ActionButton label={t('Create my own plot', 'Tự tạo cốt truyện')} variant="secondary" onPress={() => router.push('/create')} />
+          </>
+        ) : (
+          <>
+            <ActionButton label={t('Create a custom plot', 'Tạo cốt truyện riêng')} onPress={() => router.push('/create')} />
+            <ActionButton label={t('My stories', 'Câu chuyện của tôi')} variant="secondary" onPress={() => router.push('/library')} />
+          </>
+        )}
         <ActionButton label={t('Settings & data', 'Cài đặt & dữ liệu')} variant="ghost" onPress={() => router.push('/settings')} />
       </View>
-
-      <HowItWorks t={t} />
 
       {error ? <ErrorState title={t('Couldn’t load your stories', 'Không thể tải câu chuyện')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
 
       {snapshot ? (
         <>
           {snapshot.recentPlots.length === 0 ? (
-            <MotionReveal>
-              <FirstRunCard snapshot={snapshot} t={t} onStart={() => {
-                const prompt = snapshot.retention.dailyPrompt;
-                router.push({ pathname: '/create', params: { premise: prompt.premise, mood: prompt.mood, characterName: prompt.characterName } });
-              }} />
-            </MotionReveal>
+            <>
+              <MotionReveal>
+                <FirstRunCard snapshot={snapshot} t={t} onStart={() => openDailySpark(snapshot)} />
+              </MotionReveal>
+              <HowItWorks t={t} />
+            </>
           ) : <MotionReveal><RetentionCard snapshot={snapshot} t={t} /></MotionReveal>}
           {snapshot.recentPlots.length > 0 ? (
             <MotionReveal delay={70}>
-              <DailySparkCard snapshot={snapshot} t={t} onStart={() => {
-                const prompt = snapshot.retention.dailyPrompt;
-                router.push({ pathname: '/create', params: { premise: prompt.premise, mood: prompt.mood, characterName: prompt.characterName } });
-              }} />
+              <DailySparkCard snapshot={snapshot} t={t} onStart={() => openDailySpark(snapshot)} />
             </MotionReveal>
           ) : null}
           <QuotaCard snapshot={snapshot} t={t} />
           <ActionButton label={t('Unlock more episodes', 'Mở thêm tập')} variant="secondary" onPress={() => router.push('/plus')} />
-          <View style={styles.sectionHeader}>
-            <View>
-              <Eyebrow>{t('Continue the drama', 'Tiếp tục drama')}</Eyebrow>
-              <Text style={styles.sectionTitle}>{t('Pick up where you left off', 'Tiếp tục từ nơi bạn dừng')}</Text>
-            </View>
-            <Text style={styles.sectionMeta}>{snapshot.recentPlots.length} {t('active', 'đang hoạt động')}</Text>
-          </View>
+          {snapshot.recentPlots.length > 0 ? (
+            <>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Eyebrow>{t('Continue the drama', 'Tiếp tục drama')}</Eyebrow>
+                  <Text style={styles.sectionTitle}>{t('Pick up where you left off', 'Tiếp tục từ nơi bạn dừng')}</Text>
+                </View>
+                <Text style={styles.sectionMeta}>{snapshot.recentPlots.length} {t('active', 'đang hoạt động')}</Text>
+              </View>
 
-          <View style={styles.plotList}>
-            {snapshot.recentPlots.length === 0 ? (
-              <Card>
-                <Eyebrow>{t('No active plots', 'Chưa có cốt truyện hoạt động')}</Eyebrow>
-                <Text style={styles.emptyTitle}>{t('No stories yet.', 'Chưa có câu chuyện nào.')}</Text>
-                <Text style={styles.plotPremise}>{t('Use today’s spark above or create your own setup. Episode 1 does the rest.', 'Dùng gợi ý hôm nay ở trên hoặc tự tạo thiết lập. Tập 1 sẽ lo phần còn lại.')}</Text>
-              </Card>
-            ) : snapshot.recentPlots.map((plot) => (
-              <RecentPlotCard
-                key={plot.id}
-                plot={plot}
-                t={t}
-                onPress={() => router.push({ pathname: '/story', params: { plotId: plot.id } })}
-              />
-            ))}
-          </View>
+              <View style={styles.plotList}>
+                {snapshot.recentPlots.map((plot) => (
+                  <RecentPlotCard
+                    key={plot.id}
+                    plot={plot}
+                    t={t}
+                    onPress={() => router.push({ pathname: '/story', params: { plotId: plot.id } })}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
         </>
       ) : null}
 
@@ -354,10 +362,13 @@ const styles = StyleSheet.create({
   },
   quotaRows: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   quotaMetric: {
-    flex: 1,
+    minWidth: 140,
+    flexGrow: 1,
+    flexBasis: 0,
     gap: spacing.xs,
     paddingVertical: spacing.sm,
   },
@@ -439,14 +450,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
-  emptyTitle: {
-    color: colors.ink,
-    fontSize: 21,
-    lineHeight: 27,
-    fontWeight: '900',
-  },
   plotFooter: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     gap: spacing.sm,
   },

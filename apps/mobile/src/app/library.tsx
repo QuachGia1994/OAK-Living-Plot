@@ -162,6 +162,6 @@ const styles = StyleSheet.create({
   plotHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   plotTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700' },
   meta: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 10, letterSpacing: 0.5 },
-  actions: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
-  actionGrow: { flex: 1 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingTop: spacing.xs },
+  actionGrow: { minWidth: 140, flex: 1 },
 });

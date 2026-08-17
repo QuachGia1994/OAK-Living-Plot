@@ -56,7 +56,7 @@ Slice 23 adds a second bounded event family for the Phase 1 value test. Events a
 Product points contain only event name plus optional bounded mood, Free/Plus tier, episode number, and an episode-depth bucket (`episode_1`, `episodes_2_3`, `episodes_4_7`, `episode_8_plus`). They contain no user/plot/episode/choice ID, premise, prompt, script, choice label, consequence, auth data, or credential. Product telemetry uses the same Analytics Engine binding and is fail-open.
 
 ## Retention aggregate
-`scripts/retention-summary.sql` computes aggregate activation/depth plus exact D1/D7 return counts from canonical D1 timestamps. The query may join on internal user IDs inside D1, but its output contains metric names and counts only; identifiers never leave the database. `npm run retention:summary:dev` intentionally targets the development D1 and requires real Cloudflare development resources/credentials before it can run remotely.
+`scripts/retention-summary.sql` computes aggregate activation/depth plus exact D1/D7 return counts from canonical D1 timestamps. The query may join on internal user IDs inside D1, but its output is one aggregate row of metric counts only; identifiers never leave the database. `npm run retention:summary:dev` runs the query through a Node/Wrangler `--command` wrapper so the metric row is displayed directly. It intentionally targets the development D1 and requires real Cloudflare development resources/credentials before it can run remotely.
 
 ## Failure semantics
 Provider HTTP/network failures do not invent token usage or cost. Unknown model pricing or unsafe numeric input is dropped rather than estimated. Analytics Engine exceptions are swallowed at the observational boundary so generation results are unchanged.

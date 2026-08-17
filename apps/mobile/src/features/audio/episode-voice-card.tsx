@@ -4,8 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useUiCopy } from '@/features/localization/ui-copy';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
 import { createStoryRequestKey } from '@/features/story/request-key';
-import { ActionButton, Card, Eyebrow, Pill } from '@/ui/primitives';
-import { colors, radius, spacing } from '@/ui/theme';
+import { ActionButton, Eyebrow, Pill } from '@/ui/primitives';
+import { colors, radius, spacing, typography } from '@/ui/theme';
 import type { EpisodeAudioAsset } from './contracts';
 import { EpisodeAudioClientError } from './contracts';
 import { useEpisodeAudioClient } from './audio-client-context';
@@ -112,7 +112,7 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
   const progress = playerStatus.duration > 0 ? Math.min(1, playerStatus.currentTime / playerStatus.duration) : 0;
 
   return (
-    <Card style={styles.card}>
+    <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Eyebrow>{t('Episode voice', 'Giọng đọc tập')}</Eyebrow>
@@ -160,7 +160,7 @@ export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
       )}
 
       {error ? <Text style={styles.error} accessibilityLiveRegion="assertive">{error}</Text> : null}
-    </Card>
+    </View>
   );
 }
 
@@ -198,15 +198,21 @@ function formatTime(value: number): string {
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surfaceRaised },
+  card: {
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+  },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   headerCopy: { flex: 1, gap: spacing.xs },
-  title: { color: colors.ink, fontSize: 20, fontWeight: '900' },
+  title: { color: colors.ink, fontFamily: typography.display, fontSize: 21, lineHeight: 27, fontWeight: '700' },
   body: { color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
   track: { height: 5, overflow: 'hidden', borderRadius: radius.pill, backgroundColor: colors.border },
   trackFill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.accent },
-  time: { color: colors.inkMuted, fontSize: 11, fontWeight: '700', textAlign: 'right' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  time: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 10, fontWeight: '700', textAlign: 'right' },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   flexButton: { flex: 1 },
   error: { color: colors.danger, fontSize: 12, lineHeight: 18 },
 });

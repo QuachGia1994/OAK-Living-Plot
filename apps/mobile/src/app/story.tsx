@@ -9,7 +9,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeShareText } from '@/features/share/story-share';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
-import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, MotionReveal, Pill, Screen } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
 
 export default function StoryScreen() {
@@ -162,15 +162,7 @@ export default function StoryScreen() {
     <Screen>
       <View style={styles.topBar}>
         <BrandMark />
-        <View style={styles.topActions}>
-          <ActionButton
-            label={t('Share', 'Chia sẻ')}
-            variant="ghost"
-            onPress={() => void Share.share({ message: buildSpoilerSafeShareText({ title: session.title, episodeNumber: episode.number, premise: session.premise }) })}
-          />
-          <ActionButton label={t('History', 'Lịch sử')} variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
-          <ActionButton label={t('All plots', 'Tất cả cốt truyện')} variant="ghost" onPress={() => router.replace('/')} />
-        </View>
+        <ActionButton label={t('My stories', 'Câu chuyện của tôi')} variant="ghost" onPress={() => router.push('/library')} />
       </View>
 
       <View style={styles.plotHeader}>
@@ -182,13 +174,26 @@ export default function StoryScreen() {
         </View>
         <Text style={styles.plotTitle}>{session.title}</Text>
         <Text style={styles.plotMeta}>{session.characterName} · {session.mood}</Text>
+        <View style={styles.storyActions}>
+          <ActionButton
+            label={t('Share episode', 'Chia sẻ tập')}
+            variant="ghost"
+            onPress={() => void Share.share({ message: buildSpoilerSafeShareText({ title: session.title, episodeNumber: episode.number, premise: session.premise }) })}
+          />
+          <ActionButton label={t('Story history', 'Lịch sử truyện')} variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
+        </View>
       </View>
 
-      <View style={styles.episodeBlock}>
-        <Eyebrow>{t(`Episode ${episode.number}`, `Tập ${episode.number}`)}</Eyebrow>
-        <Text style={styles.episodeTitle}>{episode.title}</Text>
-        <Text style={styles.episodeBody}>{episode.body}</Text>
-      </View>
+      <MotionReveal key={episode.id}>
+        <View style={styles.episodeBlock}>
+          <View style={styles.sceneMarker}>
+            <Text style={styles.sceneMarkerText}>{t(`EP ${episode.number} · SCENE`, `TẬP ${episode.number} · CẢNH`)}</Text>
+            <View style={styles.sceneRule} />
+          </View>
+          <Text style={styles.episodeTitle}>{episode.title}</Text>
+          <Text style={styles.episodeBody}>{episode.body}</Text>
+        </View>
+      </MotionReveal>
 
       <EpisodeVoiceCard key={episode.id} episodeId={episode.id} />
 
@@ -209,7 +214,8 @@ export default function StoryScreen() {
           <ActionButton label={t('Open story library', 'Mở thư viện câu chuyện')} variant="secondary" onPress={() => router.push('/library')} />
         </Card>
       ) : awaitingChoice ? (
-        <View style={styles.choiceSection}>
+        <MotionReveal key={`choice-${episode.id}`}>
+          <View style={styles.choiceSection}>
           <View style={styles.choiceHeading}>
             <View style={styles.choiceHeadingText}>
               <Eyebrow>{t('Choose the next turn', 'Chọn bước ngoặt tiếp theo')}</Eyebrow>
@@ -248,9 +254,11 @@ export default function StoryScreen() {
               onPress={() => void commitChoice()}
             />
           </Card>
-        </View>
+          </View>
+        </MotionReveal>
       ) : (
-        <View style={styles.consequenceSection}>
+        <MotionReveal key={`consequence-${episode.id}`}>
+          <View style={styles.consequenceSection}>
           <Card style={styles.consequenceCard}>
             <Eyebrow>{t('The consequence', 'Hậu quả')}</Eyebrow>
             <Text style={styles.consequenceTitle}>{t('That choice changed what happens next.', 'Lựa chọn đó đã thay đổi điều xảy ra tiếp theo.')}</Text>
@@ -264,7 +272,8 @@ export default function StoryScreen() {
           <Text style={styles.nextNote}>
             {t('The next episode continues directly from the consequence you just created.', 'Tập tiếp theo tiếp tục trực tiếp từ hậu quả bạn vừa tạo ra.')}
           </Text>
-        </View>
+          </View>
+        </MotionReveal>
       )}
     </Screen>
   );
@@ -332,7 +341,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  topActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   plotHeader: {
     gap: spacing.sm,
     paddingTop: spacing.lg,
@@ -365,10 +373,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textTransform: 'capitalize',
   },
+  storyActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginHorizontal: -spacing.sm,
+  },
   episodeBlock: {
     gap: spacing.md,
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
+  },
+  sceneMarker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sceneMarkerText: {
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.6,
+  },
+  sceneRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderStrong,
   },
   episodeTitle: {
     color: colors.ink,
@@ -390,6 +421,7 @@ const styles = StyleSheet.create({
   },
   choiceHeading: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     gap: spacing.md,

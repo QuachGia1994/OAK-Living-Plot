@@ -27,16 +27,11 @@ user_depth AS (
   JOIN episodes e ON e.plot_id = p.id
   GROUP BY p.user_id
 )
-SELECT 'activated_users' AS metric, COUNT(*) AS value FROM activated
-UNION ALL
-SELECT 'choice_users', COUNT(*) FROM first_choice
-UNION ALL
-SELECT 'd1_returners', COUNT(DISTINCT user_id) FROM choice_days WHERE day_offset = 1
-UNION ALL
-SELECT 'd7_returners', COUNT(DISTINCT user_id) FROM choice_days WHERE day_offset = 7
-UNION ALL
-SELECT 'day7_plus_returners', COUNT(DISTINCT user_id) FROM choice_days WHERE day_offset >= 7
-UNION ALL
-SELECT 'episode_4_plus_users', COUNT(*) FROM user_depth WHERE max_episode >= 4
-UNION ALL
-SELECT 'episode_8_plus_users', COUNT(*) FROM user_depth WHERE max_episode >= 8;
+SELECT
+  (SELECT COUNT(*) FROM activated) AS activated_users,
+  (SELECT COUNT(*) FROM first_choice) AS choice_users,
+  (SELECT COUNT(DISTINCT user_id) FROM choice_days WHERE day_offset = 1) AS d1_returners,
+  (SELECT COUNT(DISTINCT user_id) FROM choice_days WHERE day_offset = 7) AS d7_returners,
+  (SELECT COUNT(DISTINCT user_id) FROM choice_days WHERE day_offset >= 7) AS day7_plus_returners,
+  (SELECT COUNT(*) FROM user_depth WHERE max_episode >= 4) AS episode_4_plus_users,
+  (SELECT COUNT(*) FROM user_depth WHERE max_episode >= 8) AS episode_8_plus_users;

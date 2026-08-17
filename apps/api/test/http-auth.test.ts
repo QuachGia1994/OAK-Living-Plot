@@ -39,7 +39,22 @@ describe('protected HTTP boundary', () => {
 
     expect(response.status).toBe(401);
     expect(response.headers.get('WWW-Authenticate')).toBe('Bearer');
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
     expect(await response.json()).toEqual({ error: 'unauthorized' });
+  });
+
+  it('rejects declared oversized protected request bodies before authentication work', async () => {
+    const response = await handleRequest(new Request('https://living-plot.test/v1/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': '20000' },
+      body: '{}',
+    }), testEnv, {
+      sessionVerifier: verifier('clerk-owner'),
+    });
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: 'payload_too_large' });
   });
 
   it('maps the authenticated subject to an internal user', async () => {

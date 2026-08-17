@@ -18,6 +18,8 @@ import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences'
 import { CloudflareProductTelemetrySink } from '../telemetry/cloudflare-product-telemetry';
 import type { ProductTelemetrySink } from '../telemetry/product-events';
 
+const MAX_JSON_BODY_CHARACTERS = 16_384;
+
 export interface RequestDependencies {
   sessionVerifier?: SessionVerifier;
   audioQueue?: AudioQueue;
@@ -47,6 +49,7 @@ export async function handleRequest(
   const route = matchProtectedRoute(url.pathname);
   if (!route) return json({ error: 'not_found' }, 404);
   if (!methodAllowed(route, request.method)) return json({ error: 'method_not_allowed' }, 405);
+  if (requestBodyTooLarge(request)) return json({ error: 'payload_too_large' }, 413);
 
   let principal;
   try {
@@ -239,11 +242,20 @@ async function handleStoryRoute(
 
 async function parseJsonObject(request: Request): Promise<Record<string, unknown> | null> {
   try {
-    const value: unknown = await request.json();
+    const raw = await request.text();
+    if (raw.length > MAX_JSON_BODY_CHARACTERS) return null;
+    const value: unknown = JSON.parse(raw);
     return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null;
   } catch {
     return null;
   }
+}
+
+function requestBodyTooLarge(request: Request): boolean {
+  const contentLength = request.headers.get('content-length');
+  if (!contentLength) return false;
+  const parsed = Number(contentLength);
+  return Number.isFinite(parsed) && parsed > MAX_JSON_BODY_CHARACTERS;
 }
 
 function isLiveStoryMood(value: unknown): value is LiveStoryMood {
@@ -331,13 +343,8 @@ async function handleAudioRequest(
   episodeId: string,
   tier: 'free' | 'plus',
 ): Promise<Response> {
-  let body: { voiceVariant?: unknown; reservationKey?: unknown };
-  try {
-    body = (await request.json()) as { voiceVariant?: unknown; reservationKey?: unknown };
-  } catch {
-    return json({ error: 'invalid_request' }, 400);
-  }
-  if (typeof body.voiceVariant !== 'string' || typeof body.reservationKey !== 'string') {
+  const body = await parseJsonObject(request);
+  if (!body || typeof body.voiceVariant !== 'string' || typeof body.reservationKey !== 'string') {
     return json({ error: 'invalid_request' }, 400);
   }
 
@@ -441,5 +448,7 @@ function unauthorized(): Response {
 function json(body: unknown, status = 200): Response {
   const response = Response.json(body, { status });
   response.headers.set('Cache-Control', 'no-store');
+  response.headers.set('Referrer-Policy', 'no-referrer');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
   return response;
 }

@@ -74,7 +74,10 @@ export default function PlusScreen() {
 
   return (
     <Screen>
-      <BrandMark />
+      <View style={styles.topBar}>
+        <BrandMark />
+        <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => router.back()} />
+      </View>
       <View style={styles.hero}>
         <Eyebrow>Living Plot Plus</Eyebrow>
         <Text style={styles.title}>{t('More episodes when the cliffhanger hits.', 'Thêm tập khi cao trào vừa tới.')}</Text>
@@ -106,7 +109,6 @@ export default function PlusScreen() {
         <ActionButton label={t('Open Plus paywall', 'Mở paywall Plus')} busy={busyAction === 'paywall'} onPress={presentPaywall} />
         <ActionButton label={t('Refresh access', 'Làm mới quyền truy cập')} variant="secondary" busy={busyAction === 'refresh'} onPress={refreshAccess} />
         <ActionButton label={t('Restore purchases', 'Khôi phục giao dịch')} variant="secondary" busy={busyAction === 'restore'} onPress={restore} />
-        <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => router.back()} />
       </View>
       {message ? <Text style={styles.message}>{message}</Text> : null}
     </Screen>
@@ -125,6 +127,7 @@ function billingMessage(error: unknown, locale: 'en' | 'vi'): string {
 }
 
 const styles = StyleSheet.create({
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   hero: { gap: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.sm },
   title: { color: colors.ink, fontFamily: typography.display, fontSize: 40, fontWeight: '700', lineHeight: 46, letterSpacing: -1.1 },
   planFeature: { paddingVertical: spacing.xl, borderWidth: 0, borderRadius: 0, backgroundColor: colors.surfaceWarm },

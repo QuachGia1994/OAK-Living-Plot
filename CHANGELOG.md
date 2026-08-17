@@ -53,13 +53,18 @@ All notable changes to Living Plot will be documented in this file.
 - Narrative regression dimensions for protagonist anchoring, requested-locale alignment, and durable canonical scene progression.
 - Privacy-safe episode-depth telemetry buckets plus aggregate D1 activation/depth/D1/D7 retention queries.
 - CI release-candidate gates for local D1 migrations, Cloudflare development dry-run, iOS production export, and Android native preview APK.
+- Closed Beta RC runbook covering real development provisioning, provider blockers, abuse/cost guardrails, live bring-up order, and exact-SHA verification.
+- Provisioned non-production D1 `living-plot-dev` plus development TTS Queue/DLQ and applied migrations `0001`–`0008` remotely; R2 remains explicitly blocked until the Cloudflare account enables the service.
+- Protected JSON request-size guard and API response hardening with `no-store`, `nosniff`, and `no-referrer` headers.
 
 ### Changed
 - Reworked the Phase 1 native mobile presentation into a Huashu-inspired Cinematic Editorial system: warmer low-chroma surfaces, restrained amber/rust accent, narrative display type, mono operational metadata, flatter controls, ruled reading lists/timelines, and fewer generic dashboard cards across Home, Create, Story, Library, History, Plus, Auth, and Settings.
+- Hardened native layout/navigation with keyboard-safe screens, bounded large-screen reading measure, small-screen wrapping, daily-spark-first onboarding, reduced-motion episode/choice/consequence reveals, simplified story navigation, and voice playback integrated into the reading flow.
 - Pinned project orchestration and default implementation to GPT-5.6 Sol; GPT-5.6 Luna is used only when the user explicitly requests a worker handoff.
 - Localized daily story sparks now follow the saved interface language while newly generated story content continues to follow each plot's independent story-locale preference.
 - Narrative prompt guidance now keeps the canonical protagonist visible, requires durable scene progress, and keeps narrative/branch output in the requested locale.
 
 ### Fixed
+- Reworked the remote retention summary from a compound `UNION ALL` file execution that failed on D1 into a single aggregate row executed through a Node/Wrangler command runner, so development activation/D1/D7/depth metrics are visible.
 - Unified ESLint 9 across workspaces and loaded Cloudflare Vitest test types so clean-install quality gates pass.
 - Prevented publishing a new episode while a previous episode is still ready and awaiting a committed choice.

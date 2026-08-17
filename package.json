@@ -21,6 +21,6 @@
     "live:smoke:voice": "node scripts/live-beta-smoke.mjs --mode=voice",
     "live:smoke:billing": "node scripts/live-beta-smoke.mjs --mode=billing",
     "live:smoke:all": "node scripts/live-beta-smoke.mjs --mode=all",
-    "retention:summary:dev": "npx wrangler d1 execute living-plot-dev --remote --env development --config apps/api/wrangler.jsonc --file scripts/retention-summary.sql"
+    "retention:summary:dev": "node scripts/run-retention-summary.mjs"
   }
 }

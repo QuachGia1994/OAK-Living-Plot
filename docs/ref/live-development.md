@@ -35,6 +35,8 @@ Copy `apps/api/.dev.vars.example` to ignored `apps/api/.dev.vars` for local work
 
 `apps/api/wrangler.jsonc` defines the non-production `development` environment as `living-plot-api-dev`, with separate development D1, R2, Queue/DLQ, and Analytics Engine bindings.
 
+As of 2026-08-17, D1 `living-plot-dev` and the `living-plot-tts-dev` / `living-plot-tts-dlq-dev` queues are provisioned, and migrations `0001`–`0008` are applied remotely. The intended R2 bucket is `living-plot-audio-dev`, but Cloudflare currently rejects bucket creation with API code `10042` until R2 is enabled in the account dashboard. Do not claim voice E2E or deploy the development Worker while that binding is unavailable.
+
 Useful commands:
 
 ```bash
