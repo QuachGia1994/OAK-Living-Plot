@@ -50,3 +50,53 @@ export const typography = {
   display: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
   mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
 } as const;
+
+export const cinematic = {
+  motion: {
+    micro: 160,
+    reveal: 280,
+    scene: 420,
+    consequence: 560,
+  },
+  radius: {
+    scene: 28,
+    choice: 20,
+  },
+  overlay: {
+    top: 'rgba(4, 4, 4, 0.34)',
+    middle: 'rgba(4, 4, 4, 0.12)',
+    subtitle: 'rgba(5, 5, 5, 0.82)',
+    strong: 'rgba(4, 4, 4, 0.9)',
+    hairline: 'rgba(255, 248, 236, 0.18)',
+  },
+  scene: {
+    tense: {
+      base: '#140A0A',
+      deep: '#090506',
+      glow: '#7A251F',
+      rim: '#E56D58',
+      haze: '#351313',
+    },
+    romantic: {
+      base: '#140B10',
+      deep: '#090508',
+      glow: '#7C294F',
+      rim: '#EF8DB4',
+      haze: '#31111F',
+    },
+    mysterious: {
+      base: '#080D16',
+      deep: '#05070C',
+      glow: '#243E7A',
+      rim: '#78A6FF',
+      haze: '#111B33',
+    },
+    hopeful: {
+      base: '#0A1210',
+      deep: '#050907',
+      glow: '#2E7157',
+      rim: '#91D7B4',
+      haze: '#12281E',
+    },
+  },
+} as const;

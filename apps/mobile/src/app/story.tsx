@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Share, StyleSheet, Text, View } from 'react-native';
 import { EpisodeVoiceCard } from '@/features/audio/episode-voice-card';
-import type { StoryChoice, StoryPlotSession } from '@/features/story/contracts';
+import type { StoryPlotSession } from '@/features/story/contracts';
 import { StoryClientError } from '@/features/story/contracts';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeShareText } from '@/features/share/story-share';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
-import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, MotionReveal, Pill, Screen } from '@/ui/primitives';
-import { colors, radius, spacing, typography } from '@/ui/theme';
+import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
+import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, MotionReveal, Pill, Screen } from '@/ui/primitives';
+import { colors, spacing, typography } from '@/ui/theme';
 
 export default function StoryScreen() {
   const router = useRouter();
@@ -83,11 +84,7 @@ export default function StoryScreen() {
     setBusyAction('commit');
     setError(null);
     try {
-      const updated = await storyExperienceClient.commitChoice(
-        session.id,
-        session.episode.id,
-        selectedChoiceId,
-      );
+      const updated = await storyExperienceClient.commitChoice(session.id, session.episode.id, selectedChoiceId);
       setSession(updated);
       setSelectedChoiceId(null);
     } catch (caught) {
@@ -137,9 +134,14 @@ export default function StoryScreen() {
 
   if (loading) {
     return (
-      <Screen>
-        <BrandMark />
-        <LoadingState label={t('Opening your latest episode…', 'Đang mở tập mới nhất…')} />
+      <Screen contentStyle={styles.playerScreen}>
+        <View style={styles.topBar}>
+          <BrandMark />
+        </View>
+        <DramaLoadingStage
+          label={t('Opening your latest scene…', 'Đang mở cảnh mới nhất…')}
+          detail={t('Restoring the episode, your last decision and the scene framing.', 'Đang khôi phục tập truyện, lựa chọn gần nhất và bố cục cảnh.')}
+        />
       </Screen>
     );
   }
@@ -159,162 +161,110 @@ export default function StoryScreen() {
   const awaitingChoice = episode.status === 'awaiting_choice';
 
   return (
-    <Screen>
+    <Screen contentStyle={styles.playerScreen}>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={t('My stories', 'Câu chuyện của tôi')} variant="ghost" onPress={() => router.push('/library')} />
       </View>
 
-      <View style={styles.plotHeader}>
-        <View style={styles.plotMetaRow}>
-          <Pill tone={awaitingChoice ? 'accent' : 'success'}>
-            {awaitingChoice ? t('Your move', 'Lượt của bạn') : t('Choice locked in', 'Đã chốt lựa chọn')}
-          </Pill>
-          <Text style={styles.episodeNumber}>EP {episode.number}</Text>
-        </View>
-        <Text style={styles.plotTitle}>{session.title}</Text>
-        <Text style={styles.plotMeta}>{session.characterName} · {session.mood}</Text>
-        <View style={styles.storyActions}>
-          <ActionButton
-            label={t('Share episode', 'Chia sẻ tập')}
-            variant="ghost"
-            onPress={() => void Share.share({ message: buildSpoilerSafeShareText({ title: session.title, episodeNumber: episode.number, premise: session.premise }) })}
-          />
-          <ActionButton label={t('Story history', 'Lịch sử truyện')} variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
-        </View>
-      </View>
-
-      <MotionReveal key={episode.id}>
-        <View style={styles.episodeBlock}>
-          <View style={styles.sceneMarker}>
-            <Text style={styles.sceneMarkerText}>{t(`EP ${episode.number} · SCENE`, `TẬP ${episode.number} · CẢNH`)}</Text>
-            <View style={styles.sceneRule} />
-          </View>
-          <Text style={styles.episodeTitle}>{episode.title}</Text>
-          <Text style={styles.episodeBody}>{episode.body}</Text>
-        </View>
+      <MotionReveal key={`scene-${episode.id}-${episode.status}`}>
+        <DramaSceneStage
+          episodeNumber={episode.number}
+          title={episode.title}
+          body={episode.body}
+          characterName={session.characterName}
+          mood={session.mood}
+          consequence={awaitingChoice ? undefined : episode.committedConsequence}
+        />
       </MotionReveal>
 
-      <EpisodeVoiceCard key={episode.id} episodeId={episode.id} />
-
-      {error ? (
-        <ErrorState
-          title={t('That action didn’t finish', 'Thao tác chưa hoàn tất')}
-          message={error}
-          retryLabel={sharedUiCopy.tryAgain[locale]}
-          onRetry={selectedChoiceId ? () => void commitChoice() : undefined}
-        />
-      ) : null}
-
-      {readOnly ? (
-        <Card style={styles.readOnlyCard}>
-          <Eyebrow>{t('Archived story', 'Câu chuyện đã tạm dừng')}</Eyebrow>
-          <Text style={styles.readOnlyTitle}>{t('This story is paused.', 'Câu chuyện này đang tạm dừng.')}</Text>
-          <Text style={styles.commitEmpty}>{t('Restore it from My Stories when you want to make another choice or continue the next episode.', 'Khôi phục từ Câu chuyện của tôi khi bạn muốn chọn tiếp hoặc sang tập mới.')}</Text>
-          <ActionButton label={t('Open story library', 'Mở thư viện câu chuyện')} variant="secondary" onPress={() => router.push('/library')} />
-        </Card>
-      ) : awaitingChoice ? (
-        <MotionReveal key={`choice-${episode.id}`}>
-          <View style={styles.choiceSection}>
-          <View style={styles.choiceHeading}>
-            <View style={styles.choiceHeadingText}>
-              <Eyebrow>{t('Choose the next turn', 'Chọn bước ngoặt tiếp theo')}</Eyebrow>
-              <Text style={styles.choiceTitle}>{t(`What should ${session.characterName} do?`, `${session.characterName} nên làm gì?`)}</Text>
-            </View>
-            <Pill>{t('Choose 1 of 3', 'Chọn 1 trong 3')}</Pill>
+      <View style={styles.playerBody}>
+        <View style={styles.plotRail}>
+          <View style={styles.plotRailTop}>
+            <Pill tone={awaitingChoice ? 'accent' : 'success'}>{awaitingChoice ? t('Decision point', 'Điểm quyết định') : t('Choice locked', 'Đã chốt lựa chọn')}</Pill>
+            <Text style={styles.plotMeta}>{session.characterName} · {session.mood}</Text>
           </View>
-
-          <View style={styles.choiceList}>
-            {episode.choices.map((choice) => (
-              <ChoiceCard
-                key={choice.id}
-                choice={choice}
-                selected={choice.id === selectedChoiceId}
-                disabled={busyAction !== null}
-                t={t}
-                onPress={() => setSelectedChoiceId(choice.id)}
-              />
-            ))}
-          </View>
-
-          <Card style={styles.commitCard}>
-            {selectedChoice ? (
-              <>
-                <Text style={styles.commitLabel}>{t('Your pick', 'Lựa chọn của bạn')}</Text>
-                <Text style={styles.commitChoice}>{selectedChoice.label}</Text>
-                <Text style={styles.commitIntent}>{t('Intent:', 'Ý định:')} {selectedChoice.intent}</Text>
-              </>
-            ) : (
-              <Text style={styles.commitEmpty}>{t('Pick A, B or C. You can still change your mind before locking it in.', 'Chọn A, B hoặc C. Bạn vẫn có thể đổi ý trước khi chốt.')}</Text>
-            )}
+          <Text style={styles.plotTitle}>{session.title}</Text>
+          <View style={styles.storyActions}>
             <ActionButton
-              label={t('Lock in this choice', 'Chốt lựa chọn này')}
-              busy={busyAction === 'commit'}
-              disabled={!selectedChoice}
-              onPress={() => void commitChoice()}
+              label={t('Share', 'Chia sẻ')}
+              variant="ghost"
+              onPress={() => void Share.share({ message: buildSpoilerSafeShareText({ title: session.title, episodeNumber: episode.number, premise: session.premise }) })}
             />
-          </Card>
+            <ActionButton label={t('History', 'Lịch sử')} variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
           </View>
-        </MotionReveal>
-      ) : (
-        <MotionReveal key={`consequence-${episode.id}`}>
-          <View style={styles.consequenceSection}>
-          <Card style={styles.consequenceCard}>
-            <Eyebrow>{t('The consequence', 'Hậu quả')}</Eyebrow>
-            <Text style={styles.consequenceTitle}>{t('That choice changed what happens next.', 'Lựa chọn đó đã thay đổi điều xảy ra tiếp theo.')}</Text>
-            <Text style={styles.consequenceBody}>{episode.committedConsequence}</Text>
-          </Card>
-          <ActionButton
-            label={t(`Continue to episode ${episode.number + 1}`, `Tiếp tục tới tập ${episode.number + 1}`)}
-            busy={busyAction === 'next'}
-            onPress={() => void requestNextEpisode()}
+        </View>
+
+        {error ? (
+          <ErrorState
+            title={t('That action didn’t finish', 'Thao tác chưa hoàn tất')}
+            message={error}
+            retryLabel={sharedUiCopy.tryAgain[locale]}
+            onRetry={selectedChoiceId ? () => void commitChoice() : undefined}
           />
-          <Text style={styles.nextNote}>
-            {t('The next episode continues directly from the consequence you just created.', 'Tập tiếp theo tiếp tục trực tiếp từ hậu quả bạn vừa tạo ra.')}
-          </Text>
-          </View>
-        </MotionReveal>
-      )}
+        ) : null}
+
+        {readOnly ? (
+          <Card style={styles.readOnlyCard}>
+            <Eyebrow>{t('Archived story', 'Câu chuyện đã tạm dừng')}</Eyebrow>
+            <Text style={styles.readOnlyTitle}>{t('This story is paused.', 'Câu chuyện này đang tạm dừng.')}</Text>
+            <Text style={styles.supportCopy}>{t('Restore it from My Stories when you want to make another choice or continue the next episode.', 'Khôi phục từ Câu chuyện của tôi khi bạn muốn chọn tiếp hoặc sang tập mới.')}</Text>
+            <ActionButton label={t('Open story library', 'Mở thư viện câu chuyện')} variant="secondary" onPress={() => router.push('/library')} />
+          </Card>
+        ) : awaitingChoice ? (
+          <MotionReveal key={`choice-${episode.id}`}>
+            <View style={styles.choiceSection}>
+              <View style={styles.choiceHeading}>
+                <Eyebrow>{t('Choose the next turn', 'Chọn bước ngoặt tiếp theo')}</Eyebrow>
+                <Text style={styles.choiceTitle}>{t(`What should ${session.characterName} do next?`, `${session.characterName} nên làm gì tiếp theo?`)}</Text>
+                <Text style={styles.choiceSupport}>{t('Three paths. One becomes canon.', 'Ba hướng đi. Chỉ một hướng trở thành câu chuyện chuẩn.')}</Text>
+              </View>
+
+              <View style={styles.choiceGrid}>
+                {episode.choices.map((choice) => (
+                  <DramaChoiceCard
+                    key={choice.id}
+                    choice={choice}
+                    selected={choice.id === selectedChoiceId}
+                    disabled={busyAction !== null}
+                    mood={session.mood}
+                    onPress={() => setSelectedChoiceId(choice.id)}
+                  />
+                ))}
+              </View>
+
+              <View style={styles.commitDock}>
+                <View style={styles.commitCopy}>
+                  <Text style={styles.commitLabel}>{selectedChoice ? t('READY TO LOCK', 'SẴN SÀNG CHỐT') : t('YOUR MOVE', 'LƯỢT CỦA BẠN')}</Text>
+                  <Text style={styles.commitText} numberOfLines={2}>{selectedChoice?.label ?? t('Pick a path to continue the drama.', 'Chọn một hướng để tiếp tục drama.')}</Text>
+                </View>
+                <ActionButton
+                  label={t('Lock this turn', 'Chốt hướng này')}
+                  busy={busyAction === 'commit'}
+                  disabled={!selectedChoice}
+                  onPress={() => void commitChoice()}
+                />
+              </View>
+            </View>
+          </MotionReveal>
+        ) : (
+          <MotionReveal key={`consequence-${episode.id}`}>
+            <View style={styles.nextSection}>
+              <Eyebrow>{t('Scene complete', 'Cảnh đã hoàn tất')}</Eyebrow>
+              <Text style={styles.nextTitle}>{t('The next scene starts from this exact consequence.', 'Cảnh tiếp theo bắt đầu chính từ hậu quả này.')}</Text>
+              <ActionButton
+                label={t(`Play episode ${episode.number + 1}`, `Xem tập ${episode.number + 1}`)}
+                busy={busyAction === 'next'}
+                onPress={() => void requestNextEpisode()}
+              />
+              <Text style={styles.supportCopy}>{t('Your locked choice remains canonical even if generation needs a retry.', 'Lựa chọn đã chốt vẫn là bản chuẩn ngay cả khi việc tạo tập mới cần thử lại.')}</Text>
+            </View>
+          </MotionReveal>
+        )}
+
+        <EpisodeVoiceCard key={episode.id} episodeId={episode.id} />
+      </View>
     </Screen>
-  );
-}
-
-type Translate = (en: string, vi: string) => string;
-
-function ChoiceCard({
-  choice,
-  selected,
-  disabled,
-  t,
-  onPress,
-}: {
-  choice: StoryChoice;
-  selected: boolean;
-  disabled: boolean;
-  t: Translate;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t(`Choice ${choice.key}: ${choice.label}`, `Lựa chọn ${choice.key}: ${choice.label}`)}
-      accessibilityState={{ selected, disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.choiceCard,
-        selected && styles.choiceCardSelected,
-        pressed && !disabled && styles.choicePressed,
-      ]}
-    >
-      <View style={[styles.choiceKey, selected && styles.choiceKeySelected]}>
-        <Text style={[styles.choiceKeyText, selected && styles.choiceKeyTextSelected]}>{choice.key}</Text>
-      </View>
-      <View style={styles.choiceCopy}>
-        <Text style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}>{choice.label}</Text>
-        <Text style={styles.choiceIntent}>{choice.intent}</Text>
-      </View>
-    </Pressable>
   );
 }
 
@@ -336,42 +286,51 @@ function messageForError(error: unknown, locale: 'en' | 'vi', fallback: string):
 }
 
 const styles = StyleSheet.create({
+  playerScreen: {
+    gap: 0,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+  },
   topBar: {
+    minHeight: 62,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  plotHeader: {
     gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.background,
+  },
+  playerBody: {
+    gap: spacing.lg,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+  },
+  plotRail: {
+    gap: spacing.sm,
+    paddingBottom: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderStrong,
   },
-  plotMetaRow: {
+  plotRailTop: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  episodeNumber: {
-    color: colors.inkMuted,
-    fontFamily: typography.mono,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.7,
+    gap: spacing.sm,
   },
   plotTitle: {
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 23,
-    lineHeight: 28,
+    fontSize: 25,
+    lineHeight: 30,
     fontWeight: '700',
   },
   plotMeta: {
     color: colors.inkMuted,
-    fontSize: 12,
-    textTransform: 'capitalize',
+    fontFamily: typography.mono,
+    fontSize: 10,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
   },
   storyActions: {
     flexDirection: 'row',
@@ -379,184 +338,81 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginHorizontal: -spacing.sm,
   },
-  episodeBlock: {
-    gap: spacing.md,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  sceneMarker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  sceneMarkerText: {
-    color: colors.accentStrong,
-    fontFamily: typography.mono,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.6,
-  },
-  sceneRule: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderStrong,
-  },
-  episodeTitle: {
-    color: colors.ink,
-    fontFamily: typography.display,
-    fontSize: 40,
-    lineHeight: 45,
-    fontWeight: '700',
-    letterSpacing: -1.05,
-  },
-  episodeBody: {
-    color: colors.storyInk,
-    fontFamily: typography.display,
-    fontSize: 19,
-    lineHeight: 32,
-  },
   choiceSection: {
-    gap: spacing.md,
+    gap: spacing.lg,
     paddingTop: spacing.md,
   },
   choiceHeading: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  choiceHeadingText: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  choiceTitle: {
-    color: colors.ink,
-    fontFamily: typography.display,
-    fontSize: 29,
-    lineHeight: 35,
-    fontWeight: '700',
-  },
-  choiceList: {
     gap: spacing.sm,
   },
-  choiceCard: {
-    minHeight: 88,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
-  },
-  choiceCardSelected: {
-    borderBottomColor: colors.accent,
-    backgroundColor: colors.surfaceWarmDeep,
-  },
-  choicePressed: {
-    opacity: 0.78,
-  },
-  choiceKey: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    backgroundColor: 'transparent',
-  },
-  choiceKeySelected: {
-    backgroundColor: colors.accent,
-  },
-  choiceKeyText: {
-    color: colors.inkMuted,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  choiceKeyTextSelected: {
-    color: colors.accentInk,
-  },
-  choiceCopy: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  choiceLabel: {
+  choiceTitle: {
+    maxWidth: 520,
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 18,
-    lineHeight: 23,
+    fontSize: 33,
+    lineHeight: 38,
     fontWeight: '700',
+    letterSpacing: -0.7,
   },
-  choiceLabelSelected: {
-    color: colors.accentStrong,
-  },
-  choiceIntent: {
-    color: colors.inkMuted,
-    fontSize: 12,
-    textTransform: 'capitalize',
-  },
-  commitCard: {
-    borderWidth: 0,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderStrong,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
-  },
-  commitLabel: {
-    color: colors.inkMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  commitChoice: {
-    color: colors.ink,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  commitIntent: {
+  choiceSupport: {
     color: colors.inkMuted,
     fontSize: 13,
-    textTransform: 'capitalize',
+    lineHeight: 20,
   },
-  commitEmpty: {
-    color: colors.inkMuted,
-    fontSize: 14,
-    lineHeight: 21,
+  choiceGrid: {
+    gap: spacing.sm,
   },
-  readOnlyCard: { backgroundColor: colors.surfaceQuiet },
-  readOnlyTitle: { color: colors.ink, fontSize: 22, lineHeight: 28, fontWeight: '900' },
-  consequenceSection: {
+  commitDock: {
     gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceRaised,
   },
-  consequenceCard: {
-    paddingVertical: spacing.xl,
-    borderWidth: 0,
-    borderRadius: 0,
-    backgroundColor: colors.surfaceWarm,
+  commitCopy: {
+    gap: spacing.xs,
   },
-  consequenceTitle: {
+  commitLabel: {
     color: colors.accentStrong,
-    fontFamily: typography.display,
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '700',
+    fontFamily: typography.mono,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.3,
   },
-  consequenceBody: {
+  commitText: {
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 18,
-    lineHeight: 29,
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: '700',
   },
-  nextNote: {
+  nextSection: {
+    gap: spacing.md,
+    paddingVertical: spacing.xl,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
+  },
+  nextTitle: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '700',
+  },
+  supportCopy: {
     color: colors.inkMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  readOnlyCard: {
+    backgroundColor: colors.surfaceQuiet,
+  },
+  readOnlyTitle: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '700',
   },
 });

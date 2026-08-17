@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { PlotDraft, StoryMood } from '@/features/story/contracts';
 import { StoryClientError } from '@/features/story/contracts';
 import { hasDraftErrors, normalizePlotDraft, storyMoodOptionsFor, validatePlotDraft } from '@/features/story/draft';
@@ -8,6 +8,7 @@ import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { createStoryRequestKey } from '@/features/story/request-key';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
+import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, Card, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
 
@@ -58,7 +59,6 @@ export default function CreatePlotScreen() {
     }
   }
 
-
   if (auth.configured && (!auth.isLoaded || !auth.isSignedIn)) {
     return (
       <Screen>
@@ -82,61 +82,77 @@ export default function CreatePlotScreen() {
       </View>
 
       <View style={styles.intro}>
-        <Eyebrow>{t('New plot · 3 quick choices', 'Cốt truyện mới · 3 lựa chọn nhanh')}</Eyebrow>
-        <Text style={styles.title}>{t('Give the drama one spark.', 'Cho câu chuyện một tia lửa.')}</Text>
-        <Text style={styles.subtitle}>
-          {t('Tell us what is happening, pick the vibe, and name the main character. Episode 1 takes it from there.', 'Nói điều gì đang xảy ra, chọn không khí và đặt tên nhân vật chính. Tập 1 sẽ tiếp tục phần còn lại.')}
-        </Text>
+        <Eyebrow>{t('Direct a new mini-drama', 'Dựng một mini-drama mới')}</Eyebrow>
+        <Text style={styles.title}>{t('Frame the first scene.', 'Dựng cảnh đầu tiên.')}</Text>
+        <Text style={styles.subtitle}>{t('One spark. One lead. One mood. The story engine handles the rest.', 'Một tia lửa. Một nhân vật chính. Một không khí. Phần còn lại để bộ máy câu chuyện xử lý.')}</Text>
       </View>
 
-      <View style={styles.setupSection}>
-        <FieldHeader step="01" label={t('What is the situation?', 'Tình huống là gì?')} hint={t('One or two sentences is enough', 'Một hoặc hai câu là đủ')} />
-        <TextInput
-          accessibilityLabel="Story premise"
-          multiline
-          maxLength={600}
-          placeholder={t('A junior chef learns the restaurant critic is the person who disappeared from her family ten years ago…', 'Một đầu bếp trẻ phát hiện vị khách phê bình nhà hàng chính là người đã biến mất khỏi gia đình cô mười năm trước…')}
-          placeholderTextColor={colors.placeholder}
-          style={[styles.textArea, showValidation && errors.premise && styles.inputError]}
-          textAlignVertical="top"
-          value={draft.premise}
-          onChangeText={(premise) => setDraft((current) => ({ ...current, premise }))}
-        />
-        <View style={styles.fieldFooter}>
-          <Text style={styles.errorText}>{showValidation ? errors.premise ?? '' : ''}</Text>
-          <Text style={styles.counter}>{draft.premise.length}/600</Text>
+      <DramaComposerPreview
+        premise={draft.premise}
+        characterName={draft.characterName}
+        mood={draft.mood}
+        label={t('LIVE SCENE PREVIEW', 'XEM TRƯỚC CẢNH')}
+      />
+
+      <View style={styles.composerSection}>
+        <FieldHeader step="01" label={t('Story spark', 'Tia lửa câu chuyện')} hint={t('Describe the moment that changes everything', 'Mô tả khoảnh khắc làm mọi thứ thay đổi')} />
+        <View style={[styles.sparkComposer, showValidation && errors.premise && styles.composerError]}>
+          <TextInput
+            accessibilityLabel="Story premise"
+            multiline
+            maxLength={600}
+            placeholder={t('A junior chef realizes tonight’s critic is the person who vanished from her family ten years ago…', 'Một đầu bếp trẻ nhận ra vị khách phê bình tối nay chính là người đã biến mất khỏi gia đình cô mười năm trước…')}
+            placeholderTextColor={colors.placeholder}
+            style={styles.sparkInput}
+            textAlignVertical="top"
+            value={draft.premise}
+            onChangeText={(premise) => setDraft((current) => ({ ...current, premise }))}
+          />
+          <View style={styles.fieldFooter}>
+            <Text style={styles.errorText}>{showValidation ? errors.premise ?? '' : ''}</Text>
+            <Text style={styles.counter}>{draft.premise.length}/600</Text>
+          </View>
         </View>
       </View>
 
-      <View style={styles.setupSection}>
-        <FieldHeader step="02" label={t('Pick the vibe', 'Chọn không khí')} hint={t('This shapes how the scene feels', 'Điều này định hình cảm xúc của cảnh')} />
+      <View style={styles.composerSection}>
+        <FieldHeader step="02" label={t('Light the scene', 'Chọn ánh sáng cảnh')} hint={t('Mood changes the visual language and dramatic pressure', 'Không khí thay đổi ngôn ngữ hình ảnh và áp lực kịch tính')} />
         <View style={styles.moodGrid}>
           {moodOptions.map((option) => (
-            <MoodOption
+            <DramaMoodSwatch
               key={option.value}
-              selected={draft.mood === option.value}
               mood={option.value}
               label={option.label}
               description={option.description}
+              selected={draft.mood === option.value}
               onPress={() => setDraft((current) => ({ ...current, mood: option.value }))}
             />
           ))}
         </View>
       </View>
 
-      <View style={styles.setupSection}>
-        <FieldHeader step="03" label={t('Who is the main character?', 'Nhân vật chính là ai?')} hint={t('Just a name', 'Chỉ cần một cái tên')} />
-        <TextInput
-          accessibilityLabel="Main character name"
-          autoCapitalize="words"
-          maxLength={50}
-          placeholder="Mina"
-          placeholderTextColor={colors.placeholder}
-          style={[styles.textInput, showValidation && errors.characterName && styles.inputError]}
-          value={draft.characterName}
-          onChangeText={(characterName) => setDraft((current) => ({ ...current, characterName }))}
-          onSubmitEditing={() => void submit()}
+      <View style={styles.composerSection}>
+        <FieldHeader step="03" label={t('Cast the lead', 'Chọn nhân vật chính')} hint={t('Give the person at the center of the scene a name', 'Đặt tên cho người ở trung tâm của cảnh')} />
+        <DramaCastingPreview
+          characterName={draft.characterName}
+          mood={draft.mood}
+          premise={draft.premise}
+          label={t('LEAD CAST', 'NHÂN VẬT CHÍNH')}
         />
+        <View style={[styles.castInputShell, showValidation && errors.characterName && styles.castInputError]}>
+          <Text style={styles.castInputLabel}>{t('NAME', 'TÊN')}</Text>
+          <TextInput
+            accessibilityLabel="Main character name"
+            autoCapitalize="words"
+            maxLength={50}
+            placeholder="Mina"
+            placeholderTextColor={colors.placeholder}
+            style={styles.castInput}
+            value={draft.characterName}
+            onChangeText={(characterName) => setDraft((current) => ({ ...current, characterName }))}
+            onSubmitEditing={() => void submit()}
+          />
+        </View>
         {showValidation && errors.characterName ? <Text style={styles.errorText}>{errors.characterName}</Text> : null}
       </View>
 
@@ -147,10 +163,19 @@ export default function CreatePlotScreen() {
         </View>
       ) : null}
 
-      <View style={styles.submitBlock}>
-        <ActionButton label={t('Start episode 1', 'Bắt đầu tập 1')} busy={busy} onPress={() => void submit()} />
-        <Text style={styles.submitNote}>{t('Your first episode is short enough to finish in about a minute. Voice is optional.', 'Tập đầu đủ ngắn để xem trong khoảng một phút. Giọng đọc là tùy chọn.')}</Text>
-      </View>
+      {busy ? (
+        <DramaGenerationState
+          characterName={draft.characterName || t('Your lead', 'Nhân vật chính')}
+          mood={draft.mood}
+          label={t('Directing episode 1…', 'Đang dựng tập 1…')}
+          detail={t('Turning your spark into a short scene, framing the lead and preparing the first decision point.', 'Đang biến tia lửa thành một cảnh ngắn, dựng nhân vật chính và chuẩn bị điểm quyết định đầu tiên.')}
+        />
+      ) : (
+        <View style={styles.submitBlock}>
+          <ActionButton label={t('Play episode 1', 'Xem tập 1')} onPress={() => void submit()} />
+          <Text style={styles.submitNote}>{t('Your setup becomes a short visual scene with three branching choices.', 'Thiết lập của bạn sẽ thành một cảnh ngắn trực quan với ba lựa chọn rẽ nhánh.')}</Text>
+        </View>
+      )}
     </Screen>
   );
 }
@@ -187,36 +212,6 @@ function FieldHeader({ step, label, hint }: { step: string; label: string; hint:
   );
 }
 
-function MoodOption({
-  selected,
-  label,
-  description,
-  onPress,
-}: {
-  selected: boolean;
-  mood: StoryMood;
-  label: string;
-  description: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.moodOption,
-        selected && styles.moodOptionSelected,
-        pressed && styles.moodPressed,
-      ]}
-    >
-      <View style={[styles.moodDot, selected && styles.moodDotSelected]} />
-      <Text style={[styles.moodLabel, selected && styles.moodLabelSelected]}>{label}</Text>
-      <Text style={styles.moodDescription}>{description}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
@@ -237,12 +232,13 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: colors.inkMuted,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 23,
+    maxWidth: 560,
   },
-  setupSection: {
+  composerSection: {
     gap: spacing.md,
-    paddingVertical: spacing.lg,
+    paddingTop: spacing.lg,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderStrong,
   },
@@ -265,49 +261,43 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 23,
-    lineHeight: 28,
+    fontSize: 25,
+    lineHeight: 30,
     fontWeight: '700',
   },
   hint: {
     color: colors.inkMuted,
     fontSize: 12,
+    lineHeight: 18,
   },
-  textArea: {
-    minHeight: 160,
-    paddingHorizontal: 0,
-    paddingVertical: spacing.md,
-    borderWidth: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
+  sparkComposer: {
+    overflow: 'hidden',
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceQuiet,
+  },
+  composerError: {
+    borderColor: colors.danger,
+  },
+  sparkInput: {
+    minHeight: 170,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 18,
+    fontSize: 19,
     lineHeight: 28,
   },
-  textInput: {
-    minHeight: 54,
-    paddingHorizontal: 0,
-    borderWidth: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
-    color: colors.ink,
-    fontFamily: typography.display,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  inputError: {
-    borderBottomColor: colors.danger,
-  },
   fieldFooter: {
-    minHeight: 18,
+    minHeight: 34,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
   errorText: {
     flex: 1,
@@ -317,50 +307,39 @@ const styles = StyleSheet.create({
   },
   counter: {
     color: colors.inkMuted,
-    fontSize: 12,
+    fontFamily: typography.mono,
+    fontSize: 10,
   },
   moodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  moodOption: {
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 0,
+  castInputShell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle,
-    borderRadius: 0,
-    backgroundColor: 'transparent',
+    borderBottomColor: colors.borderStrong,
   },
-  moodOptionSelected: {
-    borderBottomColor: colors.accent,
-    backgroundColor: colors.surfaceWarm,
+  castInputError: {
+    borderBottomColor: colors.danger,
   },
-  moodPressed: {
-    opacity: 0.78,
+  castInputLabel: {
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.4,
   },
-  moodDot: {
-    width: 8,
-    height: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.border,
-  },
-  moodDotSelected: {
-    backgroundColor: colors.accent,
-  },
-  moodLabel: {
+  castInput: {
+    minHeight: 58,
+    flex: 1,
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
-  },
-  moodLabelSelected: {
-    color: colors.accentStrong,
-  },
-  moodDescription: {
-    color: colors.inkMuted,
-    fontSize: 13,
-    lineHeight: 19,
   },
   submitError: {
     gap: spacing.xs,
@@ -380,6 +359,7 @@ const styles = StyleSheet.create({
   },
   submitBlock: {
     gap: spacing.sm,
+    paddingTop: spacing.sm,
   },
   submitNote: {
     color: colors.inkMuted,
