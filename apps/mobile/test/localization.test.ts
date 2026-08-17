@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localize, sharedUiCopy } from '../src/features/localization/ui-copy';
+import { localize, sharedUiCopy } from '../src/features/localization/copy';
 import { storyMoodOptionsFor, validatePlotDraft } from '../src/features/story/draft';
 
 describe('mobile localization', () => {

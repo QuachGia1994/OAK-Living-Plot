@@ -1,4 +1,4 @@
-import type { UiLocale } from '@/features/preferences/contracts';
+import type { UiLocale } from '../preferences/contracts';
 import type { PlotDraft, StoryMood } from './contracts';
 
 const MOOD_COPY: Record<StoryMood, Record<UiLocale, { label: string; description: string }>> = {
