@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ACCOUNT_DELETE_CONFIRMATION } from '@/features/account/contracts';
+import { deleteAccountThenSignOut } from '@/features/account/delete-flow';
 import { HttpAccountDataClient, UnavailableAccountDataClient } from '@/features/account/http-account-client';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
@@ -31,8 +32,9 @@ export default function SettingsScreen() {
   const storyLocale = preferenceDraft.storyLocale ?? preferences.storyLocale;
   const narratorVariant = preferenceDraft.narratorVariant ?? preferences.narratorVariant;
   const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'preferences' | 'export' | 'delete' | 'health' | null>(null);
+  const [busy, setBusy] = useState<'preferences' | 'export' | 'delete' | 'signout' | 'health' | null>(null);
   const [confirmation, setConfirmation] = useState('');
+  const [postDeleteSignOutFailed, setPostDeleteSignOutFailed] = useState(false);
   const [apiHealth, setApiHealth] = useState<'unchecked' | 'ok' | 'unreachable'>(apiBaseUrl ? 'unchecked' : 'unreachable');
 
   async function savePreferences() {
@@ -67,11 +69,28 @@ export default function SettingsScreen() {
     setBusy('delete');
     setMessage(null);
     try {
-      await account.deleteAccount(confirmation);
-      await auth.signOut();
-      router.replace('/');
+      const result = await deleteAccountThenSignOut(account, confirmation, auth.signOut);
+      if (result === 'deleted_and_signed_out') {
+        router.replace('/');
+      } else {
+        setPostDeleteSignOutFailed(true);
+        setMessage('Your Living Plot data was deleted, but this device could not sign out of Clerk. Retry sign-out before continuing to use the app.');
+      }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : 'Account data could not be deleted.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function retrySignOut() {
+    setBusy('signout');
+    try {
+      await auth.signOut();
+      setPostDeleteSignOutFailed(false);
+      router.replace('/');
+    } catch {
+      setMessage('Your Living Plot data is already deleted, but Clerk sign-out is still unavailable on this device.');
     } finally {
       setBusy(null);
     }
@@ -168,9 +187,12 @@ export default function SettingsScreen() {
           label="Delete my Living Plot data"
           variant="secondary"
           busy={busy === 'delete'}
-          disabled={!account.configured || confirmation !== ACCOUNT_DELETE_CONFIRMATION}
+          disabled={!account.configured || postDeleteSignOutFailed || confirmation !== ACCOUNT_DELETE_CONFIRMATION}
           onPress={() => void deleteData()}
         />
+        {postDeleteSignOutFailed ? (
+          <ActionButton label="Retry Clerk sign out" busy={busy === 'signout'} onPress={() => void retrySignOut()} />
+        ) : null}
       </Card>
 
       <Card>
