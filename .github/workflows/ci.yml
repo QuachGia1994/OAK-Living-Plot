@@ -42,6 +42,7 @@ jobs:
       EXPO_PUBLIC_LIVING_PLOT_API_URL: ${{ vars.EXPO_PUBLIC_LIVING_PLOT_API_URL }}
       EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY }}
       EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY }}
+      NODE_ENV: production
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -57,6 +58,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
 
       - name: Install dependencies
         run: npm ci
@@ -65,14 +67,14 @@ jobs:
         run: npx expo prebuild --platform android --clean --no-install
         working-directory: apps/mobile
 
-      - name: Build debug APK
-        run: ./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a --no-daemon --parallel
+      - name: Build standalone arm64 preview APK
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --parallel
         working-directory: apps/mobile/android
 
-      - name: Upload Android debug APK
+      - name: Upload standalone arm64 preview APK
         uses: actions/upload-artifact@v6
         with:
-          name: living-plot-android-debug
-          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: living-plot-android-preview-arm64
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14

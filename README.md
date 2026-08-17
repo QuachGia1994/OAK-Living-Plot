@@ -46,7 +46,7 @@ Focused narrative evaluation remains available with `npm --workspace @living-plo
 
 ## GitHub Android preview build
 
-Every push (and manual `workflow_dispatch`) runs the quality gate and, after it passes, builds an installable Android debug APK. Download the `living-plot-android-debug` artifact from the successful GitHub Actions run. The APK is retained for 14 days.
+Every push (and manual `workflow_dispatch`) runs the quality gate and, after it passes, builds an installable standalone Android arm64 preview APK. Download the `living-plot-android-preview-arm64` artifact from the successful GitHub Actions run. The release variant embeds the JavaScript bundle so it can open without a Metro development server, and the APK is retained for 14 days.
 
 The artifact is preview-safe by default. To make a GitHub-built APK use live services, define repository Actions variables named `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`, `EXPO_PUBLIC_LIVING_PLOT_API_URL`, `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY`, and `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY`. Server credentials remain backend-only and must never be stored in `EXPO_PUBLIC_*` variables.
 
