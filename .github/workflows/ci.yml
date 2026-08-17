@@ -125,25 +125,32 @@ jobs:
       - name: Validate and package unsigned IPA
         run: |
           set -euo pipefail
-          APP_PATH="ios/build/Build/Products/Release-iphoneos/LivingPlot.app"
+          PRODUCTS_DIR="ios/build/Build/Products/Release-iphoneos"
+          APP_PATH="$(find "$PRODUCTS_DIR" -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP_PATH"
           PLIST_PATH="$APP_PATH/Info.plist"
-          test -d "$APP_PATH"
           test -f "$PLIST_PATH"
 
           BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST_PATH")"
           SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST_PATH")"
           BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST_PATH")"
+          echo "Built app: $APP_PATH"
+          echo "Bundle identifier: $BUNDLE_ID"
+          echo "Marketing version: $SHORT_VERSION"
+          echo "Build number: $BUILD_NUMBER"
           test "$BUNDLE_ID" = "com.oak.livingplot"
           test "$SHORT_VERSION" = "0.1.0"
           test "$BUILD_NUMBER" = "1"
 
-          if /usr/bin/codesign -dv --verbose=2 "$APP_PATH" 2>codesign-check.txt; then
-            echo "::error::Release app was unexpectedly code signed."
-            cat codesign-check.txt
+          if test -d "$APP_PATH/_CodeSignature"; then
+            echo "::error::Release app unexpectedly contains a _CodeSignature directory."
             exit 1
           fi
-          cat codesign-check.txt
-          grep -q "code object is not signed at all" codesign-check.txt
+          if /usr/bin/codesign --verify --verbose=2 "$APP_PATH"; then
+            echo "::error::Release app was unexpectedly code signed."
+            exit 1
+          fi
+          echo "Confirmed: Release app has no valid code signature."
 
           rm -rf ios/unsigned-ipa
           mkdir -p ios/unsigned-ipa/Payload
@@ -152,8 +159,14 @@ jobs:
             cd ios/unsigned-ipa
             ditto -c -k --sequesterRsrc --keepParent Payload LivingPlot-unsigned.ipa
           )
-          test -f ios/unsigned-ipa/LivingPlot-unsigned.ipa
-          unzip -l ios/unsigned-ipa/LivingPlot-unsigned.ipa | grep -q "Payload/LivingPlot.app/Info.plist"
+          IPA_PATH="ios/unsigned-ipa/LivingPlot-unsigned.ipa"
+          test -f "$IPA_PATH"
+          IPA_LIST="$(unzip -Z1 "$IPA_PATH")"
+          case "$IPA_LIST" in
+            *"Payload/LivingPlot.app/Info.plist"*) ;;
+            *) echo "::error::Unsigned IPA is missing Payload/LivingPlot.app/Info.plist."; exit 1 ;;
+          esac
+          echo "Confirmed: IPA contains Payload/LivingPlot.app/Info.plist."
 
       - name: Upload unsigned iOS IPA
         uses: actions/upload-artifact@v6
