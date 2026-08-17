@@ -8,8 +8,8 @@ import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { createStoryRequestKey } from '@/features/story/request-key';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
-import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, Card, Eyebrow, Screen } from '@/ui/primitives';
+import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch, DramaUtilityHero } from '@/ui/drama-visuals';
+import { ActionButton, BrandMark, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
 
 const initialDraft: PlotDraft = {
@@ -63,11 +63,13 @@ export default function CreatePlotScreen() {
     return (
       <Screen>
         <BrandMark />
-        <Card>
-          <Eyebrow>{t('Save your story', 'Lưu câu chuyện')}</Eyebrow>
-          <Text style={styles.title}>{auth.isLoaded ? t('Sign in before starting a new plot.', 'Đăng nhập trước khi bắt đầu câu chuyện mới.') : t('Opening your account…', 'Đang mở tài khoản…')}</Text>
-          <Text style={styles.subtitle}>{t('Your stories and choices will stay available when you return on another device.', 'Câu chuyện và lựa chọn của bạn vẫn còn khi quay lại trên thiết bị khác.')}</Text>
-        </Card>
+        <DramaUtilityHero
+          kicker={t('SAVE YOUR PLOT', 'LƯU CỐT TRUYỆN')}
+          title={auth.isLoaded ? t('Sign in before directing a new drama.', 'Đăng nhập trước khi dựng drama mới.') : t('Opening your account…', 'Đang mở tài khoản…')}
+          detail={t('Your choices stay linked when you return on another device.', 'Lựa chọn vẫn được liên kết khi bạn quay lại trên thiết bị khác.')}
+          mood="mysterious"
+          characterName="Create"
+        />
         {auth.isLoaded ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} onPress={() => router.replace('/auth')} /> : null}
         <ActionButton label={sharedUiCopy.cancel[locale]} variant="ghost" onPress={() => router.replace('/')} />
       </Screen>
@@ -84,7 +86,7 @@ export default function CreatePlotScreen() {
       <View style={styles.intro}>
         <Eyebrow>{t('Direct a new mini-drama', 'Dựng một mini-drama mới')}</Eyebrow>
         <Text style={styles.title}>{t('Frame the first scene.', 'Dựng cảnh đầu tiên.')}</Text>
-        <Text style={styles.subtitle}>{t('One spark. One lead. One mood. The story engine handles the rest.', 'Một tia lửa. Một nhân vật chính. Một không khí. Phần còn lại để bộ máy câu chuyện xử lý.')}</Text>
+        <Text style={styles.subtitle}>{t('Spark · lead · mood · play.', 'Tia lửa · nhân vật · không khí · phát.')}</Text>
       </View>
 
       <DramaComposerPreview
@@ -95,7 +97,7 @@ export default function CreatePlotScreen() {
       />
 
       <View style={styles.composerSection}>
-        <FieldHeader step="01" label={t('Story spark', 'Tia lửa câu chuyện')} hint={t('Describe the moment that changes everything', 'Mô tả khoảnh khắc làm mọi thứ thay đổi')} />
+        <FieldHeader step="01" label={t('Story spark', 'Tia lửa câu chuyện')} hint={t('The moment everything changes', 'Khoảnh khắc mọi thứ thay đổi')} />
         <View style={[styles.sparkComposer, showValidation && errors.premise && styles.composerError]}>
           <TextInput
             accessibilityLabel="Story premise"
@@ -116,7 +118,7 @@ export default function CreatePlotScreen() {
       </View>
 
       <View style={styles.composerSection}>
-        <FieldHeader step="02" label={t('Light the scene', 'Chọn ánh sáng cảnh')} hint={t('Mood changes the visual language and dramatic pressure', 'Không khí thay đổi ngôn ngữ hình ảnh và áp lực kịch tính')} />
+        <FieldHeader step="02" label={t('Light the scene', 'Chọn ánh sáng cảnh')} hint={t('Choose the dramatic pressure', 'Chọn áp lực kịch tính')} />
         <View style={styles.moodGrid}>
           {moodOptions.map((option) => (
             <DramaMoodSwatch
@@ -132,7 +134,7 @@ export default function CreatePlotScreen() {
       </View>
 
       <View style={styles.composerSection}>
-        <FieldHeader step="03" label={t('Cast the lead', 'Chọn nhân vật chính')} hint={t('Give the person at the center of the scene a name', 'Đặt tên cho người ở trung tâm của cảnh')} />
+        <FieldHeader step="03" label={t('Cast the lead', 'Chọn nhân vật chính')} hint={t('Name the person at the center', 'Đặt tên người ở trung tâm')} />
         <DramaCastingPreview
           characterName={draft.characterName}
           mood={draft.mood}
@@ -173,7 +175,6 @@ export default function CreatePlotScreen() {
       ) : (
         <View style={styles.submitBlock}>
           <ActionButton label={t('Play episode 1', 'Xem tập 1')} onPress={() => void submit()} />
-          <Text style={styles.submitNote}>{t('Your setup becomes a short visual scene with three branching choices.', 'Thiết lập của bạn sẽ thành một cảnh ngắn trực quan với ba lựa chọn rẽ nhánh.')}</Text>
         </View>
       )}
     </Screen>
@@ -360,11 +361,5 @@ const styles = StyleSheet.create({
   submitBlock: {
     gap: spacing.sm,
     paddingTop: spacing.sm,
-  },
-  submitNote: {
-    color: colors.inkMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
   },
 });

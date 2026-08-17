@@ -10,7 +10,7 @@ import { buildSpoilerSafeShareText } from '@/features/share/story-share';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, MotionReveal, Pill, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, ErrorState, Eyebrow, MotionReveal, Pill, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
 export default function StoryScreen() {
@@ -205,19 +205,20 @@ export default function StoryScreen() {
         ) : null}
 
         {readOnly ? (
-          <Card style={styles.readOnlyCard}>
-            <Eyebrow>{t('Archived story', 'Câu chuyện đã tạm dừng')}</Eyebrow>
-            <Text style={styles.readOnlyTitle}>{t('This story is paused.', 'Câu chuyện này đang tạm dừng.')}</Text>
-            <Text style={styles.supportCopy}>{t('Restore it from My Stories when you want to make another choice or continue the next episode.', 'Khôi phục từ Câu chuyện của tôi khi bạn muốn chọn tiếp hoặc sang tập mới.')}</Text>
+          <View style={styles.readOnlyDock}>
+            <View style={styles.readOnlyHeader}>
+              <Eyebrow>{t('Archived story', 'Câu chuyện đã tạm dừng')}</Eyebrow>
+              <Text style={styles.readOnlyStatus}>{t('READ ONLY', 'CHỈ ĐỌC')}</Text>
+            </View>
+            <Text style={styles.readOnlyTitle}>{t('Paused at this scene.', 'Tạm dừng tại cảnh này.')}</Text>
             <ActionButton label={t('Open story library', 'Mở thư viện câu chuyện')} variant="secondary" onPress={() => router.push('/library')} />
-          </Card>
+          </View>
         ) : awaitingChoice ? (
           <MotionReveal key={`choice-${episode.id}`}>
             <View style={styles.choiceSection}>
               <View style={styles.choiceHeading}>
                 <Eyebrow>{t('Choose the next turn', 'Chọn bước ngoặt tiếp theo')}</Eyebrow>
                 <Text style={styles.choiceTitle}>{t(`What should ${session.characterName} do next?`, `${session.characterName} nên làm gì tiếp theo?`)}</Text>
-                <Text style={styles.choiceSupport}>{t('Three paths. One becomes canon.', 'Ba hướng đi. Chỉ một hướng trở thành câu chuyện chuẩn.')}</Text>
               </View>
 
               <View style={styles.choiceGrid}>
@@ -257,7 +258,6 @@ export default function StoryScreen() {
                 busy={busyAction === 'next'}
                 onPress={() => void requestNextEpisode()}
               />
-              <Text style={styles.supportCopy}>{t('Your locked choice remains canonical even if generation needs a retry.', 'Lựa chọn đã chốt vẫn là bản chuẩn ngay cả khi việc tạo tập mới cần thử lại.')}</Text>
             </View>
           </MotionReveal>
         )}
@@ -307,9 +307,11 @@ const styles = StyleSheet.create({
   },
   plotRail: {
     gap: spacing.sm,
-    paddingBottom: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
+    padding: spacing.md,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceQuiet,
   },
   plotRailTop: {
     flexDirection: 'row',
@@ -354,11 +356,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.7,
   },
-  choiceSupport: {
-    color: colors.inkMuted,
-    fontSize: 13,
-    lineHeight: 20,
-  },
   choiceGrid: {
     gap: spacing.sm,
   },
@@ -400,14 +397,16 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     fontWeight: '700',
   },
-  supportCopy: {
-    color: colors.inkMuted,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  readOnlyCard: {
+  readOnlyDock: {
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
     backgroundColor: colors.surfaceQuiet,
   },
+  readOnlyHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  readOnlyStatus: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
   readOnlyTitle: {
     color: colors.ink,
     fontFamily: typography.display,

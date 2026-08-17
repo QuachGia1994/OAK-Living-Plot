@@ -59,6 +59,7 @@ All notable changes to Living Plot will be documented in this file.
 - iOS unsigned Native RC pipeline on GitHub macOS: explicit Expo iOS identity, clean prebuild/CocoaPods, Release `iphoneos` Xcode build with code signing disabled, negative signature verification, `Payload/LivingPlot.app` IPA packaging, and artifact upload.
 
 ### Changed
+- Completed the cinematic surface redesign across History, Plus, Auth, and Settings: visual recap filmstrip, Plus stage-pass metrics, ambient email-code identity flow, structured privacy/data control room, safer diagnostic console, and reduced explanatory copy across Home/Create/Story without changing canonical business logic.
 - Reworked the Phase 1 native mobile presentation into a Huashu-inspired Cinematic Editorial system: warmer low-chroma surfaces, restrained amber/rust accent, narrative display type, mono operational metadata, flatter controls, ruled reading lists/timelines, and fewer generic dashboard cards across Home, Create, Story, Library, History, Plus, Auth, and Settings.
 - Hardened native layout/navigation with keyboard-safe screens, bounded large-screen reading measure, small-screen wrapping, daily-spark-first onboarding, reduced-motion episode/choice/consequence reveals, simplified story navigation, and voice playback integrated into the reading flow.
 - Pinned project orchestration and default implementation to GPT-5.6 Sol; GPT-5.6 Luna is used only when the user explicitly requests a worker handoff.

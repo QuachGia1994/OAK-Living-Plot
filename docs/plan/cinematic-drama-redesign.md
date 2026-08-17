@@ -224,11 +224,19 @@ Reduced-motion preference disables or collapses these animations to static state
 - Plus remains accessible as a compact utility row rather than another large information card.
 - First-run support copy is reduced to one short cue beneath the poster instead of repeating the product explanation.
 
-## Remaining text-heavy surfaces
+## Large Stage A — Complete cinematic surfaces
 
-1. Create setup fields and mood rows.
-2. History recap timeline.
-3. Plus/Auth/Settings utility layouts.
+The remaining surface redesign is now consolidated and complete:
+
+- History is a cinematic hybrid recap with visual episode frames, illuminated chronology, locked/current markers, choice/consequence blocks and a visual empty/loading state.
+- Plus is a cinematic daily-pass surface with Free→Plus metrics, clear primary purchase action and separated recovery utilities.
+- Auth uses an ambient identity frame and a single OTP dock while preserving the Clerk email-code state machine exactly.
+- Settings uses a control-room visual hierarchy, option tiles, compact owned-data policy cards, irreversible deletion vault and terminal-style safe diagnostics.
+- Home signed-out/first-run/Plus support copy is compressed into visual/mono cues instead of explanatory paragraphs.
+- Create sign-in and helper copy are reduced; Story read-only/control surfaces are compact cinematic docks.
+- No core screen in the main journey now depends on a long explanatory paragraph to communicate what the product is.
+
+History and utility screens intentionally retain more text than the drama player where the task is recap, billing, privacy or diagnostics.
 
 ## Next rollout stages
 
@@ -251,13 +259,17 @@ Create now behaves like a lightweight scene director rather than a three-row for
 - The submit action is framed as `Play episode 1`; request-key reuse, normalization, validation, auth and `createPlot` behavior are unchanged.
 - Generation continues into the existing cinematic directing state rather than falling back to a generic spinner.
 
-### Stage D — History hybrid
+### Stage D — History hybrid — COMPLETE
 
-Add compact scene motif thumbnails and stronger episode/choice chronology. History may remain more textual than the core player.
+Visual recap frames, episode chronology, locked/current state and choice/consequence presentation are implemented without changing canonical history ordering.
 
-### Stage E — Utility consistency
+### Stage E — Utility consistency — COMPLETE
 
-Apply cinematic tokens and contrast polish to Plus/Auth/Settings without forcing entertainment effects onto utility tasks.
+Plus/Auth/Settings now share the cinematic palette, display/mono hierarchy and dark high-contrast surfaces while remaining utility-first.
+
+### Large Stage B — Final cinematic productization — NEXT
+
+Run the full journey/device QA, motion/performance/accessibility/localization pass, then exact-SHA Android/iOS native release verification and final cinematic RC closeout.
 
 ### Stage F — Real generated scene media gate
 

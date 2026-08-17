@@ -4,7 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { StoryHistorySnapshot } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
-import { ActionButton, BrandMark, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
+import { DramaEmptyStage, DramaLoadingStage, DramaRecapFrame, DramaUtilityHero } from '@/ui/drama-visuals';
+import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
 export default function StoryHistoryScreen() {
@@ -55,35 +56,58 @@ export default function StoryHistoryScreen() {
         />
       </View>
 
-      <View style={styles.hero}>
-        <Eyebrow>{t('Previously on Living Plot', 'Trước đó trên Living Plot')}</Eyebrow>
-        <Text style={styles.title}>{history?.title ?? t('Story so far', 'Câu chuyện đến đây')}</Text>
-        <Text style={styles.body}>{t('Every episode and choice you locked in is kept here, so you can remember how the drama got to this point.', 'Mỗi tập và lựa chọn đã chốt đều được giữ ở đây để bạn nhớ drama đã đi đến điểm này thế nào.')}</Text>
-      </View>
+      <DramaUtilityHero
+        kicker={t('PREVIOUSLY ON LIVING PLOT', 'TRƯỚC ĐÓ TRÊN LIVING PLOT')}
+        title={history?.title ?? t('Story so far', 'Câu chuyện đến đây')}
+        detail={history ? t(`${history.items.length} scenes preserved in canonical order.`, `${history.items.length} cảnh được giữ theo thứ tự chuẩn.`) : t('Rebuilding the chain of choices that brought you here.', 'Đang dựng lại chuỗi lựa chọn đã đưa câu chuyện tới đây.')}
+        mood="mysterious"
+        characterName="Recap"
+      />
 
       {error ? <ErrorState title={t('Recap unavailable', 'Tóm tắt không khả dụng')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
-      {!history && !error ? <LoadingState label={t('Building your story recap…', 'Đang dựng lại tóm tắt câu chuyện…')} /> : null}
+      {!history && !error ? (
+        <DramaLoadingStage
+          label={t('Building your story recap…', 'Đang dựng lại tóm tắt câu chuyện…')}
+          detail={t('Restoring each episode, locked choice and consequence.', 'Đang khôi phục từng tập, lựa chọn đã chốt và hậu quả.')}
+        />
+      ) : null}
 
-      {history ? (
+      {history && history.items.length === 0 ? (
+        <DramaEmptyStage
+          title={t('No recap scenes yet.', 'Chưa có cảnh tóm tắt.')}
+          detail={t('Play the first episode and your locked decisions will appear here.', 'Xem tập đầu và các quyết định đã chốt sẽ xuất hiện ở đây.')}
+        />
+      ) : null}
+
+      {history && history.items.length > 0 ? (
         <View style={styles.timeline}>
-          {history.items.map((item) => (
-            <View key={item.episodeId} style={styles.timelineItem}>
-              <View style={styles.row}>
-                <Pill tone={item.status === 'choice_committed' ? 'success' : 'accent'}>EP {item.episodeNumber}</Pill>
-                <Text style={styles.status}>{item.status === 'choice_committed' ? t('Choice locked in', 'Đã chốt lựa chọn') : t('Current episode', 'Tập hiện tại')}</Text>
-              </View>
-              <Text style={styles.episodeTitle}>{item.title}</Text>
-              <Text style={styles.body}>{item.summary}</Text>
-              {item.choiceLabel ? (
-                <View style={styles.choiceBlock}>
-                  <Text style={styles.choiceLabel}>{t(`Choice ${item.choiceKey}:`, `Lựa chọn ${item.choiceKey}:`)} {item.choiceLabel}</Text>
-                  {item.consequence ? <Text style={styles.consequence}>{item.consequence}</Text> : null}
+          <View style={styles.timelineRail} />
+          {history.items.map((item, index) => {
+            const locked = item.status === 'choice_committed';
+            return (
+              <View key={item.episodeId} style={styles.timelineItem}>
+                <View style={styles.timelineMarkerColumn}>
+                  <View style={[styles.timelineNode, locked && styles.timelineNodeLocked]}>
+                    <Text style={[styles.timelineNodeText, locked && styles.timelineNodeTextLocked]}>{String(index + 1).padStart(2, '0')}</Text>
+                  </View>
                 </View>
-              ) : (
-                <Text style={styles.pending}>{t('You have not locked in a choice for this episode yet.', 'Bạn chưa chốt lựa chọn cho tập này.')}</Text>
-              )}
-            </View>
-          ))}
+                <View style={styles.timelineContent}>
+                  <View style={styles.itemHeader}>
+                    <Pill tone={locked ? 'success' : 'accent'}>{locked ? t('LOCKED', 'ĐÃ CHỐT') : t('NOW', 'HIỆN TẠI')}</Pill>
+                    <Text style={styles.itemMeta}>EP {String(item.episodeNumber).padStart(2, '0')}</Text>
+                  </View>
+                  <DramaRecapFrame
+                    episodeNumber={item.episodeNumber}
+                    title={item.title}
+                    summary={item.summary}
+                    choiceLabel={item.choiceLabel ? t(`Choice ${item.choiceKey}: ${item.choiceLabel}`, `Lựa chọn ${item.choiceKey}: ${item.choiceLabel}`) : undefined}
+                    consequence={item.consequence}
+                    pendingLabel={t('Your next choice is still waiting inside this scene.', 'Lựa chọn tiếp theo vẫn đang chờ trong cảnh này.')}
+                  />
+                </View>
+              </View>
+            );
+          })}
         </View>
       ) : null}
     </Screen>
@@ -96,17 +120,16 @@ function readParam(value: string | string[] | undefined): string | null {
 }
 
 const styles = StyleSheet.create({
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hero: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.md },
-  title: { color: colors.ink, fontFamily: typography.display, fontSize: 38, lineHeight: 44, fontWeight: '700', letterSpacing: -1 },
-  body: { color: colors.inkMuted, fontSize: 14, lineHeight: 22 },
-  timeline: { gap: 0, paddingTop: spacing.sm },
-  timelineItem: { gap: spacing.md, paddingVertical: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  status: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  episodeTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 27, lineHeight: 33, fontWeight: '700' },
-  choiceBlock: { gap: spacing.xs, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
-  choiceLabel: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 16, lineHeight: 22, fontWeight: '700' },
-  consequence: { color: colors.storyInk, fontFamily: typography.display, fontSize: 15, lineHeight: 23 },
-  pending: { color: colors.inkMuted, fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  timeline: { position: 'relative', gap: spacing.lg, paddingTop: spacing.sm },
+  timelineRail: { position: 'absolute', top: spacing.md, bottom: spacing.xl, left: 17, width: 1, backgroundColor: colors.borderStrong },
+  timelineItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  timelineMarkerColumn: { width: 36, alignItems: 'center', paddingTop: 2 },
+  timelineNode: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.accentSoft, backgroundColor: colors.background },
+  timelineNodeLocked: { borderColor: colors.borderSuccess, backgroundColor: colors.surfaceSuccess },
+  timelineNodeText: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  timelineNodeTextLocked: { color: colors.success },
+  timelineContent: { flex: 1, gap: spacing.sm, minWidth: 0 },
+  itemHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  itemMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
 });

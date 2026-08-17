@@ -8,8 +8,9 @@ import { BillingClientError } from '@/features/billing/contracts';
 import { useBillingSession } from '@/features/billing/billing-session-context';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
 import { createBillingCoordinator } from '@/features/billing/runtime';
-import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, Pill, Screen } from '@/ui/primitives';
-import { colors, spacing, typography } from '@/ui/theme';
+import { DramaUtilityHero } from '@/ui/drama-visuals';
+import { ActionButton, BrandMark, ErrorState, Eyebrow, Pill, Screen } from '@/ui/primitives';
+import { colors, cinematic, radius, spacing, typography } from '@/ui/theme';
 
 export default function PlusScreen() {
   const router = useRouter();
@@ -72,46 +73,92 @@ export default function PlusScreen() {
     }
   }
 
+  const entitlementActive = entitlement?.plusActive ?? false;
+
   return (
     <Screen>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => router.back()} />
       </View>
-      <View style={styles.hero}>
-        <Eyebrow>Living Plot Plus</Eyebrow>
-        <Text style={styles.title}>{t('More episodes when the cliffhanger hits.', 'Thêm tập khi cao trào vừa tới.')}</Text>
-        <Text style={styles.body}>{t('For people who want to keep a story moving instead of stopping after the free daily episodes.', 'Dành cho người muốn câu chuyện tiếp tục thay vì dừng sau số tập miễn phí mỗi ngày.')}</Text>
-      </View>
 
-      <Card style={styles.planFeature}>
-        <View style={styles.planHeader}>
-          <Pill tone="accent">PLUS</Pill>
-          <Pill tone={storeMode === 'test_store' ? 'success' : 'neutral'}>{storeModeLabel(storeMode, locale)}</Pill>
+      <DramaUtilityHero
+        kicker="LIVING PLOT PLUS"
+        title={t('Stay for the next scene.', 'Ở lại cho cảnh tiếp theo.')}
+        detail={t('More daily episodes and fresh narration when the cliffhanger should not end here.', 'Thêm tập và giọng đọc mới mỗi ngày khi cao trào chưa nên dừng lại.')}
+        mood="romantic"
+        characterName="Plus"
+      />
+
+      <View style={styles.pass}>
+        <View style={styles.passTopRow}>
+          <View>
+            <Eyebrow>{t('Daily story pass', 'Thẻ drama mỗi ngày')}</Eyebrow>
+            <Text style={styles.passTitle}>{entitlementActive ? t('Plus is active', 'Plus đang hoạt động') : t('Free → Plus', 'Free → Plus')}</Text>
+          </View>
+          <View style={styles.passPills}>
+            <Pill tone={entitlementActive ? 'success' : 'accent'}>{entitlementActive ? 'PLUS ACTIVE' : 'PLUS'}</Pill>
+            <Pill tone={storeMode === 'test_store' ? 'success' : 'neutral'}>{storeModeLabel(storeMode, locale)}</Pill>
+          </View>
         </View>
-        <Text style={styles.planTitle}>{t('20 story episodes + 10 fresh narrated episodes each day', '20 tập truyện + 10 tập giọng đọc mới mỗi ngày')}</Text>
-        <Text style={styles.body}>{t('Free includes 3 story episodes and 1 fresh narration per day. Replaying narration you already generated is always free.', 'Free gồm 3 tập truyện và 1 giọng đọc mới mỗi ngày. Phát lại giọng đã tạo luôn miễn phí.')}</Text>
-        <Text style={styles.storeNote}>{storeMode === 'test_store' ? t('Preview purchase mode is enabled in this development build.', 'Chế độ mua thử đã bật trong bản development này.') : storeMode === 'platform_store' ? t('Purchases are connected for this platform.', 'Mua hàng đã được kết nối trên nền tảng này.') : t('Purchases are not connected in this preview build yet.', 'Mua hàng chưa được kết nối trong bản xem trước này.')}</Text>
-        {entitlement ? <Pill tone={entitlement.plusActive ? 'success' : 'neutral'}>Backend: {entitlement.tier.toUpperCase()}</Pill> : null}
-      </Card>
+
+        <View style={styles.metricGrid}>
+          <PlanMetric label={t('Story episodes', 'Tập truyện')} free="3" plus="20" />
+          <PlanMetric label={t('Fresh narration', 'Giọng đọc mới')} free="1" plus="10" />
+        </View>
+
+        <View style={styles.passFooter}>
+          <Text style={styles.passFootnote}>{t('Replaying narration you already generated never uses another voice slot.', 'Phát lại giọng đã tạo không dùng thêm lượt giọng.')}</Text>
+          {entitlement ? <Text style={styles.backendState}>BACKEND · {entitlement.tier.toUpperCase()}</Text> : null}
+        </View>
+      </View>
 
       {!session ? (
         <ErrorState
           title={t('Sign in before upgrading', 'Đăng nhập trước khi nâng cấp')}
           message={auth.configured && auth.isSignedIn
             ? t('Your account is still opening. Try again in a moment.', 'Tài khoản vẫn đang mở. Hãy thử lại sau một chút.')
-            : t('Living Plot Plus needs a signed-in account so purchases can follow you across devices.', 'Living Plot Plus cần tài khoản đã đăng nhập để giao dịch theo bạn giữa các thiết bị.')}
+            : t('Plus needs a signed-in account so access can follow you across devices.', 'Plus cần tài khoản đã đăng nhập để quyền truy cập đi cùng bạn giữa các thiết bị.')}
         />
       ) : null}
 
-      <View style={styles.actions}>
+      <View style={styles.primaryAction}>
         {auth.configured && !auth.isSignedIn ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} variant="secondary" onPress={() => router.push('/auth')} /> : null}
-        <ActionButton label={t('Open Plus paywall', 'Mở paywall Plus')} busy={busyAction === 'paywall'} onPress={presentPaywall} />
-        <ActionButton label={t('Refresh access', 'Làm mới quyền truy cập')} variant="secondary" busy={busyAction === 'refresh'} onPress={refreshAccess} />
-        <ActionButton label={t('Restore purchases', 'Khôi phục giao dịch')} variant="secondary" busy={busyAction === 'restore'} onPress={restore} />
+        <ActionButton label={entitlementActive ? t('Open Plus access', 'Mở quyền Plus') : t('Open Plus paywall', 'Mở paywall Plus')} busy={busyAction === 'paywall'} disabled={busyAction !== null && busyAction !== 'paywall'} onPress={presentPaywall} />
       </View>
-      {message ? <Text style={styles.message}>{message}</Text> : null}
+
+      <View style={styles.utilityBar}>
+        <View style={styles.utilityCopy}>
+          <Text style={styles.utilityTitle}>{t('Purchase recovery', 'Khôi phục quyền mua')}</Text>
+          <Text style={styles.utilityDetail}>{storeModeDetail(storeMode, locale)}</Text>
+        </View>
+        <View style={styles.utilityActions}>
+          <ActionButton label={t('Refresh access', 'Làm mới quyền')} variant="secondary" busy={busyAction === 'refresh'} disabled={busyAction !== null && busyAction !== 'refresh'} onPress={refreshAccess} style={styles.utilityButton} />
+          <ActionButton label={t('Restore purchases', 'Khôi phục giao dịch')} variant="ghost" busy={busyAction === 'restore'} disabled={busyAction !== null && busyAction !== 'restore'} onPress={restore} style={styles.utilityButton} />
+        </View>
+      </View>
+
+      {message ? <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text> : null}
     </Screen>
+  );
+}
+
+function PlanMetric({ label, free, plus }: { label: string; free: string; plus: string }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <View style={styles.metricValues}>
+        <View>
+          <Text style={styles.metricTier}>FREE</Text>
+          <Text style={styles.metricFree}>{free}</Text>
+        </View>
+        <Text style={styles.metricArrow}>→</Text>
+        <View>
+          <Text style={[styles.metricTier, styles.metricTierPlus]}>PLUS</Text>
+          <Text style={styles.metricPlus}>{plus}</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -121,20 +168,48 @@ function storeModeLabel(mode: 'test_store' | 'platform_store' | 'not_configured'
   return locale === 'vi' ? 'Cửa hàng offline' : 'Store offline';
 }
 
+function storeModeDetail(mode: 'test_store' | 'platform_store' | 'not_configured', locale: 'en' | 'vi'): string {
+  if (mode === 'test_store') return locale === 'vi' ? 'Bản development đang dùng giao dịch thử.' : 'Development build uses test purchases.';
+  if (mode === 'platform_store') return locale === 'vi' ? 'Cửa hàng nền tảng đã được kết nối.' : 'Platform purchases are connected.';
+  return locale === 'vi' ? 'Cửa hàng chưa được kết nối trong bản này.' : 'Store connection is unavailable in this build.';
+}
+
 function billingMessage(error: unknown, locale: 'en' | 'vi'): string {
   if (error instanceof BillingClientError) return locale === 'vi' ? 'Không thể hoàn tất thao tác thanh toán. Hãy thử lại hoặc làm mới quyền truy cập.' : error.message;
   return locale === 'vi' ? 'Không thể hoàn tất thanh toán.' : 'Billing could not be completed.';
 }
 
 const styles = StyleSheet.create({
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hero: { gap: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.sm },
-  title: { color: colors.ink, fontFamily: typography.display, fontSize: 40, fontWeight: '700', lineHeight: 46, letterSpacing: -1.1 },
-  planFeature: { paddingVertical: spacing.xl, borderWidth: 0, borderRadius: 0, backgroundColor: colors.surfaceWarm },
-  planHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  planTitle: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 27, fontWeight: '700', lineHeight: 34 },
-  body: { color: colors.inkMuted, fontSize: 15, lineHeight: 23 },
-  storeNote: { color: colors.storyInk, fontFamily: typography.mono, fontSize: 10, lineHeight: 17, letterSpacing: 0.25 },
-  actions: { gap: spacing.sm, paddingTop: spacing.sm },
-  message: { color: colors.inkMuted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  pass: {
+    gap: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: cinematic.radius.scene,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.accentSoft,
+    backgroundColor: colors.surfaceWarmDeep,
+  },
+  passTopRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  passTitle: { marginTop: spacing.xs, color: colors.ink, fontFamily: typography.display, fontSize: 28, lineHeight: 33, fontWeight: '700' },
+  passPills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  metric: { minWidth: 150, flexGrow: 1, flexBasis: '46%', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceQuiet },
+  metricLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 0.75, textTransform: 'uppercase' },
+  metricValues: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm },
+  metricTier: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  metricTierPlus: { color: colors.accentStrong },
+  metricFree: { color: colors.inkMuted, fontFamily: typography.display, fontSize: 29, lineHeight: 32, fontWeight: '700' },
+  metricPlus: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 38, lineHeight: 40, fontWeight: '700' },
+  metricArrow: { color: colors.accentSoft, fontSize: 21, paddingBottom: 3 },
+  passFooter: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
+  passFootnote: { color: colors.storyInk, fontSize: 12, lineHeight: 18 },
+  backendState: { color: colors.success, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 0.8 },
+  primaryAction: { gap: spacing.sm },
+  utilityBar: { gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
+  utilityCopy: { gap: spacing.xs },
+  utilityTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 20, lineHeight: 24, fontWeight: '700' },
+  utilityDetail: { color: colors.quietInk, fontSize: 11, lineHeight: 17 },
+  utilityActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  utilityButton: { minWidth: 145, flexGrow: 1 },
+  message: { color: colors.inkMuted, fontSize: 13, lineHeight: 20, textAlign: 'center' },
 });

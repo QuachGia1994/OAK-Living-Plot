@@ -10,8 +10,9 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
 import type { NarratorVariant, StoryLocale, UiLocale } from '@/features/preferences/contracts';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
-import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, Pill, Screen } from '@/ui/primitives';
-import { colors, radius, spacing, typography } from '@/ui/theme';
+import { DramaUtilityHero } from '@/ui/drama-visuals';
+import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
+import { colors, cinematic, radius, spacing, typography } from '@/ui/theme';
 
 const unavailableAccount = new UnavailableAccountDataClient();
 
@@ -133,16 +134,18 @@ export default function SettingsScreen() {
         <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => router.back()} />
       </View>
 
-      <View style={styles.hero}>
-        <Eyebrow>{t('Settings & data', 'Cài đặt & dữ liệu')}</Eyebrow>
-        <Text style={styles.title}>{t('Control the defaults. Keep the story canonical.', 'Điều khiển mặc định. Giữ câu chuyện chuẩn.')}</Text>
-        <Text style={styles.body}>{t('These preferences affect new requests and narration defaults. They do not rewrite past episodes or committed choices.', 'Các tùy chọn này ảnh hưởng yêu cầu mới và giọng đọc mặc định. Chúng không viết lại tập cũ hay lựa chọn đã chốt.')}</Text>
-      </View>
+      <DramaUtilityHero
+        kicker={t('CONTROL ROOM', 'PHÒNG ĐIỀU KHIỂN')}
+        title={t('Set the defaults. Leave the canon untouched.', 'Đặt mặc định. Không chạm vào câu chuyện chuẩn.')}
+        detail={t('Preferences shape new stories and narration; past episodes and locked choices remain unchanged.', 'Tùy chọn định hình câu chuyện và giọng đọc mới; tập cũ và lựa chọn đã chốt không thay đổi.')}
+        mood="hopeful"
+        characterName="Settings"
+      />
 
       {preferenceError ? <ErrorState title={t('Preferences unavailable', 'Tùy chọn không khả dụng')} message={locale === 'vi' ? t('Preferences could not be loaded.', 'Không thể tải tùy chọn.') : preferenceError} /> : null}
 
-      <View style={styles.settingsSection}>
-        <Eyebrow>{t('Story preferences', 'Tùy chọn câu chuyện')}</Eyebrow>
+      <View style={styles.section}>
+        <SectionHeader index="01" title={t('Story defaults', 'Mặc định câu chuyện')} meta={t('NEW REQUESTS', 'YÊU CẦU MỚI')} />
         <PreferenceRow label={t('Interface language', 'Ngôn ngữ giao diện')}>
           <Option label="English" selected={uiLocale === 'en'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'en' }))} />
           <Option label="Tiếng Việt" selected={uiLocale === 'vi'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'vi' }))} />
@@ -155,36 +158,46 @@ export default function SettingsScreen() {
           <Option label={t('English female', 'Nữ tiếng Anh')} selected={narratorVariant === 'en-narrator-female'} onPress={() => setPreferenceDraft((current) => ({ ...current, narratorVariant: 'en-narrator-female' }))} />
           <Option label={t('Vietnamese female', 'Nữ tiếng Việt')} selected={narratorVariant === 'vi-narrator-female'} onPress={() => setPreferenceDraft((current) => ({ ...current, narratorVariant: 'vi-narrator-female' }))} />
         </PreferenceRow>
-        <Text style={styles.note}>{t('Interface language changes after saving. Story language applies only to new plots; narrator choice applies to new voice requests.', 'Ngôn ngữ giao diện đổi sau khi lưu. Ngôn ngữ câu chuyện chỉ áp dụng cho cốt truyện mới; giọng kể áp dụng cho yêu cầu giọng mới.')}</Text>
+        <Text style={styles.compactNote}>{t('Saved changes affect future requests only.', 'Thay đổi đã lưu chỉ áp dụng cho yêu cầu tương lai.')}</Text>
         <ActionButton label={t('Save preferences', 'Lưu tùy chọn')} busy={busy === 'preferences' || loading} onPress={() => void savePreferences()} />
       </View>
 
-      <View style={styles.settingsSection}>
-        <View style={styles.rowBetween}>
-          <Eyebrow>{t('Privacy & data', 'Quyền riêng tư & dữ liệu')}</Eyebrow>
+      <View style={styles.section}>
+        <View style={styles.sectionStatusHeader}>
+          <SectionHeader index="02" title={t('Privacy & data', 'Quyền riêng tư & dữ liệu')} meta={t('OWNED DATA', 'DỮ LIỆU SỞ HỮU')} />
           <Pill tone={account.configured ? 'success' : 'neutral'}>{account.configured ? t('Live account', 'Tài khoản live') : t('Preview only', 'Chỉ xem trước')}</Pill>
         </View>
-        <Text style={styles.body}>{t('D1 stores canonical story/application state. Narration stays in private R2. Product analytics intentionally omit user IDs and story text.', 'D1 lưu trạng thái ứng dụng/câu chuyện chuẩn. Giọng đọc nằm trong R2 riêng tư. Phân tích sản phẩm cố ý không lưu ID người dùng hay nội dung truyện.')}</Text>
-        <Text style={styles.body}>{t('Export includes your application-owned story data but never auth tokens, provider secrets, telemetry rows, private R2 object keys, or raw RevenueCat webhook bodies.', 'Bản xuất gồm dữ liệu câu chuyện thuộc ứng dụng nhưng không bao giờ gồm token đăng nhập, secret nhà cung cấp, hàng telemetry, khóa R2 riêng tư hoặc nội dung webhook RevenueCat thô.')}</Text>
-        <Text style={styles.body}>{t('Delete removes Living Plot D1 data and owned private audio. It does not claim to delete the separate Clerk or RevenueCat provider account.', 'Xóa sẽ loại bỏ dữ liệu D1 Living Plot và audio riêng tư thuộc bạn. Thao tác này không tuyên bố xóa tài khoản Clerk hay RevenueCat riêng biệt.')}</Text>
+        <View style={styles.policyGrid}>
+          <PolicyTile kicker="D1" title={t('Canonical state', 'Trạng thái chuẩn')} body={t('Stories, choices and application-owned account state.', 'Câu chuyện, lựa chọn và trạng thái tài khoản thuộc ứng dụng.')} />
+          <PolicyTile kicker="R2" title={t('Private audio', 'Audio riêng tư')} body={t('Narration stays private and owned cleanup runs before account deletion.', 'Giọng đọc giữ riêng tư và được dọn trước khi xóa tài khoản.')} />
+          <PolicyTile kicker={t('PRIVACY', 'RIÊNG TƯ')} title={t('No story text in analytics', 'Không đưa nội dung truyện vào analytics')} body={t('Exports exclude auth tokens, provider secrets, telemetry rows and private object keys.', 'Bản xuất loại trừ token, secret nhà cung cấp, telemetry và khóa object riêng tư.')} />
+        </View>
         <ActionButton label={t('Export my Living Plot data', 'Xuất dữ liệu Living Plot của tôi')} variant="secondary" busy={busy === 'export'} disabled={!account.configured} onPress={() => void exportData()} />
       </View>
 
-      <Card style={styles.dangerCard}>
-        <Eyebrow>{t('Irreversible data erase', 'Xóa dữ liệu không thể hoàn tác')}</Eyebrow>
-        <Text style={styles.dangerTitle}>{t('Delete Living Plot application data', 'Xóa dữ liệu ứng dụng Living Plot')}</Text>
-        <Text style={styles.body}>{t('Type the exact phrase below. Private audio cleanup must succeed before canonical D1 deletion is allowed.', 'Nhập chính xác cụm từ bên dưới. Audio riêng tư phải được dọn thành công trước khi D1 chuẩn được phép xóa.')}</Text>
-        <Text style={styles.confirmPhrase}>{ACCOUNT_DELETE_CONFIRMATION}</Text>
-        <TextInput
-          accessibilityLabel={t('Account deletion confirmation', 'Xác nhận xóa dữ liệu tài khoản')}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          placeholder={t('Type confirmation phrase', 'Nhập cụm từ xác nhận')}
-          placeholderTextColor={colors.placeholder}
-          style={styles.input}
-          value={confirmation}
-          onChangeText={setConfirmation}
-        />
+      <View style={styles.dangerVault}>
+        <View style={styles.dangerHeader}>
+          <View>
+            <Text style={styles.dangerKicker}>{t('IRREVERSIBLE', 'KHÔNG THỂ HOÀN TÁC')}</Text>
+            <Text style={styles.dangerTitle}>{t('Erase Living Plot data', 'Xóa dữ liệu Living Plot')}</Text>
+          </View>
+          <View style={styles.dangerSignal} />
+        </View>
+        <Text style={styles.dangerBody}>{t('Private audio cleanup must succeed before canonical D1 deletion. Type the exact phrase to unlock the action.', 'Audio riêng tư phải được dọn thành công trước khi xóa D1 chuẩn. Nhập chính xác cụm từ để mở khóa thao tác.')}</Text>
+        <View style={styles.confirmDock}>
+          <Text style={styles.confirmLabel}>{t('CONFIRMATION PHRASE', 'CỤM TỪ XÁC NHẬN')}</Text>
+          <Text style={styles.confirmPhrase}>{ACCOUNT_DELETE_CONFIRMATION}</Text>
+          <TextInput
+            accessibilityLabel={t('Account deletion confirmation', 'Xác nhận xóa dữ liệu tài khoản')}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            placeholder={t('Type confirmation phrase', 'Nhập cụm từ xác nhận')}
+            placeholderTextColor={colors.placeholder}
+            style={styles.dangerInput}
+            value={confirmation}
+            onChangeText={setConfirmation}
+          />
+        </View>
         <ActionButton
           label={t('Delete my Living Plot data', 'Xóa dữ liệu Living Plot của tôi')}
           variant="secondary"
@@ -192,26 +205,27 @@ export default function SettingsScreen() {
           disabled={!account.configured || postDeleteSignOutFailed || confirmation !== ACCOUNT_DELETE_CONFIRMATION}
           onPress={() => void deleteData()}
         />
-        {postDeleteSignOutFailed ? (
-          <ActionButton label={t('Retry Clerk sign out', 'Thử đăng xuất Clerk lại')} busy={busy === 'signout'} onPress={() => void retrySignOut()} />
-        ) : null}
-      </Card>
+        {postDeleteSignOutFailed ? <ActionButton label={t('Retry Clerk sign out', 'Thử đăng xuất Clerk lại')} busy={busy === 'signout'} onPress={() => void retrySignOut()} /> : null}
+      </View>
 
-      <View style={styles.settingsSection}>
-        <View style={styles.rowBetween}>
-          <Eyebrow>{t('Safe diagnostics', 'Chẩn đoán an toàn')}</Eyebrow>
-          <Pill>{runtimeMode}</Pill>
+      <View style={styles.section}>
+        <View style={styles.sectionStatusHeader}>
+          <SectionHeader index="03" title={t('Safe diagnostics', 'Chẩn đoán an toàn')} meta={t('STATUS ONLY', 'CHỈ TRẠNG THÁI')} />
+          <Pill tone={apiHealth === 'ok' ? 'success' : 'neutral'}>{runtimeMode}</Pill>
         </View>
-        <Diagnostic label={t('App version', 'Phiên bản ứng dụng')} value={Constants.expoConfig?.version ?? t('unknown', 'không rõ')} />
-        <Diagnostic label="API" value={apiBaseUrl ? t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
-        <Diagnostic label="Clerk" value={auth.configured ? auth.isSignedIn ? t('signed in', 'đã đăng nhập') : t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
-        <Diagnostic label="RevenueCat" value={revenueCatMode} />
-        <Diagnostic label={t('API health', 'Trạng thái API')} value={apiHealth} />
+        <View style={styles.console}>
+          <Text style={styles.consoleHeader}>LIVING_PLOT / SAFE_DIAGNOSTICS</Text>
+          <Diagnostic label={t('App version', 'Phiên bản ứng dụng')} value={Constants.expoConfig?.version ?? t('unknown', 'không rõ')} />
+          <Diagnostic label="API" value={apiBaseUrl ? t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
+          <Diagnostic label="Clerk" value={auth.configured ? auth.isSignedIn ? t('signed in', 'đã đăng nhập') : t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
+          <Diagnostic label="RevenueCat" value={revenueCatMode} />
+          <Diagnostic label={t('API health', 'Trạng thái API')} value={apiHealth} />
+        </View>
         <View style={styles.actions}>
-          <ActionButton label={t('Check API health', 'Kiểm tra API')} variant="secondary" busy={busy === 'health'} disabled={!apiBaseUrl} onPress={() => void checkHealth()} style={styles.flex} />
-          <ActionButton label={t('Share diagnostics', 'Chia sẻ chẩn đoán')} variant="ghost" onPress={() => void Share.share({ message: diagnostics })} />
+          <ActionButton label={t('Check API health', 'Kiểm tra API')} variant="secondary" busy={busy === 'health'} disabled={!apiBaseUrl} onPress={() => void checkHealth()} style={styles.flexAction} />
+          <ActionButton label={t('Share diagnostics', 'Chia sẻ chẩn đoán')} variant="ghost" onPress={() => void Share.share({ message: diagnostics })} style={styles.flexAction} />
         </View>
-        <Text style={styles.note}>{t('Diagnostics contain status booleans/version only; no tokens, internal user IDs, API URL, story text, or secret values.', 'Chẩn đoán chỉ chứa trạng thái boolean/phiên bản; không có token, ID người dùng nội bộ, URL API, nội dung truyện hay secret.')}</Text>
+        <Text style={styles.compactNote}>{t('No tokens, internal user IDs, API URL, story text or secret values are included.', 'Không gồm token, ID người dùng nội bộ, URL API, nội dung truyện hay secret.')}</Text>
       </View>
 
       {message ? <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text> : null}
@@ -219,8 +233,20 @@ export default function SettingsScreen() {
   );
 }
 
+function SectionHeader({ index, title, meta }: { index: string; title: string; meta: string }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionIndex}>{index}</Text>
+      <View style={styles.sectionHeaderCopy}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionMeta}>{meta}</Text>
+      </View>
+    </View>
+  );
+}
+
 function PreferenceRow({ label, children }: { label: string; children: ReactNode }) {
-  return <View style={styles.preferenceRow}><Text style={styles.label}>{label}</Text><View style={styles.options}>{children}</View></View>;
+  return <View style={styles.preferenceRow}><Text style={styles.preferenceLabel}>{label}</Text><View style={styles.options}>{children}</View></View>;
 }
 
 function Option({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -231,13 +257,25 @@ function Option({ label, selected, onPress }: { label: string; selected: boolean
       onPress={onPress}
       style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && styles.pressed]}
     >
-      <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{label}</Text>
+      <View style={[styles.optionSignal, selected && styles.optionSignalSelected]} />
+      <Text style={[styles.optionText, selected && styles.optionTextSelected]} numberOfLines={2}>{label}</Text>
+      <Text style={styles.optionState}>{selected ? 'SELECTED' : 'OPTION'}</Text>
     </Pressable>
   );
 }
 
+function PolicyTile({ kicker, title, body }: { kicker: string; title: string; body: string }) {
+  return (
+    <View style={styles.policyTile}>
+      <Text style={styles.policyKicker}>{kicker}</Text>
+      <Text style={styles.policyTitle}>{title}</Text>
+      <Text style={styles.policyBody}>{body}</Text>
+    </View>
+  );
+}
+
 function Diagnostic({ label, value }: { label: string; value: string }) {
-  return <View style={styles.diagnosticRow}><Text style={styles.label}>{label}</Text><Text style={styles.value}>{value}</Text></View>;
+  return <View style={styles.diagnosticRow}><Text style={styles.diagnosticLabel}>{label}</Text><Text style={styles.diagnosticValue}>{value}</Text></View>;
 }
 
 function revenueCatStoreModeFromEnvForRuntime(): string {
@@ -246,28 +284,47 @@ function revenueCatStoreModeFromEnvForRuntime(): string {
 }
 
 const styles = StyleSheet.create({
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hero: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.md },
-  title: { color: colors.ink, fontFamily: typography.display, fontSize: 38, lineHeight: 44, fontWeight: '700', letterSpacing: -1 },
-  body: { color: colors.inkMuted, fontSize: 14, lineHeight: 22 },
-  settingsSection: { gap: spacing.md, paddingVertical: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
-  rowBetween: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  diagnosticRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
-  preferenceRow: { gap: spacing.sm, paddingBottom: spacing.sm },
-  label: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  section: { gap: spacing.md, paddingVertical: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
+  sectionStatusHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  sectionHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  sectionIndex: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 17, fontWeight: '900', letterSpacing: 1.2 },
+  sectionHeaderCopy: { gap: 2 },
+  sectionTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 25, lineHeight: 29, fontWeight: '700' },
+  sectionMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 13, fontWeight: '900', letterSpacing: 0.8 },
+  preferenceRow: { gap: spacing.sm },
+  preferenceLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  option: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, borderRadius: radius.sm, backgroundColor: 'transparent' },
-  optionSelected: { borderColor: colors.accent, backgroundColor: colors.surfaceWarmDeep },
-  optionText: { color: colors.inkMuted, fontSize: 13, fontWeight: '800' },
-  optionTextSelected: { color: colors.accentStrong },
-  pressed: { opacity: 0.75 },
-  dangerCard: { borderColor: colors.danger, backgroundColor: colors.surfaceDanger },
-  dangerTitle: { color: colors.danger, fontFamily: typography.display, fontSize: 24, lineHeight: 30, fontWeight: '700' },
-  confirmPhrase: { color: colors.ink, fontFamily: typography.mono, fontSize: 11, lineHeight: 18, fontWeight: '800', letterSpacing: 0.6 },
-  input: { minHeight: 52, paddingHorizontal: 0, borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.danger, borderRadius: 0, color: colors.ink, backgroundColor: 'transparent', fontFamily: typography.mono, fontSize: 13 },
+  option: { minWidth: 140, minHeight: 104, flexGrow: 1, flexBasis: '46%', justifyContent: 'space-between', gap: spacing.sm, padding: spacing.md, borderRadius: cinematic.radius.choice, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceQuiet },
+  optionSelected: { borderColor: colors.accentSoft, backgroundColor: colors.surfaceWarmDeep },
+  optionSignal: { width: 28, height: 2, borderRadius: radius.pill, backgroundColor: colors.borderStrong },
+  optionSignalSelected: { backgroundColor: colors.accentStrong },
+  optionText: { color: colors.inkMuted, fontFamily: typography.display, fontSize: 17, lineHeight: 21, fontWeight: '700' },
+  optionTextSelected: { color: colors.ink },
+  optionState: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
+  pressed: { opacity: 0.76 },
+  compactNote: { color: colors.quietInk, fontSize: 11, lineHeight: 17 },
+  policyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  policyTile: { minWidth: 150, flexGrow: 1, flexBasis: '30%', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceQuiet },
+  policyKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  policyTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 18, lineHeight: 22, fontWeight: '700' },
+  policyBody: { color: colors.inkMuted, fontSize: 11, lineHeight: 17 },
+  dangerVault: { gap: spacing.md, padding: spacing.lg, borderRadius: cinematic.radius.scene, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.danger, backgroundColor: colors.surfaceDanger },
+  dangerHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  dangerKicker: { color: colors.danger, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
+  dangerTitle: { marginTop: spacing.xs, color: colors.ink, fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700' },
+  dangerSignal: { width: 34, height: 3, borderRadius: radius.pill, backgroundColor: colors.danger },
+  dangerBody: { color: colors.storyInk, fontSize: 12, lineHeight: 19 },
+  confirmDock: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.background },
+  confirmLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
+  confirmPhrase: { color: colors.danger, fontFamily: typography.mono, fontSize: 11, lineHeight: 18, fontWeight: '900', letterSpacing: 0.55 },
+  dangerInput: { minHeight: 50, paddingHorizontal: 0, borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.danger, color: colors.ink, backgroundColor: 'transparent', fontFamily: typography.mono, fontSize: 13 },
+  console: { gap: 0, overflow: 'hidden', borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: '#080807' },
+  consoleHeader: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 1, padding: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderStrong },
+  diagnosticRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
+  diagnosticLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '800' },
+  diagnosticValue: { color: colors.ink, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
-  flex: { flex: 1 },
-  value: { color: colors.ink, fontFamily: typography.mono, fontSize: 10, fontWeight: '800' },
-  note: { color: colors.quietInk, fontSize: 11, lineHeight: 17 },
+  flexAction: { minWidth: 150, flexGrow: 1 },
   message: { color: colors.inkMuted, fontSize: 13, lineHeight: 20, textAlign: 'center' },
 });

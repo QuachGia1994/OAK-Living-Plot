@@ -235,6 +235,76 @@ export function DramaCastingPreview({
   );
 }
 
+export function DramaUtilityHero({
+  kicker,
+  title,
+  detail,
+  mood = 'mysterious',
+  characterName = 'Living Plot',
+}: {
+  kicker: string;
+  title: string;
+  detail?: string;
+  mood?: StoryMood;
+  characterName?: string;
+}) {
+  const tone = cinematic.scene[mood];
+  return (
+    <View style={[styles.utilityHero, { backgroundColor: tone.base }]}>
+      <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${detail ?? ''}`} compact />
+      <View style={styles.utilityHeroShade} />
+      <View style={styles.utilityHeroCopy}>
+        <Text style={[styles.utilityHeroKicker, { color: tone.rim }]}>{kicker}</Text>
+        <Text style={styles.utilityHeroTitle}>{title}</Text>
+        {detail ? <Text style={styles.utilityHeroDetail}>{detail}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+export function DramaRecapFrame({
+  episodeNumber,
+  title,
+  summary,
+  choiceLabel,
+  consequence,
+  pendingLabel,
+}: {
+  episodeNumber: number;
+  title: string;
+  summary: string;
+  choiceLabel?: string;
+  consequence?: string;
+  pendingLabel: string;
+}) {
+  const tone = cinematic.scene.mysterious;
+  const sceneText = `${title} ${summary} ${consequence ?? ''}`;
+  return (
+    <View style={styles.recapFrame}>
+      <View style={[styles.recapVisual, { backgroundColor: tone.base }]}>
+        <SceneArtwork mood="mysterious" characterName={`EP ${episodeNumber}`} sceneText={sceneText} compact />
+        <View style={styles.recapShade} />
+        <View style={styles.recapVisualMeta}>
+          <Text style={styles.recapEpisode}>EP {String(episodeNumber).padStart(2, '0')}</Text>
+          <View style={[styles.recapSignal, { backgroundColor: tone.rim }]} />
+        </View>
+        <Text style={styles.recapTitle} numberOfLines={2}>{title}</Text>
+      </View>
+      <View style={styles.recapCopy}>
+        <Text style={styles.recapSummary}>{summary}</Text>
+        {choiceLabel ? (
+          <View style={styles.recapChoice}>
+            <Text style={[styles.recapChoiceLabel, { color: tone.rim }]}>{choiceLabel}</Text>
+            {consequence ? <Text style={styles.recapConsequence}>{consequence}</Text> : null}
+          </View>
+        ) : (
+          <Text style={styles.recapPending}>{pendingLabel}</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 export function DramaSceneStage({
   episodeNumber,
   title,
@@ -700,6 +770,48 @@ const styles = StyleSheet.create({
   castingKicker: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
   castingName: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 34, lineHeight: 38, fontWeight: '700' },
   castingMeta: { color: '#BDB5AA', fontFamily: typography.mono, fontSize: 8, lineHeight: 14, fontWeight: '900', letterSpacing: 0.8 },
+  utilityHero: {
+    minHeight: 330,
+    overflow: 'hidden',
+    borderRadius: cinematic.radius.scene,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: cinematic.overlay.hairline,
+  },
+  utilityHeroShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.3)' },
+  utilityHeroCopy: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.lg,
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: cinematic.overlay.hairline,
+    backgroundColor: cinematic.overlay.subtitle,
+  },
+  utilityHeroKicker: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
+  utilityHeroTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 30, lineHeight: 35, fontWeight: '700', letterSpacing: -0.6 },
+  utilityHeroDetail: { color: '#D3CBC0', fontSize: 13, lineHeight: 20 },
+  recapFrame: {
+    overflow: 'hidden',
+    borderRadius: cinematic.radius.choice,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: cinematic.overlay.hairline,
+    backgroundColor: colors.surfaceQuiet,
+  },
+  recapVisual: { minHeight: 230, overflow: 'hidden' },
+  recapShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.24)' },
+  recapVisualMeta: { position: 'absolute', top: spacing.md, left: spacing.md, right: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  recapEpisode: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
+  recapSignal: { width: 24, height: 2, borderRadius: radius.pill },
+  recapTitle: { position: 'absolute', left: spacing.md, right: spacing.md, bottom: spacing.md, color: '#FFF9EF', fontFamily: typography.display, fontSize: 25, lineHeight: 29, fontWeight: '700', letterSpacing: -0.45 },
+  recapCopy: { gap: spacing.md, padding: spacing.md },
+  recapSummary: { color: colors.storyInk, fontSize: 14, lineHeight: 22 },
+  recapChoice: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
+  recapChoiceLabel: { fontFamily: typography.display, fontSize: 17, lineHeight: 22, fontWeight: '700' },
+  recapConsequence: { color: colors.ink, fontFamily: typography.display, fontSize: 15, lineHeight: 23 },
+  recapPending: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, lineHeight: 15, fontWeight: '800', letterSpacing: 0.55, textTransform: 'uppercase' },
   sceneStage: {
     minHeight: 560,
     overflow: 'hidden',

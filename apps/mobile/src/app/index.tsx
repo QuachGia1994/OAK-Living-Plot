@@ -6,7 +6,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { StoryHomeSnapshot, StoryPlotSummary } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
-import { DramaCoverTile, DramaLoadingStage, DramaPoster } from '@/ui/drama-visuals';
+import { DramaCoverTile, DramaLoadingStage, DramaPoster, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
@@ -59,12 +59,14 @@ export default function HomeScreen() {
     return (
       <Screen>
         <BrandMark />
-        <View style={styles.authHero}>
-          <Eyebrow>{t('Your stories, remembered', 'Câu chuyện của bạn được ghi nhớ')}</Eyebrow>
-          <Text style={styles.authTitle}>{t('Pick what happens. Come back for the consequence.', 'Chọn điều xảy ra. Quay lại để xem hậu quả.')}</Text>
-          <Text style={styles.authBody}>{t('Sign in with one email code so your stories and choices stay with you across devices.', 'Đăng nhập bằng một mã email để câu chuyện và lựa chọn đi cùng bạn trên mọi thiết bị.')}</Text>
-          <ActionButton label={sharedUiCopy.signIn[locale]} onPress={() => router.push('/auth')} />
-        </View>
+        <DramaUtilityHero
+          kicker={t('YOUR STORIES, REMEMBERED', 'CÂU CHUYỆN ĐƯỢC GHI NHỚ')}
+          title={t('Pick what happens. Return for the consequence.', 'Chọn điều xảy ra. Quay lại để xem hậu quả.')}
+          detail={t('One email code keeps plots and choices linked across devices.', 'Một mã email giữ cốt truyện và lựa chọn liên kết giữa các thiết bị.')}
+          mood="mysterious"
+          characterName="Identity"
+        />
+        <ActionButton label={sharedUiCopy.signIn[locale]} onPress={() => router.push('/auth')} />
       </Screen>
     );
   }
@@ -139,15 +141,17 @@ export default function HomeScreen() {
             />
           ) : (
             <View style={styles.firstRunCue}>
-              <Text style={styles.firstRunTitle}>{t('One spark. One minute. Three ways forward.', 'Một tia lửa. Một phút. Ba hướng đi.')}</Text>
-              <Text style={styles.firstRunBody}>{t('The poster above is already cast and ready. Open it, review the setup, then play episode 1.', 'Poster phía trên đã có nhân vật và sẵn sàng. Mở nó, xem lại thiết lập rồi phát tập 1.')}</Text>
+              <Text style={styles.firstRunTitle}>{t('ONE SPARK', 'MỘT TIA LỬA')}</Text>
+              <Text style={styles.firstRunDivider}>·</Text>
+              <Text style={styles.firstRunTitle}>{t('ONE MINUTE', 'MỘT PHÚT')}</Text>
+              <Text style={styles.firstRunDivider}>·</Text>
+              <Text style={styles.firstRunTitle}>{t('THREE PATHS', 'BA HƯỚNG ĐI')}</Text>
             </View>
           )}
 
           <View style={styles.plusRow}>
             <View style={styles.plusCopy}>
-              <Text style={styles.plusKicker}>{t('Need another cliffhanger?', 'Muốn thêm một cao trào?')}</Text>
-              <Text style={styles.plusBody}>{t('Plus expands today’s episode and narration allowance.', 'Plus tăng hạn mức tập và giọng đọc trong ngày.')}</Text>
+              <Text style={styles.plusKicker}>PLUS · 20 EP / 10 VOICE</Text>
             </View>
             <ActionButton label={t('View Plus', 'Xem Plus')} variant="ghost" onPress={() => router.push('/plus')} />
           </View>
@@ -246,9 +250,6 @@ const styles = StyleSheet.create({
   heroPoster: { marginHorizontal: -spacing.lg, borderRadius: 0 },
   heroQuickActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm },
   heroQuickAction: { flexGrow: 1, minWidth: 170 },
-  authHero: { gap: spacing.md, paddingTop: spacing.xl },
-  authTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 40, lineHeight: 45, fontWeight: '700', letterSpacing: -1.1 },
-  authBody: { color: colors.inkMuted, fontSize: 15, lineHeight: 23 },
   hud: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -257,13 +258,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
-  hudMetric: { minWidth: 82, flex: 1, gap: 2, paddingVertical: spacing.md, paddingHorizontal: spacing.sm },
+  hudMetric: { minWidth: 128, flexGrow: 1, flexBasis: '46%', gap: 2, paddingVertical: spacing.md, paddingHorizontal: spacing.sm },
   hudValue: { color: colors.ink, fontFamily: typography.mono, fontSize: 17, fontWeight: '900', letterSpacing: -0.3 },
   hudValueAccent: { color: colors.accentStrong },
   hudLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 12, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
-  firstRunCue: { gap: spacing.xs, paddingVertical: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
-  firstRunTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 25, lineHeight: 30, fontWeight: '700' },
-  firstRunBody: { color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
+  firstRunCue: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
+  firstRunTitle: { color: colors.ink, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 1 },
+  firstRunDivider: { color: colors.accentStrong, fontSize: 14 },
   shelfSection: { gap: spacing.md, paddingTop: spacing.lg },
   shelfHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md },
   shelfTitle: { marginTop: spacing.xs, color: colors.ink, fontFamily: typography.display, fontSize: 29, lineHeight: 33, fontWeight: '700', letterSpacing: -0.6 },
@@ -280,8 +281,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderSubtle,
   },
-  plusCopy: { flex: 1, minWidth: 190, gap: 3 },
-  plusKicker: { color: colors.ink, fontFamily: typography.display, fontSize: 18, lineHeight: 22, fontWeight: '700' },
-  plusBody: { color: colors.quietInk, fontSize: 11, lineHeight: 16 },
+  plusCopy: { flex: 1, minWidth: 190 },
+  plusKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 0.9 },
   previewNote: { color: colors.quietInk, fontSize: 10, lineHeight: 16, textAlign: 'center', paddingHorizontal: spacing.md },
 });
