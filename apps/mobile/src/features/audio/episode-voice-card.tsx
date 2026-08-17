@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { StyleSheet, Text, View } from 'react-native';
+import { useUserPreferences } from '@/features/preferences/preferences-context';
 import { createStoryRequestKey } from '@/features/story/request-key';
 import { ActionButton, Card, Eyebrow, Pill } from '@/ui/primitives';
 import { colors, radius, spacing } from '@/ui/theme';
@@ -8,9 +9,10 @@ import type { EpisodeAudioAsset } from './contracts';
 import { EpisodeAudioClientError } from './contracts';
 import { useEpisodeAudioClient } from './audio-client-context';
 
-export function EpisodeVoiceCard({ episodeId, locale }: { episodeId: string; locale?: string }) {
+export function EpisodeVoiceCard({ episodeId }: { episodeId: string }) {
   const client = useEpisodeAudioClient();
-  const voiceVariant = useMemo(() => preferredVoiceVariant(locale), [locale]);
+  const { preferences } = useUserPreferences();
+  const voiceVariant = useMemo(() => preferences.narratorVariant, [preferences.narratorVariant]);
   const reservationKey = useRef(createStoryRequestKey('voice'));
   const loadedAssetId = useRef<string | null>(null);
   const player = useAudioPlayer(null, { updateInterval: 250 });
@@ -158,11 +160,6 @@ export function EpisodeVoiceCard({ episodeId, locale }: { episodeId: string; loc
       {error ? <Text style={styles.error} accessibilityLiveRegion="assertive">{error}</Text> : null}
     </Card>
   );
-}
-
-function preferredVoiceVariant(locale?: string): string {
-  const value = locale?.trim() || Intl.DateTimeFormat().resolvedOptions().locale || 'en-US';
-  return value.toLowerCase().startsWith('vi') ? 'vi-narrator-female' : 'en-narrator-female';
 }
 
 function isPending(status: EpisodeAudioAsset['status']): boolean {

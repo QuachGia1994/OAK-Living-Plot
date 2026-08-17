@@ -43,6 +43,9 @@ Append-only normalized RevenueCat delivery audit added by migration `0006_revenu
 ### `user_entitlements`
 One materialized Free/Plus row per internal user. Updates are monotonic by RevenueCat subscriber `request_date_ms`, so an older provider snapshot cannot overwrite newer state. A finite expired Plus row is read as effective Free using the server clock even if the next webhook is delayed.
 
+### `user_preferences`
+Owner-scoped bounded application defaults added by migration `0008_user_preferences.sql`. Stores interface-language preference (`en`/`vi`), default locale for newly created stories (`en-US`/`vi-VN`), and one approved narrator variant. Preferences cascade with the internal user and never retroactively rewrite persisted plot locale or canonical story history.
+
 ## Structured memory
 Phase 1 does not use Vectorize or a vector database. Runtime canonical plot state is schema v2 with keyed relationships/facts/threads:
 
@@ -91,3 +94,6 @@ The current Wrangler `database_id` is a non-production placeholder and `preview_
 - Repository reads structured plot memory and character state through one D1 boundary.
 - Live mobile plot creation retries converge by `(user_id, creation_key)` and cannot move ownership by supplying a client user ID.
 - Live story continuation derives generation context and choice state version from canonical D1 state; the client cannot authorize a stale/cross-owner mutation.
+- User preferences are owner-scoped, bounded to approved locale/voice values, and cannot be reassigned with a client user ID.
+- Account export omits auth/provider secrets, telemetry rows, quota reservation keys, provider voice IDs, and private R2 object keys.
+- Application-data erasure deletes owned private R2 audio before the internal D1 user; R2 failure leaves D1 intact for an explicit retry, and D1 cascades remove dependent preference/story/usage/quota/RevenueCat rows after success.

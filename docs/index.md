@@ -17,6 +17,7 @@
 - [Phase 1 retention loop](arch/retention.md) — canonical choice-history streaks, resume context, deterministic UTC daily sparks, and anti-dark-pattern guardrails.
 - [Phase 1 story library and history](arch/story-library-history.md) — reversible archive/restore lifecycle, owner-scoped library, and canonical read-only recap.
 - [Phase 1 mobile resilience and accessibility](arch/mobile-resilience.md) — bounded authenticated networking, safe GET retry, foreground refresh, UI recovery, and accessibility behavior.
+- [Phase 1 preferences and account data](arch/account-data-preferences.md) — story/narrator defaults, spoiler-safe sharing, portable export, fail-closed application-data erasure, and safe diagnostics.
 - [Live development setup](ref/live-development.md) — secret-safe readiness checks, non-production Cloudflare environment, and mobile/provider configuration.
 - [Foundation implementation slice 1](plan/done/foundation-slice1.md) — completed workspace/CI foundation and verification evidence.
 - [D1 implementation slice 2](plan/done/d1-slice2.md) — completed D1/domain baseline and verification evidence.
@@ -42,3 +43,8 @@
 - [Product funnel telemetry slice 23](plan/done/product-funnel-telemetry-slice23.md) — completed replay-safe non-identifying Analytics Engine canonical events.
 - [Mobile network resilience slice 24](plan/done/network-resilience-slice24.md) — completed timeout/abort, safe GET retry, and no automatic mutation retry.
 - [Native beta hardening slice 25](plan/done/beta-hardening-slice25.md) — completed UI crash recovery, foreground read refresh, and accessibility hardening.
+- [User preferences slice 26](plan/done/user-preferences-slice26.md) — completed owner-scoped story-locale/narrator defaults without retroactive plot mutation.
+- [Spoiler-safe share slice 27](plan/done/spoiler-safe-share-slice27.md) — completed bounded native share copy without public-story infrastructure.
+- [Account export slice 28](plan/done/account-export-slice28.md) — completed owner-scoped portable application-data export with explicit privacy exclusions.
+- [Account erasure slice 29](plan/done/account-erasure-slice29.md) — completed R2-first fail-closed Living Plot application-data deletion.
+- [Release-candidate diagnostics slice 30](plan/done/release-candidate-diagnostics-slice30.md) — completed safe runtime/privacy diagnostics surface without secret or story-content disclosure.

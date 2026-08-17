@@ -44,7 +44,9 @@ npm --workspace @living-plot/api run db:migrate:local
 
 Focused narrative evaluation remains available with `npm --workspace @living-plot/api run eval:narrative`.
 
-The native client also exposes a reversible Story Library and a read-only Story So Far timeline. Authenticated GETs use bounded timeout/abort behavior and may retry once; POST mutations are never automatically retried.
+The native client also exposes a reversible Story Library, a read-only Story So Far timeline, spoiler-safe native sharing, and Settings & Data. Settings stores bounded new-story/narrator defaults, can export the authenticated user's application-owned Living Plot data, and can erase Living Plot application data only after an exact typed confirmation. Authenticated GETs use bounded timeout/abort behavior and may retry once; POST mutations—including account erasure—are never automatically retried.
+
+Application-data erasure deletes owned private R2 narration before deleting the internal D1 user. It does not claim to delete the separate Clerk identity or RevenueCat/store account. Safe diagnostics expose only version/runtime/configuration/health status and never include tokens, internal user IDs, API URLs, story text, or secret values.
 
 ## GitHub Android preview build
 

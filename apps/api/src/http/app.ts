@@ -1,4 +1,5 @@
 import type { StoryGenerator } from '../ai/contracts';
+import { D1AccountService } from '../account/d1-account-service';
 import { createStoryGenerator } from '../ai/story-generator-factory';
 import { D1AudioService } from '../audio/d1-audio-service';
 import type { AudioAssetSnapshot, AudioQueue } from '../audio/contracts';
@@ -12,6 +13,8 @@ import type { LiveStoryError, LiveStoryMood } from '../live-story/contracts';
 import { LiveStoryService } from '../live-story/live-story-service';
 import { D1StoryRepository } from '../persistence/d1-story-repository';
 import { D1UserRepository } from '../persistence/d1-user-repository';
+import { isNarratorVariant, isStoryLocale, isUiLocale } from '../preferences/contracts';
+import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences';
 import { CloudflareProductTelemetrySink } from '../telemetry/cloudflare-product-telemetry';
 import type { ProductTelemetrySink } from '../telemetry/product-events';
 
@@ -63,6 +66,12 @@ export async function handleRequest(
   }
 
   if (route.kind === 'me') return json({ user: { id: user.id } });
+  if (route.kind === 'preferences') return handlePreferences(request, env.DB, user.id);
+  if (route.kind === 'account_export') {
+    const account = new D1AccountService(env.DB, env.AUDIO_BUCKET, dependencies.storyClock);
+    return json({ export: await account.export(user.id) });
+  }
+  if (route.kind === 'account_delete') return handleAccountDelete(request, env, user.id, dependencies.storyClock);
   if (route.kind === 'plot') return handlePlotRead(env, user.id, route.plotId);
   if (isStoryRoute(route)) return handleStoryRoute(request, env, user.id, route, dependencies);
 
@@ -96,6 +105,9 @@ type ProtectedRoute =
   | { kind: 'me' }
   | { kind: 'plot'; plotId: string }
   | { kind: 'entitlement' }
+  | { kind: 'preferences' }
+  | { kind: 'account_export' }
+  | { kind: 'account_delete' }
   | { kind: 'episode_audio'; episodeId: string }
   | { kind: 'audio_status'; assetId: string }
   | { kind: 'audio'; assetId: string }
@@ -104,6 +116,9 @@ type ProtectedRoute =
 function matchProtectedRoute(pathname: string): ProtectedRoute | null {
   if (pathname === '/v1/me') return { kind: 'me' };
   if (pathname === '/v1/entitlement') return { kind: 'entitlement' };
+  if (pathname === '/v1/preferences') return { kind: 'preferences' };
+  if (pathname === '/v1/account/export') return { kind: 'account_export' };
+  if (pathname === '/v1/account/delete') return { kind: 'account_delete' };
   if (pathname === '/v1/story/home') return { kind: 'story_home' };
   if (pathname === '/v1/story/library') return { kind: 'story_library' };
   if (pathname === '/v1/story/plots') return { kind: 'story_collection' };
@@ -154,9 +169,11 @@ function matchIds(pathname: string, pattern: RegExp): [string, string, string] |
 }
 
 function methodAllowed(route: ProtectedRoute, method: string): boolean {
+  if (route.kind === 'preferences') return method === 'GET' || method === 'POST';
   if (
     route.kind === 'episode_audio' || route.kind === 'story_collection' || route.kind === 'story_generate' ||
-    route.kind === 'story_choice' || route.kind === 'story_archive' || route.kind === 'story_restore'
+    route.kind === 'story_choice' || route.kind === 'story_archive' || route.kind === 'story_restore' ||
+    route.kind === 'account_delete'
   ) {
     return method === 'POST';
   }
@@ -255,6 +272,38 @@ function liveStoryErrorResponse(error: LiveStoryError): Response {
     currentStateVersion: error.currentStateVersion,
     committedChoiceId: error.committedChoiceId,
   }, 409);
+}
+
+async function handlePreferences(request: Request, db: D1Database, userId: string): Promise<Response> {
+  const preferences = new D1UserPreferencesRepository(db);
+  if (request.method === 'GET') return json({ preferences: await preferences.get(userId) });
+  const body = await parseJsonObject(request);
+  if (!body || !isUiLocale(body.uiLocale) || !isStoryLocale(body.storyLocale) || !isNarratorVariant(body.narratorVariant)) {
+    return json({ error: 'invalid_request' }, 400);
+  }
+  return json({
+    preferences: await preferences.set(userId, {
+      uiLocale: body.uiLocale,
+      storyLocale: body.storyLocale,
+      narratorVariant: body.narratorVariant,
+    }),
+  });
+}
+
+async function handleAccountDelete(
+  request: Request,
+  env: AppEnv,
+  userId: string,
+  clock?: () => number,
+): Promise<Response> {
+  const body = await parseJsonObject(request);
+  if (!body || typeof body.confirmation !== 'string') return json({ error: 'invalid_request' }, 400);
+  const account = new D1AccountService(env.DB, env.AUDIO_BUCKET, clock);
+  const result = await account.delete(userId, body.confirmation);
+  if (result.ok) return json({ deleted: true });
+  if (result.code === 'invalid_confirmation') return json({ error: result.code }, 400);
+  if (result.code === 'audio_cleanup_failed') return json({ error: result.code }, 503);
+  return json({ error: 'internal_error' }, 500);
 }
 
 async function handlePlotRead(env: AppEnv, userId: string, plotId: string): Promise<Response> {

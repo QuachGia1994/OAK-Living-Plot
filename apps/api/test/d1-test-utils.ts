@@ -11,6 +11,7 @@ export async function applySqlMigration(db: D1Database, sql: string): Promise<vo
 
 export async function resetStoryData(db: D1Database): Promise<void> {
   const tables = [
+    'user_preferences',
     'user_entitlements',
     'revenuecat_events',
     'usage_events',

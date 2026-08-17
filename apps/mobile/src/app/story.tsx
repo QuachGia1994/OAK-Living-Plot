@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { EpisodeVoiceCard } from '@/features/audio/episode-voice-card';
 import type { StoryChoice, StoryPlotSession } from '@/features/story/contracts';
 import { StoryClientError } from '@/features/story/contracts';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
+import { buildSpoilerSafeShareText } from '@/features/share/story-share';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
@@ -160,6 +161,11 @@ export default function StoryScreen() {
       <View style={styles.topBar}>
         <BrandMark />
         <View style={styles.topActions}>
+          <ActionButton
+            label="Share"
+            variant="ghost"
+            onPress={() => void Share.share({ message: buildSpoilerSafeShareText({ title: session.title, episodeNumber: episode.number, premise: session.premise }) })}
+          />
           <ActionButton label="History" variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
           <ActionButton label="All plots" variant="ghost" onPress={() => router.replace('/')} />
         </View>

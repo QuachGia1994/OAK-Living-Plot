@@ -42,6 +42,11 @@ All notable changes to Living Plot will be documented in this file.
 - Replay-safe privacy-preserving product funnel Analytics Engine events for newly canonical story/lifecycle/voice actions.
 - Shared authenticated mobile HTTP transport with bounded timeout/abort, one safe GET retry with fresh tokens, and no automatic POST retry.
 - Root native UI error recovery, foreground read-only home/story refresh, and expanded busy/error/choice/audio accessibility semantics.
+- Owner-scoped D1 story/narrator preferences with new-story locale defaults and approved narrator selection.
+- Spoiler-safe native story sharing with bounded title/episode/premise-hook copy and no public-story backend exposure.
+- Versioned owner-scoped Living Plot application-data export with explicit exclusion of auth/provider secrets, telemetry, quota keys, and private R2 keys.
+- R2-first fail-closed Living Plot application-data erasure with exact typed confirmation and D1 cascade cleanup.
+- Settings & Data release-candidate surface with privacy boundary summary, bounded backend health probe, and non-secret diagnostics sharing.
 
 ### Changed
 - Pinned project orchestration and default implementation to GPT-5.6 Sol; GPT-5.6 Luna is used only when the user explicitly requests a worker handoff.

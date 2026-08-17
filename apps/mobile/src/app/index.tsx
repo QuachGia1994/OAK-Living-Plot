@@ -89,6 +89,7 @@ export default function HomeScreen() {
         </Text>
         <ActionButton label="Create my first plot" onPress={() => router.push('/create')} />
         <ActionButton label="My stories" variant="secondary" onPress={() => router.push('/library')} />
+        <ActionButton label="Settings & data" variant="ghost" onPress={() => router.push('/settings')} />
       </View>
 
       <HowItWorks />
