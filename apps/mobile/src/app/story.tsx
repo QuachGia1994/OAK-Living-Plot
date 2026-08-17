@@ -10,7 +10,7 @@ import { buildSpoilerSafeShareText } from '@/features/share/story-share';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
-import { colors, radius, spacing } from '@/ui/theme';
+import { colors, radius, spacing, typography } from '@/ui/theme';
 
 export default function StoryScreen() {
   const router = useRouter();
@@ -335,10 +335,10 @@ const styles = StyleSheet.create({
   topActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   plotHeader: {
     gap: spacing.sm,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
   },
   plotMetaRow: {
     flexDirection: 'row',
@@ -348,14 +348,17 @@ const styles = StyleSheet.create({
   },
   episodeNumber: {
     color: colors.inkMuted,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.5,
+    fontFamily: typography.mono,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.7,
   },
   plotTitle: {
     color: colors.ink,
-    fontSize: 20,
-    fontWeight: '900',
+    fontFamily: typography.display,
+    fontSize: 23,
+    lineHeight: 28,
+    fontWeight: '700',
   },
   plotMeta: {
     color: colors.inkMuted,
@@ -364,19 +367,22 @@ const styles = StyleSheet.create({
   },
   episodeBlock: {
     gap: spacing.md,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   episodeTitle: {
     color: colors.ink,
-    fontSize: 36,
-    lineHeight: 40,
-    fontWeight: '900',
-    letterSpacing: -0.9,
+    fontFamily: typography.display,
+    fontSize: 40,
+    lineHeight: 45,
+    fontWeight: '700',
+    letterSpacing: -1.05,
   },
   episodeBody: {
     color: colors.storyInk,
-    fontSize: 18,
-    lineHeight: 31,
+    fontFamily: typography.display,
+    fontSize: 19,
+    lineHeight: 32,
   },
   choiceSection: {
     gap: spacing.md,
@@ -394,38 +400,43 @@ const styles = StyleSheet.create({
   },
   choiceTitle: {
     color: colors.ink,
-    fontSize: 26,
-    lineHeight: 31,
-    fontWeight: '900',
+    fontFamily: typography.display,
+    fontSize: 29,
+    lineHeight: 35,
+    fontWeight: '700',
   },
   choiceList: {
     gap: spacing.sm,
   },
   choiceCard: {
-    minHeight: 92,
+    minHeight: 88,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
   },
   choiceCardSelected: {
-    borderColor: colors.accent,
+    borderBottomColor: colors.accent,
     backgroundColor: colors.surfaceWarmDeep,
   },
   choicePressed: {
     opacity: 0.78,
   },
   choiceKey: {
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: 'transparent',
   },
   choiceKeySelected: {
     backgroundColor: colors.accent,
@@ -444,9 +455,10 @@ const styles = StyleSheet.create({
   },
   choiceLabel: {
     color: colors.ink,
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: '800',
+    fontFamily: typography.display,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '700',
   },
   choiceLabelSelected: {
     color: colors.accentStrong,
@@ -457,7 +469,11 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   commitCard: {
-    backgroundColor: colors.overlay,
+    borderWidth: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
   },
   commitLabel: {
     color: colors.inkMuted,
@@ -487,18 +503,23 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   consequenceCard: {
-    borderColor: colors.borderSuccess,
-    backgroundColor: colors.surfaceSuccess,
+    paddingVertical: spacing.xl,
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: colors.surfaceWarm,
   },
   consequenceTitle: {
-    color: colors.success,
-    fontSize: 24,
-    fontWeight: '900',
+    color: colors.accentStrong,
+    fontFamily: typography.display,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '700',
   },
   consequenceBody: {
     color: colors.ink,
-    fontSize: 17,
-    lineHeight: 26,
+    fontFamily: typography.display,
+    fontSize: 18,
+    lineHeight: 29,
   },
   nextNote: {
     color: colors.inkMuted,

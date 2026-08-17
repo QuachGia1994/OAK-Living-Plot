@@ -7,7 +7,7 @@ import type { StoryHomeSnapshot, StoryPlotSummary } from '@/features/story/contr
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, MotionReveal, Pill, Screen } from '@/ui/primitives';
-import { colors, radius, spacing } from '@/ui/theme';
+import { colors, spacing, typography } from '@/ui/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -154,14 +154,14 @@ type Translate = (en: string, vi: string) => string;
 
 function HowItWorks({ t }: { t: Translate }) {
   return (
-    <Card style={styles.howCard}>
+    <View style={styles.howCard}>
       <Eyebrow>{t('How Living Plot works', 'Living Plot hoạt động thế nào')}</Eyebrow>
       <View style={styles.howSteps}>
         <HowStep number="1" title={t('Set the spark', 'Đặt tia lửa')} body={t('Give us the situation, mood and one main character.', 'Cho biết tình huống, không khí và một nhân vật chính.')} />
         <HowStep number="2" title={t('Watch the episode', 'Xem tập truyện')} body={t('AI turns it into a short, dramatic scene you can read or hear.', 'AI biến nó thành một cảnh drama ngắn để bạn đọc hoặc nghe.')} />
         <HowStep number="3" title={t('Choose the consequence', 'Chọn hậu quả')} body={t('Pick A, B or C. The next episode continues from that exact decision.', 'Chọn A, B hoặc C. Tập sau tiếp tục chính xác từ quyết định đó.')} />
       </View>
-    </Card>
+    </View>
   );
 }
 
@@ -196,7 +196,7 @@ function FirstRunCard({ snapshot, t, onStart }: { snapshot: StoryHomeSnapshot; t
 function RetentionCard({ snapshot, t }: { snapshot: StoryHomeSnapshot; t: Translate }) {
   const { retention } = snapshot;
   return (
-    <Card style={styles.retentionCard}>
+    <View style={styles.retentionCard}>
       <View style={styles.retentionHeader}>
         <View style={styles.retentionCopy}>
           <Eyebrow>{t('Your momentum', 'Nhịp của bạn')}</Eyebrow>
@@ -205,7 +205,7 @@ function RetentionCard({ snapshot, t }: { snapshot: StoryHomeSnapshot; t: Transl
         <Pill tone={retention.currentStreakDays > 0 ? 'success' : 'neutral'}>{retention.choicesMade} {t('choices', 'lựa chọn')}</Pill>
       </View>
       <Text style={styles.retentionBody}>{retention.activePlots} {t('active stories', 'câu chuyện đang hoạt động')} · {retention.choicesMade} {t('decisions made.', 'quyết định đã đưa ra.')}</Text>
-    </Card>
+    </View>
   );
 }
 
@@ -227,7 +227,7 @@ function DailySparkCard({ snapshot, t, onStart }: { snapshot: StoryHomeSnapshot;
 function QuotaCard({ snapshot, t }: { snapshot: StoryHomeSnapshot; t: Translate }) {
   const { quota } = snapshot;
   return (
-    <Card style={styles.quotaCard}>
+    <View style={styles.quotaCard}>
       <View style={styles.quotaHeader}>
         <View>
           <Eyebrow>{t('Today', 'Hôm nay')}</Eyebrow>
@@ -240,7 +240,7 @@ function QuotaCard({ snapshot, t }: { snapshot: StoryHomeSnapshot; t: Translate 
         <QuotaMetric label={t('Fresh voice', 'Giọng mới')} value={t(`${quota.voiceRemaining} / ${quota.voiceLimit} left`, `còn ${quota.voiceRemaining} / ${quota.voiceLimit}`)} />
       </View>
       <Text style={styles.quotaFootnote}>{t('Fresh voice is optional. Replaying existing narration does not use another voice slot.', 'Giọng đọc mới là tùy chọn. Phát lại bản đã tạo không dùng thêm lượt giọng.')}</Text>
-    </Card>
+    </View>
   );
 }
 
@@ -281,32 +281,42 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   hero: {
     gap: spacing.md,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
   },
   heroTitle: {
     color: colors.ink,
-    fontSize: 39,
-    lineHeight: 43,
-    fontWeight: '900',
-    letterSpacing: -1.2,
+    fontFamily: typography.display,
+    fontSize: 44,
+    lineHeight: 49,
+    fontWeight: '700',
+    letterSpacing: -1.35,
   },
   heroBody: {
     color: colors.inkMuted,
-    fontSize: 17,
-    lineHeight: 26,
+    fontSize: 16,
+    lineHeight: 25,
     maxWidth: 560,
   },
-  howCard: { backgroundColor: colors.surfaceQuiet },
-  howSteps: { gap: spacing.md },
+  howCard: {
+    gap: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  howSteps: { gap: spacing.lg },
   howStep: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  howNumber: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.accent },
-  howNumberText: { color: colors.accentInk, fontSize: 13, fontWeight: '900' },
+  howNumber: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.accentSoft },
+  howNumberText: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 11, fontWeight: '800' },
   howCopy: { flex: 1, gap: spacing.xs },
   howTitle: { color: colors.ink, fontSize: 16, fontWeight: '900' },
   howBody: { color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
   retentionCard: {
-    backgroundColor: colors.surfaceSuccess,
-    borderColor: colors.borderSuccess,
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderSubtle,
   },
   retentionHeader: {
     flexDirection: 'row',
@@ -315,14 +325,23 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   retentionCopy: { flex: 1, gap: spacing.xs },
-  retentionTitle: { color: colors.ink, fontSize: 22, lineHeight: 28, fontWeight: '900' },
+  retentionTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 24, lineHeight: 30, fontWeight: '700' },
   retentionBody: { color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
-  sparkCard: { backgroundColor: colors.surfaceWarm },
+  sparkCard: {
+    paddingVertical: spacing.xl,
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: colors.surfaceWarm,
+  },
   sparkHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  sparkTitle: { color: colors.accentStrong, fontSize: 24, lineHeight: 30, fontWeight: '900' },
+  sparkTitle: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 29, lineHeight: 35, fontWeight: '700' },
   sparkBody: { color: colors.storyInk, fontSize: 15, lineHeight: 23 },
   quotaCard: {
-    backgroundColor: colors.surfaceQuiet,
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
   },
   quotaHeader: {
     gap: spacing.md,
@@ -340,9 +359,7 @@ const styles = StyleSheet.create({
   quotaMetric: {
     flex: 1,
     gap: spacing.xs,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceRaised,
+    paddingVertical: spacing.sm,
   },
   quotaMetricLabel: {
     color: colors.inkMuted,
@@ -368,9 +385,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginTop: spacing.xs,
     color: colors.ink,
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: -0.7,
+    fontFamily: typography.display,
+    fontSize: 31,
+    lineHeight: 36,
+    fontWeight: '700',
+    letterSpacing: -0.8,
   },
   sectionMeta: {
     color: colors.inkMuted,
@@ -381,12 +400,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   plotCard: {
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
+    backgroundColor: 'transparent',
   },
   pressed: {
     opacity: 0.8,
@@ -406,8 +424,10 @@ const styles = StyleSheet.create({
   },
   plotTitle: {
     color: colors.ink,
-    fontSize: 23,
-    fontWeight: '900',
+    fontFamily: typography.display,
+    fontSize: 25,
+    lineHeight: 30,
+    fontWeight: '700',
   },
   plotPremise: {
     color: colors.inkMuted,

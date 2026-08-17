@@ -9,7 +9,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { createStoryRequestKey } from '@/features/story/request-key';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { ActionButton, BrandMark, Card, Eyebrow, Screen } from '@/ui/primitives';
-import { colors, radius, spacing } from '@/ui/theme';
+import { colors, radius, spacing, typography } from '@/ui/theme';
 
 const initialDraft: PlotDraft = {
   premise: '',
@@ -89,7 +89,7 @@ export default function CreatePlotScreen() {
         </Text>
       </View>
 
-      <Card>
+      <View style={styles.setupSection}>
         <FieldHeader step="01" label={t('What is the situation?', 'Tình huống là gì?')} hint={t('One or two sentences is enough', 'Một hoặc hai câu là đủ')} />
         <TextInput
           accessibilityLabel="Story premise"
@@ -106,9 +106,9 @@ export default function CreatePlotScreen() {
           <Text style={styles.errorText}>{showValidation ? errors.premise ?? '' : ''}</Text>
           <Text style={styles.counter}>{draft.premise.length}/600</Text>
         </View>
-      </Card>
+      </View>
 
-      <Card>
+      <View style={styles.setupSection}>
         <FieldHeader step="02" label={t('Pick the vibe', 'Chọn không khí')} hint={t('This shapes how the scene feels', 'Điều này định hình cảm xúc của cảnh')} />
         <View style={styles.moodGrid}>
           {moodOptions.map((option) => (
@@ -122,9 +122,9 @@ export default function CreatePlotScreen() {
             />
           ))}
         </View>
-      </Card>
+      </View>
 
-      <Card>
+      <View style={styles.setupSection}>
         <FieldHeader step="03" label={t('Who is the main character?', 'Nhân vật chính là ai?')} hint={t('Just a name', 'Chỉ cần một cái tên')} />
         <TextInput
           accessibilityLabel="Main character name"
@@ -138,7 +138,7 @@ export default function CreatePlotScreen() {
           onSubmitEditing={() => void submit()}
         />
         {showValidation && errors.characterName ? <Text style={styles.errorText}>{errors.characterName}</Text> : null}
-      </Card>
+      </View>
 
       {submitError ? (
         <View style={styles.submitError}>
@@ -229,15 +229,22 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.ink,
-    fontSize: 38,
-    lineHeight: 42,
-    fontWeight: '900',
-    letterSpacing: -1,
+    fontFamily: typography.display,
+    fontSize: 42,
+    lineHeight: 47,
+    fontWeight: '700',
+    letterSpacing: -1.2,
   },
   subtitle: {
     color: colors.inkMuted,
     fontSize: 16,
     lineHeight: 24,
+  },
+  setupSection: {
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
   },
   fieldHeader: {
     gap: spacing.sm,
@@ -248,45 +255,53 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   step: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1.2,
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
   },
   fieldLabel: {
     flex: 1,
     color: colors.ink,
-    fontSize: 20,
-    fontWeight: '800',
+    fontFamily: typography.display,
+    fontSize: 23,
+    lineHeight: 28,
+    fontWeight: '700',
   },
   hint: {
     color: colors.inkMuted,
     fontSize: 12,
   },
   textArea: {
-    minHeight: 152,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceRaised,
+    minHeight: 160,
+    paddingHorizontal: 0,
+    paddingVertical: spacing.md,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
     color: colors.ink,
-    fontSize: 16,
-    lineHeight: 24,
+    fontFamily: typography.display,
+    fontSize: 18,
+    lineHeight: 28,
   },
   textInput: {
     minHeight: 54,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceRaised,
+    paddingHorizontal: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
     color: colors.ink,
-    fontSize: 17,
+    fontFamily: typography.display,
+    fontSize: 20,
     fontWeight: '700',
   },
   inputError: {
-    borderColor: colors.danger,
+    borderBottomColor: colors.danger,
   },
   fieldFooter: {
     minHeight: 18,
@@ -309,14 +324,16 @@ const styles = StyleSheet.create({
   },
   moodOption: {
     gap: spacing.xs,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceRaised,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderSubtle,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
   },
   moodOptionSelected: {
-    borderColor: colors.accent,
+    borderBottomColor: colors.accent,
     backgroundColor: colors.surfaceWarm,
   },
   moodPressed: {
@@ -333,8 +350,9 @@ const styles = StyleSheet.create({
   },
   moodLabel: {
     color: colors.ink,
-    fontSize: 16,
-    fontWeight: '800',
+    fontFamily: typography.display,
+    fontSize: 18,
+    fontWeight: '700',
   },
   moodLabelSelected: {
     color: colors.accentStrong,

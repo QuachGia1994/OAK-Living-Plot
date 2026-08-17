@@ -4,8 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { StoryHistorySnapshot } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
-import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
-import { colors, spacing } from '@/ui/theme';
+import { ActionButton, BrandMark, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
+import { colors, spacing, typography } from '@/ui/theme';
 
 export default function StoryHistoryScreen() {
   const router = useRouter();
@@ -67,7 +67,7 @@ export default function StoryHistoryScreen() {
       {history ? (
         <View style={styles.timeline}>
           {history.items.map((item) => (
-            <Card key={item.episodeId}>
+            <View key={item.episodeId} style={styles.timelineItem}>
               <View style={styles.row}>
                 <Pill tone={item.status === 'choice_committed' ? 'success' : 'accent'}>EP {item.episodeNumber}</Pill>
                 <Text style={styles.status}>{item.status === 'choice_committed' ? t('Choice locked in', 'Đã chốt lựa chọn') : t('Current episode', 'Tập hiện tại')}</Text>
@@ -82,7 +82,7 @@ export default function StoryHistoryScreen() {
               ) : (
                 <Text style={styles.pending}>{t('You have not locked in a choice for this episode yet.', 'Bạn chưa chốt lựa chọn cho tập này.')}</Text>
               )}
-            </Card>
+            </View>
           ))}
         </View>
       ) : null}
@@ -97,15 +97,16 @@ function readParam(value: string | string[] | undefined): string | null {
 
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hero: { gap: spacing.sm },
-  title: { color: colors.ink, fontSize: 32, lineHeight: 38, fontWeight: '900' },
+  hero: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.md },
+  title: { color: colors.ink, fontFamily: typography.display, fontSize: 38, lineHeight: 44, fontWeight: '700', letterSpacing: -1 },
   body: { color: colors.inkMuted, fontSize: 14, lineHeight: 22 },
-  timeline: { gap: spacing.md },
+  timeline: { gap: 0, paddingTop: spacing.sm },
+  timelineItem: { gap: spacing.md, paddingVertical: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  status: { color: colors.inkMuted, fontSize: 12, fontWeight: '700' },
-  episodeTitle: { color: colors.ink, fontSize: 22, lineHeight: 28, fontWeight: '900' },
-  choiceBlock: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
-  choiceLabel: { color: colors.accentStrong, fontSize: 14, lineHeight: 20, fontWeight: '800' },
-  consequence: { color: colors.storyInk, fontSize: 14, lineHeight: 21 },
+  status: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  episodeTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 27, lineHeight: 33, fontWeight: '700' },
+  choiceBlock: { gap: spacing.xs, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
+  choiceLabel: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  consequence: { color: colors.storyInk, fontFamily: typography.display, fontSize: 15, lineHeight: 23 },
   pending: { color: colors.inkMuted, fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
 });

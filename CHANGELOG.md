@@ -55,6 +55,7 @@ All notable changes to Living Plot will be documented in this file.
 - CI release-candidate gates for local D1 migrations, Cloudflare development dry-run, iOS production export, and Android native preview APK.
 
 ### Changed
+- Reworked the Phase 1 native mobile presentation into a Huashu-inspired Cinematic Editorial system: warmer low-chroma surfaces, restrained amber/rust accent, narrative display type, mono operational metadata, flatter controls, ruled reading lists/timelines, and fewer generic dashboard cards across Home, Create, Story, Library, History, Plus, Auth, and Settings.
 - Pinned project orchestration and default implementation to GPT-5.6 Sol; GPT-5.6 Luna is used only when the user explicitly requests a worker handoff.
 - Localized daily story sparks now follow the saved interface language while newly generated story content continues to follow each plot's independent story-locale preference.
 - Narrative prompt guidance now keeps the canonical protagonist visible, requires durable scene progress, and keeps narrative/branch output in the requested locale.

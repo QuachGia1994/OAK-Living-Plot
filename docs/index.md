@@ -19,6 +19,7 @@
 - [Phase 1 mobile resilience and accessibility](arch/mobile-resilience.md) — bounded authenticated networking, safe GET retry, foreground refresh, UI recovery, and accessibility behavior.
 - [Phase 1 preferences and account data](arch/account-data-preferences.md) — EN/VI interface plus story/narrator defaults, spoiler-safe sharing, portable export, fail-closed application-data erasure, and safe diagnostics.
 - [Live development setup](ref/live-development.md) — secret-safe readiness checks, non-production Cloudflare environment, and mobile/provider configuration.
+- [Huashu-inspired mobile redesign](plan/huashu-redesign.md) — production React Native adaptation of the Cinematic Editorial visual system across the Phase 1 mobile surfaces.
 - [Foundation implementation slice 1](plan/done/foundation-slice1.md) — completed workspace/CI foundation and verification evidence.
 - [D1 implementation slice 2](plan/done/d1-slice2.md) — completed D1/domain baseline and verification evidence.
 - [Authentication implementation slice 3](plan/done/auth-slice3.md) — completed auth/ownership boundary and verification evidence.

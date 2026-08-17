@@ -13,7 +13,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, radius, spacing } from './theme';
+import { colors, radius, spacing, typography } from './theme';
 
 export function Screen({ children, contentStyle }: { children: ReactNode; contentStyle?: StyleProp<ViewStyle> }) {
   return (
@@ -32,7 +32,7 @@ export function Screen({ children, contentStyle }: { children: ReactNode; conten
 export function BrandMark() {
   return (
     <View style={styles.brandRow}>
-      <View style={styles.brandDot} />
+      <View style={styles.brandRule} />
       <Text style={styles.brandText}>LIVING PLOT</Text>
     </View>
   );
@@ -193,31 +193,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  brandDot: {
-    width: 10,
-    height: 10,
-    borderRadius: radius.pill,
+  brandRule: {
+    width: 20,
+    height: 1,
     backgroundColor: colors.accent,
   },
   brandText: {
     color: colors.ink,
-    fontSize: 12,
+    fontFamily: typography.mono,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 2.2,
+    letterSpacing: 2.5,
   },
   eyebrow: {
-    color: colors.accent,
-    fontSize: 12,
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 1.7,
     textTransform: 'uppercase',
   },
   card: {
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
     backgroundColor: colors.surface,
   },
   pill: {
@@ -245,20 +246,20 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
   button: {
-    minHeight: 52,
+    minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   buttonPrimary: {
     borderColor: colors.accent,
     backgroundColor: colors.accent,
   },
   buttonSecondary: {
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.borderStrong,
+    backgroundColor: 'transparent',
   },
   buttonGhost: {
     minHeight: 44,
@@ -274,8 +275,9 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: colors.ink,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
+    letterSpacing: 0.15,
   },
   buttonTextPrimary: {
     color: colors.accentInk,

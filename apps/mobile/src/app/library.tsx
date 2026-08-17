@@ -4,8 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { StoryLibrarySnapshot, StoryPlotSummary } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
-import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
-import { colors, spacing } from '@/ui/theme';
+import { ActionButton, BrandMark, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
+import { colors, spacing, typography } from '@/ui/theme';
 
 export default function StoryLibraryScreen() {
   const router = useRouter();
@@ -122,9 +122,9 @@ function LibrarySection({
         <Text style={styles.sectionTitle}>{title}</Text>
         <Pill>{plots.length}</Pill>
       </View>
-      {plots.length === 0 ? <Card><Text style={styles.body}>{empty}</Text></Card> : null}
+      {plots.length === 0 ? <View style={styles.emptyState}><Text style={styles.body}>{empty}</Text></View> : null}
       {plots.map((plot) => (
-        <Card key={plot.id}>
+        <View key={plot.id} style={styles.plotRow}>
           <View style={styles.plotHeader}>
             <Pill tone={plot.status === 'awaiting_choice' ? 'accent' : 'success'}>EP {plot.episodeNumber}</Pill>
             <Text style={styles.meta}>{plot.updatedLabel}</Text>
@@ -143,7 +143,7 @@ function LibrarySection({
               />
             </View>
           </View>
-        </Card>
+        </View>
       ))}
     </View>
   );
@@ -151,15 +151,17 @@ function LibrarySection({
 
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hero: { gap: spacing.sm },
-  title: { color: colors.ink, fontSize: 32, lineHeight: 38, fontWeight: '900' },
+  hero: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm },
+  title: { color: colors.ink, fontFamily: typography.display, fontSize: 38, lineHeight: 44, fontWeight: '700', letterSpacing: -1 },
   body: { color: colors.inkMuted, fontSize: 14, lineHeight: 21 },
-  section: { gap: spacing.md },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { color: colors.ink, fontSize: 24, fontWeight: '900' },
+  section: { gap: spacing.sm, paddingTop: spacing.lg },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderStrong },
+  sectionTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 26, lineHeight: 32, fontWeight: '700' },
+  emptyState: { paddingVertical: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
+  plotRow: { gap: spacing.sm, paddingVertical: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderStrong },
   plotHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  plotTitle: { color: colors.ink, fontSize: 20, lineHeight: 26, fontWeight: '900' },
-  meta: { color: colors.inkMuted, fontSize: 12 },
-  actions: { flexDirection: 'row', gap: spacing.sm },
+  plotTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700' },
+  meta: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 10, letterSpacing: 0.5 },
+  actions: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.xs },
   actionGrow: { flex: 1 },
 });

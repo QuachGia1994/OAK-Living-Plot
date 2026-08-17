@@ -9,7 +9,7 @@ import { useBillingSession } from '@/features/billing/billing-session-context';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
 import { createBillingCoordinator } from '@/features/billing/runtime';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, Pill, Screen } from '@/ui/primitives';
-import { colors, spacing } from '@/ui/theme';
+import { colors, spacing, typography } from '@/ui/theme';
 
 export default function PlusScreen() {
   const router = useRouter();
@@ -81,7 +81,7 @@ export default function PlusScreen() {
         <Text style={styles.body}>{t('For people who want to keep a story moving instead of stopping after the free daily episodes.', 'Dành cho người muốn câu chuyện tiếp tục thay vì dừng sau số tập miễn phí mỗi ngày.')}</Text>
       </View>
 
-      <Card>
+      <Card style={styles.planFeature}>
         <View style={styles.planHeader}>
           <Pill tone="accent">PLUS</Pill>
           <Pill tone={storeMode === 'test_store' ? 'success' : 'neutral'}>{storeModeLabel(storeMode, locale)}</Pill>
@@ -125,12 +125,13 @@ function billingMessage(error: unknown, locale: 'en' | 'vi'): string {
 }
 
 const styles = StyleSheet.create({
-  hero: { gap: spacing.sm },
-  title: { color: colors.ink, fontSize: 32, fontWeight: '800', lineHeight: 38 },
+  hero: { gap: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.sm },
+  title: { color: colors.ink, fontFamily: typography.display, fontSize: 40, fontWeight: '700', lineHeight: 46, letterSpacing: -1.1 },
+  planFeature: { paddingVertical: spacing.xl, borderWidth: 0, borderRadius: 0, backgroundColor: colors.surfaceWarm },
   planHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  planTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', lineHeight: 27 },
+  planTitle: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 27, fontWeight: '700', lineHeight: 34 },
   body: { color: colors.inkMuted, fontSize: 15, lineHeight: 23 },
-  storeNote: { color: colors.storyInk, fontSize: 12, lineHeight: 19 },
-  actions: { gap: spacing.sm },
-  message: { color: colors.inkMuted, fontSize: 14, lineHeight: 21 },
+  storeNote: { color: colors.storyInk, fontFamily: typography.mono, fontSize: 10, lineHeight: 17, letterSpacing: 0.25 },
+  actions: { gap: spacing.sm, paddingTop: spacing.sm },
+  message: { color: colors.inkMuted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
 });

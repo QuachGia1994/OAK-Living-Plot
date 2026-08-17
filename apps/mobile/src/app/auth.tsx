@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useUiCopy } from '@/features/localization/ui-copy';
-import { ActionButton, BrandMark, Card, Eyebrow, Screen } from '@/ui/primitives';
-import { colors, radius, spacing } from '@/ui/theme';
+import { ActionButton, BrandMark, Eyebrow, Screen } from '@/ui/primitives';
+import { colors, spacing, typography } from '@/ui/theme';
 
 export default function AuthScreen() {
   const auth = useMobileAuth();
@@ -16,11 +16,11 @@ export default function AuthScreen() {
     return (
       <Screen>
         <BrandMark />
-        <Card>
+        <View style={styles.authSection}>
           <Eyebrow>{t('Preview build', 'Bản xem trước')}</Eyebrow>
           <Text style={styles.title}>{t('Sign-in is not connected in this preview.', 'Đăng nhập chưa được kết nối trong bản xem trước.')}</Text>
           <Text style={styles.body}>{t('You can still explore the complete story flow. Account sign-in will be available once the live service is connected.', 'Bạn vẫn có thể khám phá toàn bộ luồng câu chuyện. Đăng nhập sẽ khả dụng khi dịch vụ live được kết nối.')}</Text>
-        </Card>
+        </View>
         <ActionButton label={t('Back to preview', 'Quay lại bản xem trước')} onPress={() => router.replace('/')} />
       </Screen>
     );
@@ -33,7 +33,7 @@ export default function AuthScreen() {
     return (
       <Screen>
         <BrandMark />
-        <Card><Text style={styles.title}>{t('You’re signed in.', 'Bạn đã đăng nhập.')}</Text></Card>
+        <View style={styles.authSection}><Text style={styles.title}>{t('You’re signed in.', 'Bạn đã đăng nhập.')}</Text></View>
         <ActionButton label={t('Open Living Plot', 'Mở Living Plot')} onPress={() => router.replace('/')} />
       </Screen>
     );
@@ -116,7 +116,7 @@ function ClerkEmailOtpForm() {
         </Text>
       </View>
 
-      <Card>
+      <View style={styles.authSection}>
         {!verifying ? (
           <TextInput
             accessibilityLabel="Email address"
@@ -155,7 +155,7 @@ function ClerkEmailOtpForm() {
             <ActionButton label={t('Start over', 'Làm lại')} variant="ghost" disabled={busy} onPress={startOver} />
           </>
         ) : null}
-      </Card>
+      </View>
     </Screen>
   );
 }
@@ -173,18 +173,21 @@ function clerkMessage(error: unknown): string {
 }
 
 const styles = StyleSheet.create({
-  intro: { gap: spacing.sm, paddingTop: spacing.md },
-  title: { color: colors.ink, fontSize: 32, lineHeight: 38, fontWeight: '900' },
+  intro: { gap: spacing.sm, paddingTop: spacing.xl, paddingBottom: spacing.md },
+  authSection: { gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
+  title: { color: colors.ink, fontFamily: typography.display, fontSize: 39, lineHeight: 45, fontWeight: '700', letterSpacing: -1 },
   body: { color: colors.inkMuted, fontSize: 15, lineHeight: 23 },
   input: {
-    minHeight: 54,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceRaised,
+    minHeight: 58,
+    paddingHorizontal: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
     color: colors.ink,
-    fontSize: 17,
+    fontFamily: typography.display,
+    fontSize: 20,
   },
   error: { color: colors.danger, fontSize: 13, lineHeight: 19 },
 });

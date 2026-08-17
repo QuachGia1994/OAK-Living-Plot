@@ -11,7 +11,7 @@ import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config
 import type { NarratorVariant, StoryLocale, UiLocale } from '@/features/preferences/contracts';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, Pill, Screen } from '@/ui/primitives';
-import { colors, radius, spacing } from '@/ui/theme';
+import { colors, radius, spacing, typography } from '@/ui/theme';
 
 const unavailableAccount = new UnavailableAccountDataClient();
 
@@ -141,7 +141,7 @@ export default function SettingsScreen() {
 
       {preferenceError ? <ErrorState title={t('Preferences unavailable', 'Tùy chọn không khả dụng')} message={locale === 'vi' ? t('Preferences could not be loaded.', 'Không thể tải tùy chọn.') : preferenceError} /> : null}
 
-      <Card>
+      <View style={styles.settingsSection}>
         <Eyebrow>{t('Story preferences', 'Tùy chọn câu chuyện')}</Eyebrow>
         <PreferenceRow label={t('Interface language', 'Ngôn ngữ giao diện')}>
           <Option label="English" selected={uiLocale === 'en'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'en' }))} />
@@ -157,9 +157,9 @@ export default function SettingsScreen() {
         </PreferenceRow>
         <Text style={styles.note}>{t('Interface language changes after saving. Story language applies only to new plots; narrator choice applies to new voice requests.', 'Ngôn ngữ giao diện đổi sau khi lưu. Ngôn ngữ câu chuyện chỉ áp dụng cho cốt truyện mới; giọng kể áp dụng cho yêu cầu giọng mới.')}</Text>
         <ActionButton label={t('Save preferences', 'Lưu tùy chọn')} busy={busy === 'preferences' || loading} onPress={() => void savePreferences()} />
-      </Card>
+      </View>
 
-      <Card>
+      <View style={styles.settingsSection}>
         <View style={styles.rowBetween}>
           <Eyebrow>{t('Privacy & data', 'Quyền riêng tư & dữ liệu')}</Eyebrow>
           <Pill tone={account.configured ? 'success' : 'neutral'}>{account.configured ? t('Live account', 'Tài khoản live') : t('Preview only', 'Chỉ xem trước')}</Pill>
@@ -168,7 +168,7 @@ export default function SettingsScreen() {
         <Text style={styles.body}>{t('Export includes your application-owned story data but never auth tokens, provider secrets, telemetry rows, private R2 object keys, or raw RevenueCat webhook bodies.', 'Bản xuất gồm dữ liệu câu chuyện thuộc ứng dụng nhưng không bao giờ gồm token đăng nhập, secret nhà cung cấp, hàng telemetry, khóa R2 riêng tư hoặc nội dung webhook RevenueCat thô.')}</Text>
         <Text style={styles.body}>{t('Delete removes Living Plot D1 data and owned private audio. It does not claim to delete the separate Clerk or RevenueCat provider account.', 'Xóa sẽ loại bỏ dữ liệu D1 Living Plot và audio riêng tư thuộc bạn. Thao tác này không tuyên bố xóa tài khoản Clerk hay RevenueCat riêng biệt.')}</Text>
         <ActionButton label={t('Export my Living Plot data', 'Xuất dữ liệu Living Plot của tôi')} variant="secondary" busy={busy === 'export'} disabled={!account.configured} onPress={() => void exportData()} />
-      </Card>
+      </View>
 
       <Card style={styles.dangerCard}>
         <Eyebrow>{t('Irreversible data erase', 'Xóa dữ liệu không thể hoàn tác')}</Eyebrow>
@@ -197,7 +197,7 @@ export default function SettingsScreen() {
         ) : null}
       </Card>
 
-      <Card>
+      <View style={styles.settingsSection}>
         <View style={styles.rowBetween}>
           <Eyebrow>{t('Safe diagnostics', 'Chẩn đoán an toàn')}</Eyebrow>
           <Pill>{runtimeMode}</Pill>
@@ -212,7 +212,7 @@ export default function SettingsScreen() {
           <ActionButton label={t('Share diagnostics', 'Chia sẻ chẩn đoán')} variant="ghost" onPress={() => void Share.share({ message: diagnostics })} />
         </View>
         <Text style={styles.note}>{t('Diagnostics contain status booleans/version only; no tokens, internal user IDs, API URL, story text, or secret values.', 'Chẩn đoán chỉ chứa trạng thái boolean/phiên bản; không có token, ID người dùng nội bộ, URL API, nội dung truyện hay secret.')}</Text>
-      </Card>
+      </View>
 
       {message ? <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text> : null}
     </Screen>
@@ -237,7 +237,7 @@ function Option({ label, selected, onPress }: { label: string; selected: boolean
 }
 
 function Diagnostic({ label, value }: { label: string; value: string }) {
-  return <View style={styles.rowBetween}><Text style={styles.label}>{label}</Text><Text style={styles.value}>{value}</Text></View>;
+  return <View style={styles.diagnosticRow}><Text style={styles.label}>{label}</Text><Text style={styles.value}>{value}</Text></View>;
 }
 
 function revenueCatStoreModeFromEnvForRuntime(): string {
@@ -247,25 +247,27 @@ function revenueCatStoreModeFromEnvForRuntime(): string {
 
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hero: { gap: spacing.sm },
-  title: { color: colors.ink, fontSize: 32, lineHeight: 38, fontWeight: '900' },
+  hero: { gap: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.md },
+  title: { color: colors.ink, fontFamily: typography.display, fontSize: 38, lineHeight: 44, fontWeight: '700', letterSpacing: -1 },
   body: { color: colors.inkMuted, fontSize: 14, lineHeight: 22 },
+  settingsSection: { gap: spacing.md, paddingVertical: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  preferenceRow: { gap: spacing.sm },
-  label: { color: colors.inkMuted, fontSize: 12, fontWeight: '800' },
+  diagnosticRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
+  preferenceRow: { gap: spacing.sm, paddingBottom: spacing.sm },
+  label: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  option: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, backgroundColor: colors.surfaceRaised },
+  option: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, borderRadius: radius.sm, backgroundColor: 'transparent' },
   optionSelected: { borderColor: colors.accent, backgroundColor: colors.surfaceWarmDeep },
   optionText: { color: colors.inkMuted, fontSize: 13, fontWeight: '800' },
   optionTextSelected: { color: colors.accentStrong },
   pressed: { opacity: 0.75 },
   dangerCard: { borderColor: colors.danger, backgroundColor: colors.surfaceDanger },
-  dangerTitle: { color: colors.danger, fontSize: 21, lineHeight: 27, fontWeight: '900' },
-  confirmPhrase: { color: colors.ink, fontSize: 12, lineHeight: 18, fontWeight: '900', letterSpacing: 0.4 },
-  input: { minHeight: 48, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.ink, backgroundColor: colors.surface },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  dangerTitle: { color: colors.danger, fontFamily: typography.display, fontSize: 24, lineHeight: 30, fontWeight: '700' },
+  confirmPhrase: { color: colors.ink, fontFamily: typography.mono, fontSize: 11, lineHeight: 18, fontWeight: '800', letterSpacing: 0.6 },
+  input: { minHeight: 52, paddingHorizontal: 0, borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.danger, borderRadius: 0, color: colors.ink, backgroundColor: 'transparent', fontFamily: typography.mono, fontSize: 13 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   flex: { flex: 1 },
-  value: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  value: { color: colors.ink, fontFamily: typography.mono, fontSize: 10, fontWeight: '800' },
   note: { color: colors.quietInk, fontSize: 11, lineHeight: 17 },
   message: { color: colors.inkMuted, fontSize: 13, lineHeight: 20, textAlign: 'center' },
 });
