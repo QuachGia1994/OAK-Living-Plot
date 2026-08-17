@@ -94,13 +94,14 @@ export default function CreatePlotScreen() {
         characterName={draft.characterName}
         mood={draft.mood}
         label={t('LIVE SCENE PREVIEW', 'XEM TRƯỚC CẢNH')}
+        locale={locale}
       />
 
       <View style={styles.composerSection}>
         <FieldHeader step="01" label={t('Story spark', 'Tia lửa câu chuyện')} hint={t('The moment everything changes', 'Khoảnh khắc mọi thứ thay đổi')} />
         <View style={[styles.sparkComposer, showValidation && errors.premise && styles.composerError]}>
           <TextInput
-            accessibilityLabel="Story premise"
+            accessibilityLabel={t('Story premise', 'Tình huống câu chuyện')}
             multiline
             maxLength={600}
             placeholder={t('A junior chef realizes tonight’s critic is the person who vanished from her family ten years ago…', 'Một đầu bếp trẻ nhận ra vị khách phê bình tối nay chính là người đã biến mất khỏi gia đình cô mười năm trước…')}
@@ -127,6 +128,7 @@ export default function CreatePlotScreen() {
               label={option.label}
               description={option.description}
               selected={draft.mood === option.value}
+              locale={locale}
               onPress={() => setDraft((current) => ({ ...current, mood: option.value }))}
             />
           ))}
@@ -140,11 +142,12 @@ export default function CreatePlotScreen() {
           mood={draft.mood}
           premise={draft.premise}
           label={t('LEAD CAST', 'NHÂN VẬT CHÍNH')}
+          locale={locale}
         />
         <View style={[styles.castInputShell, showValidation && errors.characterName && styles.castInputError]}>
           <Text style={styles.castInputLabel}>{t('NAME', 'TÊN')}</Text>
           <TextInput
-            accessibilityLabel="Main character name"
+            accessibilityLabel={t('Main character name', 'Tên nhân vật chính')}
             autoCapitalize="words"
             maxLength={50}
             placeholder="Mina"
@@ -171,6 +174,7 @@ export default function CreatePlotScreen() {
           mood={draft.mood}
           label={t('Directing episode 1…', 'Đang dựng tập 1…')}
           detail={t('Turning your spark into a short scene, framing the lead and preparing the first decision point.', 'Đang biến tia lửa thành một cảnh ngắn, dựng nhân vật chính và chuẩn bị điểm quyết định đầu tiên.')}
+          locale={locale}
         />
       ) : (
         <View style={styles.submitBlock}>

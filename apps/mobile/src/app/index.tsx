@@ -52,7 +52,7 @@ export default function HomeScreen() {
   }, [auth.configured, auth.isLoaded, auth.isSignedIn, storyExperienceClient, t]);
 
   if (auth.configured && !auth.isLoaded) {
-    return <Screen><BrandMark /><DramaLoadingStage label={t('Opening your Living Plot session…', 'Đang mở phiên Living Plot…')} /></Screen>;
+    return <Screen><BrandMark /><DramaLoadingStage label={t('Opening your Living Plot session…', 'Đang mở phiên Living Plot…')} locale={locale} /></Screen>;
   }
 
   if (auth.configured && !auth.isSignedIn) {
@@ -78,6 +78,7 @@ export default function HomeScreen() {
         <DramaLoadingStage
           label={t('Opening tonight’s drama…', 'Đang mở drama tối nay…')}
           detail={t('Framing your latest story and restoring the next decision point.', 'Đang dựng lại câu chuyện gần nhất và điểm quyết định tiếp theo.')}
+          locale={locale}
         />
       </Screen>
     );
@@ -151,7 +152,7 @@ export default function HomeScreen() {
 
           <View style={styles.plusRow}>
             <View style={styles.plusCopy}>
-              <Text style={styles.plusKicker}>PLUS · 20 EP / 10 VOICE</Text>
+              <Text style={styles.plusKicker}>{t('PLUS · 20 EP / 10 VOICE', 'PLUS · 20 TẬP / 10 GIỌNG')}</Text>
             </View>
             <ActionButton label={t('View Plus', 'Xem Plus')} variant="ghost" onPress={() => router.push('/plus')} />
           </View>

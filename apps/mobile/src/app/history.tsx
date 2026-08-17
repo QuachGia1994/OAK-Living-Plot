@@ -69,14 +69,23 @@ export default function StoryHistoryScreen() {
         <DramaLoadingStage
           label={t('Building your story recap…', 'Đang dựng lại tóm tắt câu chuyện…')}
           detail={t('Restoring each episode, locked choice and consequence.', 'Đang khôi phục từng tập, lựa chọn đã chốt và hậu quả.')}
+          locale={locale}
         />
       ) : null}
 
       {history && history.items.length === 0 ? (
-        <DramaEmptyStage
-          title={t('No recap scenes yet.', 'Chưa có cảnh tóm tắt.')}
-          detail={t('Play the first episode and your locked decisions will appear here.', 'Xem tập đầu và các quyết định đã chốt sẽ xuất hiện ở đây.')}
-        />
+        <View style={styles.emptyState}>
+          <DramaEmptyStage
+            title={t('No recap scenes yet.', 'Chưa có cảnh tóm tắt.')}
+            detail={t('Play the first episode and your locked decisions will appear here.', 'Xem tập đầu và các quyết định đã chốt sẽ xuất hiện ở đây.')}
+            locale={locale}
+          />
+          <ActionButton
+            label={t('Back to story', 'Quay lại câu chuyện')}
+            variant="secondary"
+            onPress={() => plotId ? router.replace({ pathname: '/story', params: { plotId } }) : router.replace('/')}
+          />
+        </View>
       ) : null}
 
       {history && history.items.length > 0 ? (
@@ -121,6 +130,7 @@ function readParam(value: string | string[] | undefined): string | null {
 
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  emptyState: { gap: spacing.md },
   timeline: { position: 'relative', gap: spacing.lg, paddingTop: spacing.sm },
   timelineRail: { position: 'absolute', top: spacing.md, bottom: spacing.xl, left: 17, width: 1, backgroundColor: colors.borderStrong },
   timelineItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },

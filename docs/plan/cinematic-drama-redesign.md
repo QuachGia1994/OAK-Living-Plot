@@ -267,9 +267,20 @@ Visual recap frames, episode chronology, locked/current state and choice/consequ
 
 Plus/Auth/Settings now share the cinematic palette, display/mono hierarchy and dark high-contrast surfaces while remaining utility-first.
 
-### Large Stage B — Final cinematic productization — NEXT
+### Large Stage B — Final cinematic productization — COMPLETE
 
-Run the full journey/device QA, motion/performance/accessibility/localization pass, then exact-SHA Android/iOS native release verification and final cinematic RC closeout.
+Final RC productization closes the redesign without expanding backend/media scope:
+
+- Shared cinematic UI copy is now fully localized for English/Vietnamese, including empty/composer/casting/mood/scene/choice/generation/consequence surfaces and screen-reader cues.
+- Scene beat progress exposes semantic `progressbar` values, while create/auth form accessibility labels follow the active UI locale.
+- History empty state now provides a direct return path; Home/Plus support labels no longer leak English into Vietnamese UI.
+- Reduced-motion handling remains active for scene/subtitle/consequence/generation reveals; the visual layer keeps native-driver animation and bounded deterministic artwork rather than adding effect-heavy dependencies.
+- Small-screen grids continue to wrap via flex-basis/min-width rules; no new fixed-width navigation or horizontal scroll requirement was introduced.
+- A pure cinematic-copy regression test locks the EN/VI interaction language without adding a UI testing dependency solely for release cosmetics.
+- Kiro post-fix read-only audit found zero blocker/high issues in the current mobile journey. Agy was requested twice but its CLI/platform invocation was unavailable, so no unverified findings were used.
+- Final release acceptance requires exact-SHA GitHub Actions quality, iOS static export, unsigned native IPA, and Android APK gates to pass.
+
+The cinematic redesign is considered complete after that exact-SHA native gate. Real generated scene media remains a separately gated product expansion.
 
 ### Stage F — Real generated scene media gate
 

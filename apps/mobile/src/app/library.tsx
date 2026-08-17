@@ -83,6 +83,7 @@ export default function StoryLibraryScreen() {
         <DramaLoadingStage
           label={t('Lighting your story shelf…', 'Đang thắp sáng kệ câu chuyện…')}
           detail={t('Restoring covers, episode positions and your next decision points.', 'Đang dựng lại bìa, vị trí tập và điểm quyết định tiếp theo.')}
+          locale={locale}
         />
       ) : null}
 
@@ -91,6 +92,7 @@ export default function StoryLibraryScreen() {
           <DramaEmptyStage
             title={t('No drama is playing yet.', 'Chưa có drama nào đang phát.')}
             detail={t('Give Living Plot one spark and your first cover will appear here.', 'Cho Living Plot một tia lửa và bìa câu chuyện đầu tiên sẽ xuất hiện ở đây.')}
+            locale={locale}
           />
           <ActionButton label={t('Create my first drama', 'Tạo drama đầu tiên')} onPress={() => router.push('/create')} />
         </View>

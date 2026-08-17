@@ -97,7 +97,7 @@ export default function PlusScreen() {
             <Text style={styles.passTitle}>{entitlementActive ? t('Plus is active', 'Plus đang hoạt động') : t('Free → Plus', 'Free → Plus')}</Text>
           </View>
           <View style={styles.passPills}>
-            <Pill tone={entitlementActive ? 'success' : 'accent'}>{entitlementActive ? 'PLUS ACTIVE' : 'PLUS'}</Pill>
+            <Pill tone={entitlementActive ? 'success' : 'accent'}>{entitlementActive ? t('PLUS ACTIVE', 'PLUS ĐANG BẬT') : 'PLUS'}</Pill>
             <Pill tone={storeMode === 'test_store' ? 'success' : 'neutral'}>{storeModeLabel(storeMode, locale)}</Pill>
           </View>
         </View>

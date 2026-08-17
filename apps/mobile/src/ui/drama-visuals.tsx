@@ -9,7 +9,9 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import type { UiLocale } from '@/features/preferences/contracts';
 import type { StoryChoice, StoryMood } from '@/features/story/contracts';
+import { dramaVisualCopyFor } from './drama-copy';
 import { buildSubtitleBeats, clampSceneBeat, sceneMotifForText, type SceneMotif } from './drama-storyboard';
 import { cinematic, colors, radius, spacing, typography } from './theme';
 
@@ -115,19 +117,22 @@ export function DramaCoverTile({
 export function DramaEmptyStage({
   title,
   detail,
+  locale,
   mood = 'mysterious',
 }: {
   title: string;
   detail: string;
+  locale: UiLocale;
   mood?: StoryMood;
 }) {
   const tone = cinematic.scene[mood];
+  const copy = dramaVisualCopyFor(locale);
   return (
     <View style={[styles.emptyStage, { backgroundColor: tone.base }]}>
       <SceneArtwork mood={mood} characterName="Lead" sceneText={detail} compact />
       <View style={styles.emptyShade} />
       <View style={styles.emptyCopy}>
-        <Text style={[styles.emptyKicker, { color: tone.rim }]}>YOUR NEXT SCENE</Text>
+        <Text style={[styles.emptyKicker, { color: tone.rim }]}>{copy.emptyKicker}</Text>
         <Text style={styles.emptyTitle}>{title}</Text>
         <Text style={styles.emptyDetail}>{detail}</Text>
       </View>
@@ -140,15 +145,18 @@ export function DramaComposerPreview({
   characterName,
   mood,
   label,
+  locale,
 }: {
   premise: string;
   characterName: string;
   mood: StoryMood;
   label: string;
+  locale: UiLocale;
 }) {
   const tone = cinematic.scene[mood];
-  const lead = characterName.trim() || 'YOUR LEAD';
-  const sceneText = premise.trim() || 'A charged moment before the first choice.';
+  const copy = dramaVisualCopyFor(locale);
+  const lead = characterName.trim() || copy.composerLead;
+  const sceneText = premise.trim() || copy.composerFallbackScene;
   return (
     <View style={[styles.composerPreview, { backgroundColor: tone.base }]} accessibilityLabel={`${label}. ${lead}.`}>
       <SceneArtwork mood={mood} characterName={lead} sceneText={sceneText} compact />
@@ -170,15 +178,18 @@ export function DramaMoodSwatch({
   label,
   description,
   selected,
+  locale,
   onPress,
 }: {
   mood: StoryMood;
   label: string;
   description: string;
   selected: boolean;
+  locale: UiLocale;
   onPress: () => void;
 }) {
   const tone = cinematic.scene[mood];
+  const copy = dramaVisualCopyFor(locale);
   return (
     <Pressable
       accessibilityRole="button"
@@ -198,7 +209,7 @@ export function DramaMoodSwatch({
         <View style={styles.moodSwatchShade} />
       </View>
       <View style={styles.moodSwatchTopRow}>
-        <Text style={styles.moodSwatchState}>{selected ? 'SELECTED' : 'MOOD'}</Text>
+        <Text style={styles.moodSwatchState}>{selected ? copy.moodSelected : copy.moodKicker}</Text>
         <View style={[styles.moodSwatchSignal, { backgroundColor: tone.rim }]} />
       </View>
       <View style={styles.moodSwatchCopy}>
@@ -214,14 +225,17 @@ export function DramaCastingPreview({
   mood,
   premise,
   label,
+  locale,
 }: {
   characterName: string;
   mood: StoryMood;
   premise: string;
   label: string;
+  locale: UiLocale;
 }) {
   const tone = cinematic.scene[mood];
-  const lead = characterName.trim() || 'UNCAST';
+  const copy = dramaVisualCopyFor(locale);
+  const lead = characterName.trim() || copy.castingUncast;
   return (
     <View style={[styles.castingPreview, { backgroundColor: tone.base }]}>
       <SceneArtwork mood={mood} characterName={lead} sceneText={premise} compact />
@@ -229,7 +243,7 @@ export function DramaCastingPreview({
       <View style={styles.castingCopy}>
         <Text style={[styles.castingKicker, { color: tone.rim }]}>{label}</Text>
         <Text style={styles.castingName} numberOfLines={1}>{lead}</Text>
-        <Text style={styles.castingMeta}>{characterName.trim() ? 'LEAD LOCKED FOR EPISODE 1' : 'NAME THE PERSON AT THE CENTER OF THE DRAMA'}</Text>
+        <Text style={styles.castingMeta}>{characterName.trim() ? copy.castingLocked : copy.castingPrompt}</Text>
       </View>
     </View>
   );
@@ -311,6 +325,7 @@ export function DramaSceneStage({
   body,
   characterName,
   mood,
+  locale,
   consequence,
 }: {
   episodeNumber: number;
@@ -318,11 +333,13 @@ export function DramaSceneStage({
   body: string;
   characterName: string;
   mood: StoryMood;
+  locale: UiLocale;
   consequence?: string;
 }) {
   const beats = useMemo(() => buildSubtitleBeats(body), [body]);
   const [beatIndex, setBeatIndex] = useState(0);
   const tone = cinematic.scene[mood];
+  const copy = dramaVisualCopyFor(locale);
   const beat = beats[clampSceneBeat(beatIndex, beats.length)] ?? body;
   const hasNextBeat = beatIndex < beats.length - 1;
 
@@ -330,7 +347,7 @@ export function DramaSceneStage({
     <Pressable
       accessibilityRole={consequence ? undefined : 'button'}
       accessibilityLabel={consequence ? undefined : `${characterName}. ${beat}`}
-      accessibilityHint={consequence ? undefined : hasNextBeat ? 'Advances to the next subtitle beat' : 'This is the final subtitle beat'}
+      accessibilityHint={consequence ? undefined : hasNextBeat ? copy.sceneAdvanceHint : copy.sceneFinalHint}
       disabled={Boolean(consequence) || !hasNextBeat}
       onPress={() => hasNextBeat && setBeatIndex((current) => current + 1)}
       style={[styles.sceneStage, { backgroundColor: tone.base }]}
@@ -342,7 +359,12 @@ export function DramaSceneStage({
           <Text style={styles.sceneEpisode}>EP {String(episodeNumber).padStart(2, '0')}</Text>
           <Text style={styles.sceneTitle} numberOfLines={2}>{title}</Text>
         </View>
-        <View style={styles.sceneProgress} accessibilityLabel={`Scene beat ${Math.min(beatIndex + 1, Math.max(beats.length, 1))} of ${Math.max(beats.length, 1)}`}>
+        <View
+          style={styles.sceneProgress}
+          accessibilityRole="progressbar"
+          accessibilityLabel={copy.sceneProgress(Math.min(beatIndex + 1, Math.max(beats.length, 1)), Math.max(beats.length, 1))}
+          accessibilityValue={{ min: 1, max: Math.max(beats.length, 1), now: Math.min(beatIndex + 1, Math.max(beats.length, 1)) }}
+        >
           {(beats.length > 0 ? beats : [body]).map((_, index) => (
             <View
               key={`${episodeNumber}-beat-${index}`}
@@ -356,12 +378,12 @@ export function DramaSceneStage({
       </View>
 
       {consequence ? (
-        <ConsequenceOverlay consequence={consequence} tone={tone} />
+        <ConsequenceOverlay consequence={consequence} tone={tone} locale={locale} />
       ) : (
         <View style={styles.subtitleDock}>
           <View style={styles.subtitleLabelRow}>
             <Text style={[styles.subtitleSpeaker, { color: tone.rim }]}>{characterName}</Text>
-            <Text style={styles.subtitleCue}>{hasNextBeat ? 'TAP SCENE TO ADVANCE' : 'END OF SCENE'}</Text>
+            <Text style={styles.subtitleCue}>{hasNextBeat ? copy.sceneAdvanceCue : copy.sceneEndCue}</Text>
           </View>
           <SubtitleBeat key={`${episodeNumber}-${beatIndex}`} text={beat} />
         </View>
@@ -375,19 +397,22 @@ export function DramaChoiceCard({
   selected,
   disabled,
   mood,
+  locale,
   onPress,
 }: {
   choice: StoryChoice;
   selected: boolean;
   disabled: boolean;
   mood: StoryMood;
+  locale: UiLocale;
   onPress: () => void;
 }) {
   const tone = cinematic.scene[mood];
+  const copy = dramaVisualCopyFor(locale);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Choice ${choice.key}: ${choice.label}`}
+      accessibilityLabel={copy.choiceAccessibility(choice.key, choice.label)}
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -407,7 +432,7 @@ export function DramaChoiceCard({
       <Text style={[styles.choiceLabel, selected && { color: colors.ink }]}>{choice.label}</Text>
       <View style={styles.choiceBottomRow}>
         <View style={[styles.choiceLight, { backgroundColor: selected ? tone.rim : tone.glow }]} />
-        <Text style={[styles.choiceState, selected && { color: tone.rim }]}>{selected ? 'SELECTED' : 'CHOOSE THIS TURN'}</Text>
+        <Text style={[styles.choiceState, selected && { color: tone.rim }]}>{selected ? copy.choiceSelected : copy.choicePrompt}</Text>
       </View>
     </Pressable>
   );
@@ -418,20 +443,23 @@ export function DramaGenerationState({
   mood,
   label,
   detail,
+  locale,
 }: {
   characterName: string;
   mood: StoryMood;
   label: string;
   detail: string;
+  locale: UiLocale;
 }) {
   const tone = cinematic.scene[mood];
+  const copy = dramaVisualCopyFor(locale);
   const pulse = usePulse();
   return (
     <View style={[styles.generationCard, { backgroundColor: tone.base }]} accessibilityRole="progressbar" accessibilityLabel={label} accessibilityLiveRegion="polite">
       <SceneArtwork mood={mood} characterName={characterName || 'Lead'} compact />
       <View style={styles.generationShade} />
       <View style={styles.generationCopy}>
-        <Text style={[styles.generationEyebrow, { color: tone.rim }]}>DIRECTING YOUR DRAMA</Text>
+        <Text style={[styles.generationEyebrow, { color: tone.rim }]}>{copy.generationKicker}</Text>
         <Text style={styles.generationTitle}>{label}</Text>
         <Text style={styles.generationDetail}>{detail}</Text>
         <View style={styles.generationTrack}>
@@ -442,13 +470,15 @@ export function DramaGenerationState({
   );
 }
 
-export function DramaLoadingStage({ label, detail }: { label: string; detail?: string }) {
+export function DramaLoadingStage({ label, detail, locale }: { label: string; detail?: string; locale: UiLocale }) {
+  const copy = dramaVisualCopyFor(locale);
   return (
     <DramaGenerationState
       characterName="Lead"
       mood="mysterious"
       label={label}
-      detail={detail ?? 'Framing the latest scene and restoring your last decision.'}
+      detail={detail ?? copy.loadingDefaultDetail}
+      locale={locale}
     />
   );
 }
@@ -556,7 +586,8 @@ function SubtitleBeat({ text }: { text: string }) {
   return <Animated.Text style={[styles.subtitleText, { opacity, transform: [{ translateY: translate }] }]}>{text}</Animated.Text>;
 }
 
-function ConsequenceOverlay({ consequence, tone }: { consequence: string; tone: SceneTone }) {
+function ConsequenceOverlay({ consequence, tone, locale }: { consequence: string; tone: SceneTone; locale: UiLocale }) {
+  const copy = dramaVisualCopyFor(locale);
   const [opacity] = useState(() => new Animated.Value(0));
   const [scale] = useState(() => new Animated.Value(0.98));
   const [beam] = useState(() => new Animated.Value(-220));
@@ -584,8 +615,8 @@ function ConsequenceOverlay({ consequence, tone }: { consequence: string; tone: 
   return (
     <Animated.View style={[styles.consequenceOverlay, { opacity, transform: [{ scale }] }]} accessibilityLiveRegion="polite">
       <Animated.View style={[styles.consequenceBeam, { backgroundColor: tone.rim, transform: [{ translateX: beam }, { rotate: '14deg' }] }]} />
-      <Text style={[styles.consequenceKicker, { color: tone.rim }]}>THE STORY BENDS</Text>
-      <Text style={styles.consequenceHeadline}>Your choice changed the next scene.</Text>
+      <Text style={[styles.consequenceKicker, { color: tone.rim }]}>{copy.consequenceKicker}</Text>
+      <Text style={styles.consequenceHeadline}>{copy.consequenceHeadline}</Text>
       <Text style={styles.consequenceText}>{consequence}</Text>
     </Animated.View>
   );

@@ -141,6 +141,7 @@ export default function StoryScreen() {
         <DramaLoadingStage
           label={t('Opening your latest scene…', 'Đang mở cảnh mới nhất…')}
           detail={t('Restoring the episode, your last decision and the scene framing.', 'Đang khôi phục tập truyện, lựa chọn gần nhất và bố cục cảnh.')}
+          locale={locale}
         />
       </Screen>
     );
@@ -174,6 +175,7 @@ export default function StoryScreen() {
           body={episode.body}
           characterName={session.characterName}
           mood={session.mood}
+          locale={locale}
           consequence={awaitingChoice ? undefined : episode.committedConsequence}
         />
       </MotionReveal>
@@ -229,6 +231,7 @@ export default function StoryScreen() {
                     selected={choice.id === selectedChoiceId}
                     disabled={busyAction !== null}
                     mood={session.mood}
+                    locale={locale}
                     onPress={() => setSelectedChoiceId(choice.id)}
                   />
                 ))}

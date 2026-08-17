@@ -11,7 +11,7 @@ import { colors, cinematic, spacing, typography } from '@/ui/theme';
 export default function AuthScreen() {
   const auth = useMobileAuth();
   const router = useRouter();
-  const { t } = useUiCopy();
+  const { locale, t } = useUiCopy();
 
   if (!auth.configured) {
     return (
@@ -33,7 +33,7 @@ export default function AuthScreen() {
     return (
       <Screen>
         <BrandMark />
-        <DramaLoadingStage label={t('Opening secure session…', 'Đang mở phiên đăng nhập…')} detail={t('Restoring your identity without touching story state.', 'Đang khôi phục danh tính mà không thay đổi trạng thái câu chuyện.')} />
+        <DramaLoadingStage label={t('Opening secure session…', 'Đang mở phiên đăng nhập…')} detail={t('Restoring your identity without touching story state.', 'Đang khôi phục danh tính mà không thay đổi trạng thái câu chuyện.')} locale={locale} />
       </Screen>
     );
   }
@@ -140,7 +140,7 @@ function ClerkEmailOtpForm() {
 
         {!verifying ? (
           <TextInput
-            accessibilityLabel="Email address"
+            accessibilityLabel={t('Email address', 'Địa chỉ email')}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
@@ -153,7 +153,7 @@ function ClerkEmailOtpForm() {
           />
         ) : (
           <TextInput
-            accessibilityLabel="Verification code"
+            accessibilityLabel={t('Verification code', 'Mã xác minh')}
             autoCapitalize="none"
             keyboardType="number-pad"
             placeholder="123456"
