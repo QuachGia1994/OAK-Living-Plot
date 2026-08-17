@@ -56,6 +56,7 @@ All notable changes to Living Plot will be documented in this file.
 - Closed Beta RC runbook covering real development provisioning, provider blockers, abuse/cost guardrails, live bring-up order, and exact-SHA verification.
 - Provisioned non-production D1 `living-plot-dev` plus development TTS Queue/DLQ and applied migrations `0001`–`0008` remotely; R2 remains explicitly blocked until the Cloudflare account enables the service.
 - Protected JSON request-size guard and API response hardening with `no-store`, `nosniff`, and `no-referrer` headers.
+- iOS unsigned Native RC pipeline on GitHub macOS: explicit Expo iOS identity, clean prebuild/CocoaPods, Release `iphoneos` Xcode build with code signing disabled, negative signature verification, `Payload/LivingPlot.app` IPA packaging, and artifact upload.
 
 ### Changed
 - Reworked the Phase 1 native mobile presentation into a Huashu-inspired Cinematic Editorial system: warmer low-chroma surfaces, restrained amber/rust accent, narrative display type, mono operational metadata, flatter controls, ruled reading lists/timelines, and fewer generic dashboard cards across Home, Create, Story, Library, History, Plus, Auth, and Settings.

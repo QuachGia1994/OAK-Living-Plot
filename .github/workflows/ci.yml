@@ -71,6 +71,98 @@ jobs:
         run: npx expo export --platform ios --output-dir dist-ios
         working-directory: apps/mobile
 
+  ios-unsigned-ipa:
+    if: github.event_name != 'pull_request'
+    needs: quality
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      EXPO_PUBLIC_LIVING_PLOT_API_URL: ${{ vars.EXPO_PUBLIC_LIVING_PLOT_API_URL }}
+      EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY }}
+      EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY }}
+      EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY }}
+      NODE_ENV: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Inspect Xcode toolchain
+        run: xcodebuild -version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate iOS project
+        run: npx expo prebuild --platform ios --clean --no-install
+        working-directory: apps/mobile
+
+      - name: Install CocoaPods
+        run: pod install
+        working-directory: apps/mobile/ios
+
+      - name: Build unsigned Release app
+        run: |
+          xcodebuild \
+            -workspace ios/LivingPlot.xcworkspace \
+            -scheme LivingPlot \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+        working-directory: apps/mobile
+
+      - name: Validate and package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP_PATH="ios/build/Build/Products/Release-iphoneos/LivingPlot.app"
+          PLIST_PATH="$APP_PATH/Info.plist"
+          test -d "$APP_PATH"
+          test -f "$PLIST_PATH"
+
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST_PATH")"
+          SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST_PATH")"
+          BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST_PATH")"
+          test "$BUNDLE_ID" = "com.oak.livingplot"
+          test "$SHORT_VERSION" = "0.1.0"
+          test "$BUILD_NUMBER" = "1"
+
+          if /usr/bin/codesign -dv --verbose=2 "$APP_PATH" 2>codesign-check.txt; then
+            echo "::error::Release app was unexpectedly code signed."
+            cat codesign-check.txt
+            exit 1
+          fi
+          cat codesign-check.txt
+          grep -q "code object is not signed at all" codesign-check.txt
+
+          rm -rf ios/unsigned-ipa
+          mkdir -p ios/unsigned-ipa/Payload
+          ditto "$APP_PATH" ios/unsigned-ipa/Payload/LivingPlot.app
+          (
+            cd ios/unsigned-ipa
+            ditto -c -k --sequesterRsrc --keepParent Payload LivingPlot-unsigned.ipa
+          )
+          test -f ios/unsigned-ipa/LivingPlot-unsigned.ipa
+          unzip -l ios/unsigned-ipa/LivingPlot-unsigned.ipa | grep -q "Payload/LivingPlot.app/Info.plist"
+
+      - name: Upload unsigned iOS IPA
+        uses: actions/upload-artifact@v6
+        with:
+          name: living-plot-ios-unsigned-ipa
+          path: apps/mobile/ios/unsigned-ipa/LivingPlot-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
   android-apk:
     if: github.event_name != 'pull_request'
     needs: quality

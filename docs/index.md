@@ -20,6 +20,7 @@
 - [Phase 1 preferences and account data](arch/account-data-preferences.md) — EN/VI interface plus story/narrator defaults, spoiler-safe sharing, portable export, fail-closed application-data erasure, and safe diagnostics.
 - [Live development setup](ref/live-development.md) — secret-safe readiness checks, non-production Cloudflare environment, and mobile/provider configuration.
 - [Closed Beta RC runbook](ref/beta-rc-runbook.md) — current development provisioning, provider blockers, abuse/cost guardrails, live bring-up order, and exact-SHA release verification.
+- [iOS unsigned Native RC](ref/ios-unsigned-rc.md) — reproducible macOS/Xcode device Release build with signing disabled and `Payload/*.app` IPA packaging verification.
 - [Huashu-inspired mobile redesign](plan/huashu-redesign.md) — production React Native adaptation of the Cinematic Editorial visual system across the Phase 1 mobile surfaces.
 - [Foundation implementation slice 1](plan/done/foundation-slice1.md) — completed workspace/CI foundation and verification evidence.
 - [D1 implementation slice 2](plan/done/d1-slice2.md) — completed D1/domain baseline and verification evidence.

@@ -6,6 +6,10 @@
     "orientation": "portrait",
     "scheme": "livingplot",
     "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.oak.livingplot",
+      "buildNumber": "1"
+    },
     "android": {
       "package": "com.oak.livingplot",
       "versionCode": 1
