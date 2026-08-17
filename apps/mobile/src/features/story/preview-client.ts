@@ -29,6 +29,17 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
         voiceLimit: 1,
         resetLabel: 'Resets at 00:00 UTC',
       },
+      retention: {
+        currentStreakDays: 2,
+        choicesMade: 4,
+        activePlots: this.plots.size,
+        dailyPrompt: {
+          label: 'A message at the wrong time',
+          premise: 'A voice note arrives from someone who should have no way to contact you, and it contains one detail only you would recognize.',
+          mood: 'mysterious',
+          characterName: 'Mina',
+        },
+      },
     };
   }
 
@@ -186,6 +197,9 @@ function toSummary(plot: StoryPlotSession): StoryPlotSummary {
     updatedLabel: 'Just now',
     episodeNumber: plot.episode.number,
     status: plot.episode.status === 'awaiting_choice' ? 'awaiting_choice' : 'ready_for_next',
+    resumeLine: plot.episode.status === 'choice_committed'
+      ? plot.episode.committedConsequence ?? plot.episode.summary
+      : plot.episode.summary,
   };
 }
 

@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate preview-safe live configuration
+        run: npm run live:check:preview
+
       - name: Lint
         run: npm run lint
 
@@ -40,6 +43,7 @@ jobs:
     env:
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY }}
       EXPO_PUBLIC_LIVING_PLOT_API_URL: ${{ vars.EXPO_PUBLIC_LIVING_PLOT_API_URL }}
+      EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY }}
       EXPO_PUBLIC_REVENUECAT_IOS_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY }}
       EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY }}
       NODE_ENV: production

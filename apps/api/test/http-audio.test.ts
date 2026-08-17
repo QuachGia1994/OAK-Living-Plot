@@ -149,6 +149,29 @@ describe('audio HTTP boundary', () => {
     expect(attackerRead.status).toBe(404);
   });
 
+  it('exposes owner-scoped JSON status separately from the private binary stream', async () => {
+    await seedOwnerWithEpisodes(1);
+    const queue = fakeQueue();
+    const requested = await handleRequest(postAudio('episode-1', 'voice-http-status'), testEnv, {
+      sessionVerifier: verifier('clerk-owner'),
+      audioQueue: queue,
+    });
+    const requestedBody = (await requested.json()) as { audio: { id: string } };
+
+    const ownerStatus = await handleRequest(getAudioStatus(requestedBody.audio.id), testEnv, {
+      sessionVerifier: verifier('clerk-owner'),
+    });
+    const attackerStatus = await handleRequest(getAudioStatus(requestedBody.audio.id), testEnv, {
+      sessionVerifier: verifier('clerk-attacker'),
+    });
+
+    expect(ownerStatus.status).toBe(200);
+    expect(await ownerStatus.json()).toEqual({
+      audio: expect.objectContaining({ id: requestedBody.audio.id, episodeId: 'episode-1', status: 'queued' }),
+    });
+    expect(attackerStatus.status).toBe(404);
+  });
+
   it('returns processing metadata rather than a public URL while audio is not ready', async () => {
     await seedOwnerWithEpisodes(1);
     const queue = fakeQueue();
@@ -225,4 +248,8 @@ function postAudio(episodeId: string, reservationKey: string): Request {
 
 function getAudio(assetId: string): Request {
   return new Request(`https://living-plot.test/v1/audio/${assetId}`);
+}
+
+function getAudioStatus(assetId: string): Request {
+  return new Request(`https://living-plot.test/v1/audio/${assetId}/status`);
 }

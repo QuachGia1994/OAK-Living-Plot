@@ -1,6 +1,6 @@
 # Phase 1 TTS and private-audio boundary
 
-> updated 2026-08-16 · 0.0.0
+> updated 2026-08-17 · 0.0.0
 
 ## Responsibility
 Slice 9 adds derived voice generation without making audio part of canonical story state. Text episodes remain canonical and usable when voice is queued, retrying, failed, or unavailable.
@@ -13,7 +13,7 @@ The boundary owns:
 - private R2 object persistence;
 - owner-scoped HTTP request/status/audio delivery.
 
-RevenueCat entitlement materialization, analytics/cost accounting, public deployment, and mobile playback remain separate slices.
+RevenueCat entitlement materialization and analytics/cost accounting remain separate authority domains. Mobile playback now consumes this boundary without making audio canonical.
 
 ## Google authentication
 `GoogleAccessTokenProvider` performs the explicit server-to-server flow required by the architecture:
@@ -65,7 +65,7 @@ Terminal failure is `failed`.
 7. transition to `queued` and send `{assetId}` only to the Queue;
 8. if enqueue fails, mark failed and release the reservation.
 
-Until RevenueCat is implemented, the HTTP boundary intentionally evaluates every authenticated user using the Free voice tier. The client cannot elevate itself to Plus.
+The HTTP boundary resolves Free/Plus from the backend materialized RevenueCat entitlement immediately before voice quota reservation. The client cannot elevate itself by sending a tier flag.
 
 ## Queue and DLQ
 Wrangler declares:
@@ -85,7 +85,9 @@ The consumer writes deterministic MP3 keys:
 
 `audio/{episodeId}/{voiceVariant}.mp3`
 
-`GET /v1/audio/:assetId` authenticates the user and verifies asset ownership through episode → plot before reading R2. Non-ready assets return status metadata with HTTP 202. Ready assets are streamed with `Content-Type: audio/mpeg` and private cache headers. The object key and provider voice ID are not exposed.
+`GET /v1/audio/:assetId/status` authenticates the user and returns only client-safe lifecycle metadata for polling. `GET /v1/audio/:assetId` separately authenticates the owner through episode → plot before reading R2; non-ready reads return HTTP 202 metadata and ready assets stream `audio/mpeg` with private cache headers. The object key and provider voice ID are never exposed.
+
+The Expo client requests one approved narrator variant, polls the status route while work is pending, and uses Expo Audio with the protected stream URL plus an Authorization header after `ready`. Playback failure never invalidates or hides the text episode.
 
 ## Idempotency and failure semantics
 - same episode/voice request while work exists returns the canonical asset;
@@ -97,5 +99,5 @@ The consumer writes deterministic MP3 keys:
 - DLQ terminal cleanup releases held quota;
 - R2 remains private even if D1 finalization fails.
 
-## Deferred
-No live Google credential/network integration test, remote Queue/R2 provisioning, RevenueCat Plus entitlement, exact TTS cost telemetry, mobile audio player, public deployment, or store build is performed in this slice.
+## External environment gate
+Live Google credential/network synthesis and remote development Queue/R2 provisioning remain unverified until credentials/resources exist. Production deployment and store submission are not part of the current Phase 1 development gate.

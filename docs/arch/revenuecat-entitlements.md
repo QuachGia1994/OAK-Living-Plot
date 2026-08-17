@@ -1,6 +1,6 @@
 # Phase 1 RevenueCat entitlement boundary
 
-> updated 2026-08-16 · 0.0.0
+> updated 2026-08-17 · 0.0.0
 
 ## Authority
 RevenueCat is the store/subscription provider boundary; D1 is the application authorization source of truth after provider verification. Mobile `CustomerInfo`, paywall return values, public RevenueCat SDK keys, and client booleans such as `isPlus` are never quota authority.
@@ -14,7 +14,7 @@ Worker-only values:
 - `REVENUECAT_WEBHOOK_AUTHORIZATION` — exact custom Authorization value expected on the webhook;
 - `REVENUECAT_WEBHOOK_SIGNING_SECRET` — HMAC signing secret.
 
-Mobile receives only platform public SDK keys through `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` and `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY`.
+Mobile receives only public SDK keys. `EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY` may be used for RevenueCat Test Store validation and takes precedence over platform keys; otherwise mobile uses `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` or `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY`.
 
 ## Webhook trust flow
 `POST /v1/webhooks/revenuecat` is public only in the routing sense; it is not unauthenticated data authority.
@@ -54,21 +54,20 @@ The Expo client installs `react-native-purchases`, `react-native-purchases-ui`, 
 `RevenueCatPurchaseGateway`:
 - requires an explicit internal App User ID before configuring RevenueCat;
 - never intentionally configures an anonymous purchase identity;
-- selects only a public iOS/Android SDK key;
+- selects the public Test Store key when configured, otherwise only the current iOS/Android public SDK key;
 - presents the configured Plus paywall;
 - performs user-initiated restore.
 
 `BillingCoordinator` always refreshes `/v1/entitlement` with the authenticated bearer token after purchase/paywall or restore. The local RevenueCat result can explain UI progress but cannot unlock Plus by itself.
 
-Slice 10 deliberately leaves `BillingSessionContext` empty in the existing local story preview because Clerk mobile sign-in/live API wiring is still deferred. The Plus screen therefore refuses to invent an anonymous identity. A later integration slice must provide `{appUserId: internal users.id, bearerToken}` from authenticated backend identity before real store actions are enabled.
+Authenticated runtime wiring now supplies the internal `users.id` plus a fresh-token provider to `BillingSessionContext`. Preview/signed-out mode still refuses to invent an anonymous purchase identity. After any paywall/restore action, `BillingCoordinator` refreshes backend entitlement before the UI treats Plus as active.
 
-## Deferred integration gate
-This slice does not claim:
-- RevenueCat dashboard product/offering configuration;
-- App Store Connect / Google Play product creation;
-- real iOS/Android sandbox purchase;
-- renewal, cancellation, billing issue, refund, transfer, or restore convergence against live provider infrastructure;
-- Clerk mobile identity wiring;
-- public deployment.
+## Test Store and external integration gate
+The mobile configuration can select RevenueCat Test Store for purchase-flow validation without shipping an App Store/Google Play product. This proves only the client configuration boundary; it does not make local RevenueCat state authoritative.
 
-Those require the real-device/sandbox integration gate.
+Still unverified without external provider configuration:
+- RevenueCat dashboard offering/entitlement setup and webhook convergence;
+- real Test Store purchase against this project;
+- App Store Connect / Google Play product creation or native sandbox purchase;
+- renewal, cancellation, billing issue, refund, transfer, and restore convergence against provider infrastructure;
+- public deployment or store submission.

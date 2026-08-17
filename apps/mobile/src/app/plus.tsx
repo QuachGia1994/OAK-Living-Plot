@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import type { BackendEntitlement } from '@/features/billing/contracts';
 import { BillingClientError } from '@/features/billing/contracts';
 import { useBillingSession } from '@/features/billing/billing-session-context';
+import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
 import { createBillingCoordinator } from '@/features/billing/runtime';
 import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, Pill, Screen } from '@/ui/primitives';
 import { colors, spacing } from '@/ui/theme';
@@ -14,6 +15,10 @@ export default function PlusScreen() {
   const auth = useMobileAuth();
   const session = useBillingSession();
   const coordinator = useMemo(() => createBillingCoordinator(), []);
+  const storeMode = useMemo(() => {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return 'not_configured' as const;
+    return revenueCatStoreModeFromEnv(Platform.OS);
+  }, []);
   const [busyAction, setBusyAction] = useState<'paywall' | 'restore' | 'refresh' | null>(null);
   const [entitlement, setEntitlement] = useState<BackendEntitlement | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -75,9 +80,13 @@ export default function PlusScreen() {
       </View>
 
       <Card>
-        <Pill tone="accent">PLUS</Pill>
+        <View style={styles.planHeader}>
+          <Pill tone="accent">PLUS</Pill>
+          <Pill tone={storeMode === 'test_store' ? 'success' : 'neutral'}>{storeModeLabel(storeMode)}</Pill>
+        </View>
         <Text style={styles.planTitle}>20 text episodes + 10 fresh voiced episodes / UTC day</Text>
         <Text style={styles.body}>Free remains 3 text + 1 fresh voice. Cached audio replay does not spend a new voice generation slot.</Text>
+        <Text style={styles.storeNote}>{storeMode === 'test_store' ? 'Test Store is enabled for purchase-flow validation without shipping to an app store.' : storeMode === 'platform_store' ? 'This build uses the platform RevenueCat SDK key.' : 'Store purchase actions stay unavailable until a Test Store or platform public key is configured.'}</Text>
         {entitlement ? <Pill tone={entitlement.plusActive ? 'success' : 'neutral'}>Backend: {entitlement.tier.toUpperCase()}</Pill> : null}
       </Card>
 
@@ -102,6 +111,12 @@ export default function PlusScreen() {
   );
 }
 
+function storeModeLabel(mode: 'test_store' | 'platform_store' | 'not_configured'): string {
+  if (mode === 'test_store') return 'Test Store';
+  if (mode === 'platform_store') return 'Platform Store';
+  return 'Store offline';
+}
+
 function billingMessage(error: unknown): string {
   if (error instanceof BillingClientError) return error.message;
   return 'Billing could not be completed.';
@@ -110,8 +125,10 @@ function billingMessage(error: unknown): string {
 const styles = StyleSheet.create({
   hero: { gap: spacing.sm },
   title: { color: colors.ink, fontSize: 32, fontWeight: '800', lineHeight: 38 },
+  planHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   planTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', lineHeight: 27 },
   body: { color: colors.inkMuted, fontSize: 15, lineHeight: 23 },
+  storeNote: { color: colors.storyInk, fontSize: 12, lineHeight: 19 },
   actions: { gap: spacing.sm },
   message: { color: colors.inkMuted, fontSize: 14, lineHeight: 21 },
 });

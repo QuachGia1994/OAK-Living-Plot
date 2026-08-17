@@ -73,6 +73,7 @@ export async function handleRequest(
     const entitlement = await entitlements.getEntitlement(user.id);
     return handleAudioRequest(request, audio, user.id, route.episodeId, entitlement.tier);
   }
+  if (route.kind === 'audio_status') return handleAudioStatus(audio, user.id, route.assetId);
   return handleAudioRead(env, audio, user.id, route.assetId);
 }
 
@@ -88,6 +89,7 @@ type ProtectedRoute =
   | { kind: 'plot'; plotId: string }
   | { kind: 'entitlement' }
   | { kind: 'episode_audio'; episodeId: string }
+  | { kind: 'audio_status'; assetId: string }
   | { kind: 'audio'; assetId: string }
   | StoryRoute;
 
@@ -107,6 +109,8 @@ function matchProtectedRoute(pathname: string): ProtectedRoute | null {
   if (plot) return { kind: 'plot', plotId: plot };
   const episodeAudio = matchId(pathname, /^\/v1\/episodes\/([^/]+)\/audio$/);
   if (episodeAudio) return { kind: 'episode_audio', episodeId: episodeAudio };
+  const audioStatus = matchId(pathname, /^\/v1\/audio\/([^/]+)\/status$/);
+  if (audioStatus) return { kind: 'audio_status', assetId: audioStatus };
   const audio = matchId(pathname, /^\/v1\/audio\/([^/]+)$/);
   if (audio) return { kind: 'audio', assetId: audio };
   return null;
@@ -291,6 +295,15 @@ async function handleAudioRequest(
     { audio: clientAudio(result.value) },
     result.value.status === 'ready' ? 200 : 202,
   );
+}
+
+async function handleAudioStatus(
+  audio: D1AudioService,
+  userId: string,
+  assetId: string,
+): Promise<Response> {
+  const asset = await audio.getOwnedAsset(userId, assetId);
+  return asset ? json({ audio: clientAudio(asset) }) : json({ error: 'not_found' }, 404);
 }
 
 async function handleAudioRead(

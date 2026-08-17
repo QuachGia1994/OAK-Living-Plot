@@ -1,4 +1,5 @@
 import { createInitialPlotState, parseStructuredPlotState } from '../domain/story';
+import type { RetentionActivityDay } from '../retention/retention';
 import type {
   CreatedPlotRecord,
   GenerationContext,
@@ -106,6 +107,22 @@ export class D1LiveStoryRepository {
       .all<{ id: string }>();
     const sessions = await Promise.all(rows.results.map((row) => this.loadSession(userId, row.id)));
     return sessions.filter(isStoredSession).map((stored) => toPlotSummary(stored.session));
+  }
+
+  async loadRetentionActivity(userId: string): Promise<RetentionActivityDay[]> {
+    const result = await this.db
+      .prepare(
+        `SELECT strftime('%Y-%m-%d', cc.committed_at / 1000, 'unixepoch') AS utc_day,
+                COUNT(*) AS choices_made
+         FROM choice_commits cc
+         JOIN plots p ON p.id = cc.plot_id
+         WHERE p.user_id = ?
+         GROUP BY utc_day
+         ORDER BY utc_day DESC`,
+      )
+      .bind(userId)
+      .all<{ utc_day: string; choices_made: number }>();
+    return result.results.map((row) => ({ utcDay: row.utc_day, choicesMade: row.choices_made }));
   }
 
   async loadGenerationContext(userId: string, plotId: string): Promise<GenerationContext | null> {
@@ -326,6 +343,9 @@ function toPlotSummary(session: LiveStorySession): LiveStoryPlotSummary {
     updatedAt: session.updatedAt,
     episodeNumber: session.episode.number,
     status: session.episode.status === 'awaiting_choice' ? 'awaiting_choice' : 'ready_for_next',
+    resumeLine: session.episode.status === 'choice_committed'
+      ? session.episode.committedConsequence ?? session.episode.summary
+      : session.episode.summary,
   };
 }
 

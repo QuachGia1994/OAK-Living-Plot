@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -97,6 +99,40 @@ export function ActionButton({ label, variant = 'primary', busy = false, disable
   );
 }
 
+export function MotionReveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  const [opacity] = useState(() => new Animated.Value(0));
+  const [translateY] = useState(() => new Animated.Value(10));
+
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (!active) return;
+        if (enabled) {
+          opacity.setValue(1);
+          translateY.setValue(0);
+          return;
+        }
+        Animated.parallel([
+          Animated.timing(opacity, { toValue: 1, duration: 240, delay, useNativeDriver: true }),
+          Animated.timing(translateY, { toValue: 0, duration: 280, delay, useNativeDriver: true }),
+        ]).start();
+      })
+      .catch(() => {
+        if (!active) return;
+        opacity.setValue(1);
+        translateY.setValue(0);
+      });
+    return () => { active = false; };
+  }, [delay, opacity, translateY]);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export function LoadingState({ label = 'Loading your story…' }: { label?: string }) {
   return (
     <View style={styles.stateWrap}>
@@ -169,10 +205,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceRaised,
   },
   pillAccent: {
-    backgroundColor: '#2A2116',
+    backgroundColor: colors.surfaceAccentPill,
   },
   pillSuccess: {
-    backgroundColor: '#14251B',
+    backgroundColor: colors.surfaceSuccessPill,
   },
   pillText: {
     color: colors.inkMuted,

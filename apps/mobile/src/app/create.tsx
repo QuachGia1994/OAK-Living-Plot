@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { PlotDraft, StoryMood } from '@/features/story/contracts';
-import { hasDraftErrors, storyMoodOptions, validatePlotDraft } from '@/features/story/draft';
+import { StoryClientError } from '@/features/story/contracts';
+import { hasDraftErrors, normalizePlotDraft, storyMoodOptions, validatePlotDraft } from '@/features/story/draft';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { createStoryRequestKey } from '@/features/story/request-key';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
@@ -17,10 +18,15 @@ const initialDraft: PlotDraft = {
 
 export default function CreatePlotScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ premise?: string | string[]; mood?: string | string[]; characterName?: string | string[] }>();
   const auth = useMobileAuth();
   const storyExperienceClient = useStoryExperienceClient();
-  const creationKey = useRef(createStoryRequestKey('creation'));
-  const [draft, setDraft] = useState(initialDraft);
+  const creationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const [draft, setDraft] = useState<PlotDraft>(() => ({
+    premise: readParam(params.premise) ?? initialDraft.premise,
+    mood: readMood(params.mood) ?? initialDraft.mood,
+    characterName: readParam(params.characterName) ?? initialDraft.characterName,
+  }));
   const [showValidation, setShowValidation] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -32,11 +38,18 @@ export default function CreatePlotScreen() {
     if (hasDraftErrors(errors)) return;
 
     setBusy(true);
+    const normalizedDraft = normalizePlotDraft(draft);
+    const fingerprint = JSON.stringify(normalizedDraft);
+    const previousAttempt = creationAttempt.current;
+    const attempt = previousAttempt?.fingerprint === fingerprint
+      ? previousAttempt
+      : { fingerprint, key: createStoryRequestKey('creation') };
+    creationAttempt.current = attempt;
     try {
-      const plot = await storyExperienceClient.createPlot(draft, creationKey.current);
+      const plot = await storyExperienceClient.createPlot(normalizedDraft, attempt.key);
       router.replace({ pathname: '/story', params: { plotId: plot.id } });
-    } catch {
-      setSubmitError('The first episode could not be prepared. Your setup is still here, so you can try again.');
+    } catch (caught) {
+      setSubmitError(createErrorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -80,7 +93,7 @@ export default function CreatePlotScreen() {
           multiline
           maxLength={600}
           placeholder="A junior chef learns the restaurant critic is the person who disappeared from her family ten years ago…"
-          placeholderTextColor="#666169"
+          placeholderTextColor={colors.placeholder}
           style={[styles.textArea, showValidation && errors.premise && styles.inputError]}
           textAlignVertical="top"
           value={draft.premise}
@@ -115,7 +128,7 @@ export default function CreatePlotScreen() {
           autoCapitalize="words"
           maxLength={50}
           placeholder="Mina"
-          placeholderTextColor="#666169"
+          placeholderTextColor={colors.placeholder}
           style={[styles.textInput, showValidation && errors.characterName && styles.inputError]}
           value={draft.characterName}
           onChangeText={(characterName) => setDraft((current) => ({ ...current, characterName }))}
@@ -133,10 +146,29 @@ export default function CreatePlotScreen() {
 
       <View style={styles.submitBlock}>
         <ActionButton label="Generate episode 1" busy={busy} onPress={() => void submit()} />
-        <Text style={styles.submitNote}>Text arrives first. Voice is a separate optional layer in a later slice.</Text>
+        <Text style={styles.submitNote}>Text arrives first. Private voice stays optional after the episode is ready.</Text>
       </View>
     </Screen>
   );
+}
+
+function createErrorMessage(error: unknown): string {
+  if (!(error instanceof StoryClientError)) return 'The first episode could not be prepared. Your setup is still here, so you can try again.';
+  if (error.code === 'quota_exceeded') return 'Today’s text episode allowance is exhausted. Your setup is saved here until the UTC reset.';
+  if (error.code === 'auth_required') return 'Your session expired. Sign in again before generating this plot.';
+  if (error.code === 'provider_unavailable') return 'The story engine is temporarily unavailable. Your setup is unchanged; try again later.';
+  if (error.code === 'choice_required') return 'This creation attempt no longer matches the server copy. Edit the setup or return home to resume the existing plot.';
+  return error.message;
+}
+
+function readParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0]?.trim() || null;
+  return value?.trim() || null;
+}
+
+function readMood(value: string | string[] | undefined): StoryMood | null {
+  const candidate = readParam(value);
+  return candidate === 'tense' || candidate === 'romantic' || candidate === 'mysterious' || candidate === 'hopeful' ? candidate : null;
 }
 
 function FieldHeader({ step, label, hint }: { step: string; label: string; hint: string }) {
@@ -281,7 +313,7 @@ const styles = StyleSheet.create({
   },
   moodOptionSelected: {
     borderColor: colors.accent,
-    backgroundColor: '#241E16',
+    backgroundColor: colors.surfaceWarm,
   },
   moodPressed: {
     opacity: 0.78,
@@ -312,7 +344,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: '#281719',
+    backgroundColor: colors.surfaceDanger,
   },
   submitErrorTitle: {
     color: colors.danger,

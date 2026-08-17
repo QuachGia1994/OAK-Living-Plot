@@ -1,6 +1,7 @@
 import { BillingCoordinator } from './billing-coordinator';
 import { HttpEntitlementApi } from './http-entitlement-api';
-import { RevenueCatPurchaseGateway, revenueCatPublicKeysFromEnv } from './revenuecat-purchase-gateway';
+import { RevenueCatPurchaseGateway } from './revenuecat-purchase-gateway';
+import { revenueCatPublicKeysFromEnv } from './revenuecat-config';
 
 export function createBillingCoordinator(): BillingCoordinator {
   return new BillingCoordinator(

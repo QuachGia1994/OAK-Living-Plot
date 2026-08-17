@@ -111,7 +111,10 @@ describe('authenticated live story HTTP loop', () => {
     expect(home.status).toBe(200);
     const homeBody = await home.json() as HomeEnvelope;
     expect(homeBody.home.recentPlots[0]).toMatchObject({ id: first.id, episodeNumber: 2, status: 'awaiting_choice' });
+    expect(homeBody.home.recentPlots[0]?.resumeLine).toContain('advances the authenticated live story');
     expect(homeBody.home.quota).toMatchObject({ textLimit: 3, textRemaining: 1, voiceLimit: 1, voiceRemaining: 1 });
+    expect(homeBody.home.retention).toMatchObject({ choicesMade: 1, activePlots: 1 });
+    expect(homeBody.home.retention.dailyPrompt.premise.length).toBeGreaterThan(20);
   });
 
   it('hides another owner story and ignores a forged client user id', async () => {
@@ -265,7 +268,13 @@ interface StoryEnvelope {
 
 interface HomeEnvelope {
   home: {
-    recentPlots: Array<{ id: string; episodeNumber: number; status: string }>;
+    recentPlots: Array<{ id: string; episodeNumber: number; status: string; resumeLine: string }>;
     quota: { textRemaining: number; textLimit: number; voiceRemaining: number; voiceLimit: number };
+    retention: {
+      currentStreakDays: number;
+      choicesMade: number;
+      activePlots: number;
+      dailyPrompt: { label: string; premise: string; mood: string; characterName: string };
+    };
   };
 }

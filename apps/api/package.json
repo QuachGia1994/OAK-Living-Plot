@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "dev:remote": "wrangler dev --remote --env development",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:development": "wrangler d1 migrations apply DB --remote --env development",
     "eval:narrative": "vitest run test/narrative-evals.test.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

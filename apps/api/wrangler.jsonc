@@ -46,5 +46,51 @@
         "max_batch_timeout": 5
       }
     ]
+  },
+  "env": {
+    "development": {
+      "name": "living-plot-api-dev",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "living-plot-dev",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "AUDIO_BUCKET"
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "ANALYTICS",
+          "dataset": "living_plot_events_dev"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TTS_QUEUE",
+            "queue": "living-plot-tts-dev"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "living-plot-tts-dev",
+            "max_batch_size": 5,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "retry_delay": 30,
+            "dead_letter_queue": "living-plot-tts-dlq-dev"
+          },
+          {
+            "queue": "living-plot-tts-dlq-dev",
+            "max_batch_size": 5,
+            "max_batch_timeout": 5
+          }
+        ]
+      }
+    }
   }
 }

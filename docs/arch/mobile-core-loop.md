@@ -1,91 +1,57 @@
 # Phase 1 mobile core loop
 
-> updated 2026-08-16 · 0.0.0
+> updated 2026-08-17 · 0.0.0
 
 ## Responsibility
-Slice 8 makes the product loop concrete in the Expo client without moving backend authority into the device. The mobile app owns presentation and transient selection state only. Canonical plot/choice/quota state remains a backend responsibility.
+The Expo client owns presentation, transient selection/loading state, native audio playback, and navigation. Canonical plot, episode, choice, quota, entitlement, audio lifecycle, and retention history remain backend-owned.
 
 ## Routes
-Expo Router owns three core routes:
-
-- `/` — product home, quota display, recent plots, start/resume actions.
-- `/create` — first-run plot setup with exactly three meaningful decisions: premise, mood, and one main character.
-- `/story?plotId=...` — current episode reader, all three choices, commit confirmation, visible committed consequence, and next-episode action.
-
-The root Stack keeps headers hidden because the product supplies its own compact navigation affordances and story context.
+- `/` presents recent/resumable plots, canonical quota projection, choice momentum, the UTC daily spark, and start/resume actions.
+- `/create` collects only premise, mood, and one main character. Daily-spark route params may prefill these fields, but the user may edit them before generation.
+- `/story?plotId=...` reads the latest canonical episode, selects/commits exactly one of three choices, displays the committed consequence, requests the continuation, and optionally generates/plays private narration.
+- `/plus` presents the Free/Plus quota hypothesis and the configured RevenueCat store mode without treating store state as entitlement authority.
+- `/auth` owns Clerk email-code sign-in-or-up when live public configuration is present.
 
 ## Story client boundary
-UI routes depend on `StoryExperienceClient`, not Gemini, D1, Clerk, or provider payloads. The interface covers:
+UI routes depend on `StoryExperienceClient`. Live mode uses the authenticated HTTP implementation; deterministic preview mode is selected only when Clerk/API public configuration is intentionally absent.
 
-- load home/recent plot state;
-- create a plot;
-- load/resume a plot;
-- commit one choice;
-- request the next episode.
+The live client requests a fresh Clerk bearer token for every protected request and validates DTOs before exposing them to screens. It never writes canonical state locally.
 
-`PreviewStoryExperienceClient` is deterministic local preview data for this UI-only slice. It exists so the complete interaction can be exercised before HTTP orchestration routes are added. Replacing it with an authenticated API client must not require screen rewrites.
+### Retry convergence
+Client-generated request keys survive uncertain network failures:
+- plot creation keeps the same creation key and first-generation key across retry;
+- next-episode generation keeps the same generation key per plot until canonical success or a definite invalid request;
+- stale/choice-conflict responses reload the canonical plot rather than inventing a local winner.
 
-The preview client deliberately mirrors backend semantics where useful:
+This composes with server idempotency so a lost HTTP response does not imply a second Gemini episode.
 
-- every episode has exactly A/B/C choices;
-- a next episode requires a committed choice;
-- retrying the same choice is idempotent;
-- committing a different choice after one is canonical returns a conflict;
-- episode 2 includes the prior committed consequence;
-- resume returns the current unresolved episode unchanged.
+## Episode and consequence UX
+All three choices render together. A tap selects locally; only a successful server commit changes the screen to committed state. The consequence appears before the next-episode action.
 
-It is not canonical persistence and is not presented as production networking.
+Loading/error paths preserve the last canonical session. Auth expiry, quota exhaustion, provider unavailability, ownership failure, and stale/conflicting state remain explicit errors or canonical resync paths.
 
-## First-run friction
-Before episode 1, the user supplies only:
+## Voice UX
+Narration is optional derived media. Text remains readable when audio is absent, queued, processing, failed, or quota-exhausted.
 
-1. premise/situation;
-2. mood;
-3. main character name.
+The story route can:
+1. request an approved voice variant with an idempotent reservation key;
+2. poll the authenticated JSON audio-status route;
+3. when ready, hand Expo Audio a private stream URL plus a fresh Authorization header;
+4. play, pause, seek to start, and show progress.
 
-Premise and character input are NFC-normalized and length-bounded in a pure validation module outside React components. Optional traits, relationships, title editing, and advanced setup are intentionally absent.
+The R2 object key and provider voice ID never reach mobile.
 
-## Episode UX
-The story screen always communicates current plot, episode number, and state:
-
-- `Awaiting your choice` while the episode is unresolved;
-- `Choice committed` after one option is canonical in the client boundary.
-
-All three choices render together in one group. Tapping only selects locally; no transition is treated as committed until the explicit commit action succeeds. After commit, the UI shows the consequence before exposing `Generate episode N+1`.
-
-This separation prevents a transient tap from being visually confused with canonical choice state.
-
-## Waiting and failure states
-Home/resume/create/commit/next actions have explicit loading or retryable error states. A failed next-episode request preserves the committed consequence. A failed create request preserves the user's setup fields. Missing plot links provide a path back home.
-
-No voice loading state is coupled to text because TTS remains a later derived-media slice.
-
-## Quota display
-The home screen shows text/voice remaining values as display-only data through the client boundary and explicitly labels the backend as authoritative. Slice 8 does not reimplement quota enforcement on device.
+## Retention UX
+Home receives retention metadata derived from canonical choice history. It shows a descriptive choice streak, total committed choices, active plot count, per-plot `Previously:` resume lines, and one deterministic UTC daily spark. Streaks have no quota, pricing, or access effect.
 
 ## Visual system
-The first mobile system is intentionally small:
-
-- cinematic dark background;
-- warm accent for decisions/continuity;
-- high-contrast reading typography;
-- reusable `Screen`, `Card`, `Pill`, `ActionButton`, loading, and error primitives;
+The mobile design stays dependency-light and token-driven:
+- cinematic dark surfaces and warm decision accent;
+- high-contrast long-form reading typography;
+- reusable Screen/Card/Pill/ActionButton/loading/error primitives;
+- semantic theme tokens rather than raw values in TSX;
+- short entrance motion through the shared primitive, automatically disabled when the OS Reduce Motion setting is enabled;
 - Safe Area handling at the root and screen level.
 
-No icon package, animation library, image asset pipeline, or design-system dependency was added.
-
 ## Verification
-Mobile behavior tests cover:
-
-- NFC input normalization;
-- minimal setup validation;
-- exactly three A/B/C choices;
-- same-choice idempotency and conflicting-choice rejection;
-- next-episode choice requirement;
-- visible prior consequence in episode 2;
-- unresolved episode resume behavior.
-
-Expo Android static export is part of the STOP gate so file-based routes, aliases, Safe Area imports, React Compiler, and Metro resolution are checked beyond TypeScript alone.
-
-## Deferred
-Clerk mobile auth/session storage, live API orchestration, server plot-create/generate endpoints, TTS playback, RevenueCat/paywall, analytics, remote D1, deployment, native-store builds, and external beta remain outside this slice.
+Mobile tests cover setup validation, preview semantics, authenticated story DTO parsing, fresh bearer tokens, retry-key reuse, canonical resync after conflict, retention parsing, private audio request/status/playback-source authorization, RevenueCat Test Store selection, and backend entitlement refresh behavior. TypeScript, lint, Expo native prebuild/release build, and GitHub CI remain release gates.

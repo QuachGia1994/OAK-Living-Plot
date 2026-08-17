@@ -7,6 +7,7 @@ import type { EpisodePublicationError } from '../publication/contracts';
 import { D1QuotaLedger } from '../quota/d1-quota-ledger';
 import type { QuotaError } from '../quota/contracts';
 import { quotaPolicyFor } from '../quota/policy';
+import { buildRetentionSnapshot } from '../retention/retention';
 import type {
   LiveStoryCommitInput,
   LiveStoryCreateInput,
@@ -44,7 +45,10 @@ export class LiveStoryService {
     const policy = quotaPolicyFor(entitlement.tier);
     const utcDay = utcDayFromMillis(this.clock());
     const usage = await this.quota.getDailyUsage(userId, utcDay);
-    const recentPlots = await this.stories.listOwnedPlots(userId);
+    const [recentPlots, activity] = await Promise.all([
+      this.stories.listOwnedPlots(userId),
+      this.stories.loadRetentionActivity(userId),
+    ]);
     return {
       ok: true,
       value: {
@@ -56,6 +60,7 @@ export class LiveStoryService {
           voiceLimit: policy.voiceEpisodesPerUtcDay,
           resetAt: nextUtcReset(utcDay),
         },
+        retention: buildRetentionSnapshot(activity, recentPlots.length, this.clock()),
       },
     };
   }

@@ -35,6 +35,21 @@ export interface StoryPlotSummary {
   updatedLabel: string;
   episodeNumber: number;
   status: 'awaiting_choice' | 'ready_for_next';
+  resumeLine: string;
+}
+
+export interface DailyStoryPrompt {
+  label: string;
+  premise: string;
+  mood: StoryMood;
+  characterName: string;
+}
+
+export interface RetentionDisplay {
+  currentStreakDays: number;
+  choicesMade: number;
+  activePlots: number;
+  dailyPrompt: DailyStoryPrompt;
 }
 
 export interface StoryPlotSession {
@@ -57,6 +72,7 @@ export interface QuotaDisplay {
 export interface StoryHomeSnapshot {
   recentPlots: StoryPlotSummary[];
   quota: QuotaDisplay;
+  retention: RetentionDisplay;
 }
 
 export interface StoryExperienceClient {

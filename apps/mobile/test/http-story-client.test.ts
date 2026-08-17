@@ -39,6 +39,68 @@ describe('HttpStoryExperienceClient', () => {
     await expect(client.loadHome()).rejects.toMatchObject({ code: 'provider_unavailable' });
   });
 
+  it('reuses the next-episode generation key after a network failure', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    let attempt = 0;
+    const fetcher = vi.fn<TestFetch>(async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      attempt += 1;
+      if (attempt === 1) throw new Error('response lost');
+      return Response.json({ story: storyPayload() });
+    });
+    const client = new HttpStoryExperienceClient('https://api.test', async () => 'token', fetcher);
+
+    await expect(client.requestNextEpisode('plot-1')).rejects.toMatchObject({ code: 'backend_unavailable' });
+    await expect(client.requestNextEpisode('plot-1')).resolves.toMatchObject({ id: 'plot-1' });
+
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].generationKey).toBe(bodies[1].generationKey);
+  });
+
+  it('resyncs canonical story after a choice conflict', async () => {
+    const responses = [
+      Response.json({ error: 'choice_conflict' }, { status: 409 }),
+      Response.json({ story: storyPayload({ status: 'choice_committed', committedChoiceId: 'choice-b' }) }),
+    ];
+    const client = new HttpStoryExperienceClient('https://api.test', async () => 'token', async () => responses.shift()!);
+
+    const story = await client.commitChoice('plot-1', 'episode-1', 'choice-a');
+
+    expect(story.episode.status).toBe('choice_committed');
+    expect(story.episode.committedChoiceId).toBe('choice-b');
+  });
+
+  it('parses retention and relative resume metadata from home', async () => {
+    const now = Date.parse('2026-08-17T01:00:00.000Z');
+    const client = new HttpStoryExperienceClient(
+      'https://api.test',
+      async () => 'token',
+      async () => Response.json({
+        home: {
+          recentPlots: [{
+            id: 'plot-1', title: 'The Message', premise: 'Mina receives an impossible message.', mood: 'mysterious',
+            characterName: 'Mina', updatedAt: now - 3_600_000, episodeNumber: 2, status: 'ready_for_next',
+            resumeLine: 'Mina learned who sent the message.',
+          }],
+          quota: { textRemaining: 2, textLimit: 3, voiceRemaining: 1, voiceLimit: 1, resetAt: '2026-08-18T00:00:00.000Z' },
+          retention: {
+            currentStreakDays: 2,
+            choicesMade: 5,
+            activePlots: 1,
+            dailyPrompt: { label: 'Daily spark', premise: 'A sufficiently specific daily story premise appears here.', mood: 'tense', characterName: 'Mina' },
+          },
+        },
+      }),
+      'en-US',
+      () => now,
+    );
+
+    const home = await client.loadHome();
+
+    expect(home.recentPlots[0]).toMatchObject({ updatedLabel: '1h ago', resumeLine: 'Mina learned who sent the message.' });
+    expect(home.retention).toMatchObject({ currentStreakDays: 2, choicesMade: 5, activePlots: 1 });
+  });
+
   it('rejects malformed server story data instead of creating client canonical state', async () => {
     const client = new HttpStoryExperienceClient(
       'https://api.test',
@@ -54,7 +116,7 @@ describe('HttpStoryExperienceClient', () => {
 
 type TestFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
-function storyPayload() {
+function storyPayload(overrides: { status?: 'awaiting_choice' | 'choice_committed'; committedChoiceId?: string } = {}) {
   return {
     id: 'plot-1',
     title: 'The Message',
@@ -69,7 +131,8 @@ function storyPayload() {
       title: 'First turn',
       body: 'A sufficiently long story body is returned by the real server.',
       summary: 'Mina must choose.',
-      status: 'awaiting_choice',
+      status: overrides.status ?? 'awaiting_choice',
+      ...(overrides.committedChoiceId ? { committedChoiceId: overrides.committedChoiceId, committedConsequence: 'Canonical consequence.' } : {}),
       choices: [
         { id: 'choice-a', key: 'A', label: 'Tell the truth', intent: 'confess', consequence: 'Trust changes.' },
         { id: 'choice-b', key: 'B', label: 'Investigate first', intent: 'investigate', consequence: 'A clue appears.' },

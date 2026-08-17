@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import type { StoryHomeSnapshot, StoryPlotSummary } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
-import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, Pill, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, Card, ErrorState, Eyebrow, LoadingState, MotionReveal, Pill, Screen } from '@/ui/primitives';
 import { colors, radius, spacing } from '@/ui/theme';
 
 export default function HomeScreen() {
@@ -92,6 +92,16 @@ export default function HomeScreen() {
 
       {snapshot ? (
         <>
+          <MotionReveal><RetentionCard snapshot={snapshot} /></MotionReveal>
+          <MotionReveal delay={70}>
+            <DailySparkCard snapshot={snapshot} onStart={() => {
+              const prompt = snapshot.retention.dailyPrompt;
+              router.push({
+                pathname: '/create',
+                params: { premise: prompt.premise, mood: prompt.mood, characterName: prompt.characterName },
+              });
+            }} />
+          </MotionReveal>
           <QuotaCard snapshot={snapshot} />
           <ActionButton label="See Living Plot Plus" variant="secondary" onPress={() => router.push('/plus')} />
           <View style={styles.sectionHeader}>
@@ -103,7 +113,13 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.plotList}>
-            {snapshot.recentPlots.map((plot) => (
+            {snapshot.recentPlots.length === 0 ? (
+              <Card>
+                <Eyebrow>No active plots</Eyebrow>
+                <Text style={styles.emptyTitle}>Your first consequence starts with one decision.</Text>
+                <Text style={styles.plotPremise}>Start a plot or use today’s spark. Nothing is generated until you ask for episode one.</Text>
+              </Card>
+            ) : snapshot.recentPlots.map((plot) => (
               <RecentPlotCard
                 key={plot.id}
                 plot={plot}
@@ -118,6 +134,37 @@ export default function HomeScreen() {
         {auth.configured ? 'Live mode: Clerk session → internal Living Plot user → canonical D1 story state.' : 'Preview mode: add Clerk and API public configuration to switch to canonical server stories.'}
       </Text>
     </Screen>
+  );
+}
+
+function RetentionCard({ snapshot }: { snapshot: StoryHomeSnapshot }) {
+  const { retention } = snapshot;
+  return (
+    <Card style={styles.retentionCard}>
+      <View style={styles.retentionHeader}>
+        <View style={styles.retentionCopy}>
+          <Eyebrow>Your plot momentum</Eyebrow>
+          <Text style={styles.retentionTitle}>{retention.currentStreakDays > 0 ? `${retention.currentStreakDays}-day choice streak` : 'Make one meaningful choice today'}</Text>
+        </View>
+        <Pill tone={retention.currentStreakDays > 0 ? 'success' : 'neutral'}>{retention.choicesMade} choices</Pill>
+      </View>
+      <Text style={styles.retentionBody}>{retention.activePlots} active {retention.activePlots === 1 ? 'plot' : 'plots'}. Streaks come only from committed canonical choices.</Text>
+    </Card>
+  );
+}
+
+function DailySparkCard({ snapshot, onStart }: { snapshot: StoryHomeSnapshot; onStart: () => void }) {
+  const prompt = snapshot.retention.dailyPrompt;
+  return (
+    <Card style={styles.sparkCard}>
+      <View style={styles.sparkHeader}>
+        <Eyebrow>Today’s spark</Eyebrow>
+        <Pill tone="accent">{prompt.mood}</Pill>
+      </View>
+      <Text style={styles.sparkTitle}>{prompt.label}</Text>
+      <Text style={styles.sparkBody}>{prompt.premise}</Text>
+      <ActionButton label="Use this spark" variant="secondary" onPress={onStart} />
+    </Card>
   );
 }
 
@@ -164,9 +211,8 @@ function RecentPlotCard({ plot, onPress }: { plot: StoryPlotSummary; onPress: ()
         <Text style={styles.plotEpisode}>EP {plot.episodeNumber}</Text>
       </View>
       <Text style={styles.plotTitle}>{plot.title}</Text>
-      <Text style={styles.plotPremise} numberOfLines={2}>
-        {plot.premise}
-      </Text>
+      <Text style={styles.plotPremise} numberOfLines={2}>{plot.premise}</Text>
+      <Text style={styles.resumeLine} numberOfLines={2}>Previously: {plot.resumeLine}</Text>
       <View style={styles.plotFooter}>
         <Text style={styles.plotMeta}>{plot.characterName} · {plot.mood}</Text>
         <Text style={styles.plotMeta}>{plot.updatedLabel}</Text>
@@ -194,8 +240,25 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     maxWidth: 560,
   },
+  retentionCard: {
+    backgroundColor: colors.surfaceSuccess,
+    borderColor: colors.borderSuccess,
+  },
+  retentionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  retentionCopy: { flex: 1, gap: spacing.xs },
+  retentionTitle: { color: colors.ink, fontSize: 22, lineHeight: 28, fontWeight: '900' },
+  retentionBody: { color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
+  sparkCard: { backgroundColor: colors.surfaceWarm },
+  sparkHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  sparkTitle: { color: colors.accentStrong, fontSize: 24, lineHeight: 30, fontWeight: '900' },
+  sparkBody: { color: colors.storyInk, fontSize: 15, lineHeight: 23 },
   quotaCard: {
-    backgroundColor: '#121116',
+    backgroundColor: colors.surfaceQuiet,
   },
   quotaHeader: {
     gap: spacing.md,
@@ -287,6 +350,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
+  resumeLine: {
+    color: colors.storyInk,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  emptyTitle: {
+    color: colors.ink,
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: '900',
+  },
   plotFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -298,7 +372,7 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   previewNote: {
-    color: '#777179',
+    color: colors.quietInk,
     fontSize: 11,
     lineHeight: 17,
     textAlign: 'center',

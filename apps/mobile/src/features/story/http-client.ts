@@ -15,29 +15,41 @@ type TokenProvider = () => Promise<string | null>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export class HttpStoryExperienceClient implements StoryExperienceClient {
+  private readonly createGenerationKeys = new Map<string, string>();
+  private readonly nextGenerationKeys = new Map<string, string>();
+
   constructor(
     private readonly apiBaseUrl: string,
     private readonly tokenProvider: TokenProvider,
     private readonly fetcher: FetchLike = fetch,
     private readonly locale = 'en-US',
+    private readonly clock: () => number = Date.now,
   ) {}
 
   async loadHome(): Promise<StoryHomeSnapshot> {
     const payload = await this.request('/v1/story/home', 'GET');
     if (!isRecord(payload) || !isRecord(payload.home)) throw invalidBackendResponse();
-    return parseHome(payload.home);
+    return parseHome(payload.home, this.clock());
   }
 
   async createPlot(draft: PlotDraft, creationKey = createStoryRequestKey('creation')): Promise<StoryPlotSession> {
-    const payload = await this.request('/v1/story/plots', 'POST', {
-      creationKey,
-      generationKey: createStoryRequestKey('generation'),
-      premise: draft.premise.trim(),
-      mood: draft.mood,
-      characterName: draft.characterName.trim(),
-      locale: this.locale,
-    });
-    return parseStoryEnvelope(payload);
+    const generationKey = this.createGenerationKeys.get(creationKey) ?? createStoryRequestKey('generation');
+    this.createGenerationKeys.set(creationKey, generationKey);
+    try {
+      const payload = await this.request('/v1/story/plots', 'POST', {
+        creationKey,
+        generationKey,
+        premise: draft.premise.trim(),
+        mood: draft.mood,
+        characterName: draft.characterName.trim(),
+        locale: this.locale,
+      });
+      this.createGenerationKeys.delete(creationKey);
+      return parseStoryEnvelope(payload);
+    } catch (error) {
+      if (error instanceof StoryClientError && error.code === 'invalid_input') this.createGenerationKeys.delete(creationKey);
+      throw error;
+    }
   }
 
   async loadPlot(plotId: string): Promise<StoryPlotSession> {
@@ -46,15 +58,35 @@ export class HttpStoryExperienceClient implements StoryExperienceClient {
 
   async commitChoice(plotId: string, episodeId: string, choiceId: string): Promise<StoryPlotSession> {
     const path = `/v1/story/plots/${encodeURIComponent(plotId)}/episodes/${encodeURIComponent(episodeId)}/choices/${encodeURIComponent(choiceId)}`;
-    return parseStoryEnvelope(await this.request(path, 'POST'));
+    try {
+      return parseStoryEnvelope(await this.request(path, 'POST'));
+    } catch (error) {
+      if (error instanceof StoryClientError && (error.code === 'choice_conflict' || error.code === 'choice_required')) {
+        return this.loadPlot(plotId);
+      }
+      throw error;
+    }
   }
 
   async requestNextEpisode(plotId: string): Promise<StoryPlotSession> {
-    return parseStoryEnvelope(await this.request(
-      `/v1/story/plots/${encodeURIComponent(plotId)}/episodes`,
-      'POST',
-      { generationKey: createStoryRequestKey('generation') },
-    ));
+    const generationKey = this.nextGenerationKeys.get(plotId) ?? createStoryRequestKey('generation');
+    this.nextGenerationKeys.set(plotId, generationKey);
+    try {
+      const story = parseStoryEnvelope(await this.request(
+        `/v1/story/plots/${encodeURIComponent(plotId)}/episodes`,
+        'POST',
+        { generationKey },
+      ));
+      this.nextGenerationKeys.delete(plotId);
+      return story;
+    } catch (error) {
+      if (error instanceof StoryClientError && error.code === 'choice_required') {
+        this.nextGenerationKeys.delete(plotId);
+        return this.loadPlot(plotId);
+      }
+      if (error instanceof StoryClientError && error.code === 'invalid_input') this.nextGenerationKeys.delete(plotId);
+      throw error;
+    }
   }
 
   private async request(path: string, method: string, body?: unknown): Promise<unknown> {
@@ -148,14 +180,14 @@ function parseChoice(value: unknown): StoryChoice {
   return { id: value.id, key: value.key, label: value.label, intent: value.intent, consequence: value.consequence };
 }
 
-function parseHome(value: Record<string, unknown>): StoryHomeSnapshot {
+function parseHome(value: Record<string, unknown>, nowMs: number): StoryHomeSnapshot {
   if (!Array.isArray(value.recentPlots) || !isRecord(value.quota)) throw invalidBackendResponse();
   const quota = value.quota;
   if (![quota.textRemaining, quota.textLimit, quota.voiceRemaining, quota.voiceLimit].every(Number.isInteger) || typeof quota.resetAt !== 'string') {
     throw invalidBackendResponse();
   }
   return {
-    recentPlots: value.recentPlots.map(parsePlotSummary),
+    recentPlots: value.recentPlots.map((plot) => parsePlotSummary(plot, nowMs)),
     quota: {
       textRemaining: Number(quota.textRemaining),
       textLimit: Number(quota.textLimit),
@@ -163,14 +195,16 @@ function parseHome(value: Record<string, unknown>): StoryHomeSnapshot {
       voiceLimit: Number(quota.voiceLimit),
       resetLabel: resetLabel(quota.resetAt),
     },
+    retention: parseRetention(value.retention),
   };
 }
 
-function parsePlotSummary(value: unknown): StoryPlotSummary {
+function parsePlotSummary(value: unknown, nowMs: number): StoryPlotSummary {
   if (
     !isRecord(value) || typeof value.id !== 'string' || typeof value.title !== 'string' || typeof value.premise !== 'string' ||
     !isMood(value.mood) || typeof value.characterName !== 'string' || !Number.isInteger(value.updatedAt) ||
-    !Number.isInteger(value.episodeNumber) || (value.status !== 'awaiting_choice' && value.status !== 'ready_for_next')
+    !Number.isInteger(value.episodeNumber) || (value.status !== 'awaiting_choice' && value.status !== 'ready_for_next') ||
+    typeof value.resumeLine !== 'string'
   ) throw invalidBackendResponse();
   return {
     id: value.id,
@@ -178,9 +212,33 @@ function parsePlotSummary(value: unknown): StoryPlotSummary {
     premise: value.premise,
     mood: value.mood,
     characterName: value.characterName,
-    updatedLabel: 'Recently',
+    updatedLabel: relativeUpdatedLabel(Number(value.updatedAt), nowMs),
     episodeNumber: Number(value.episodeNumber),
     status: value.status,
+    resumeLine: value.resumeLine,
+  };
+}
+
+function parseRetention(value: unknown): StoryHomeSnapshot['retention'] {
+  if (
+    !isRecord(value) || !Number.isInteger(value.currentStreakDays) || !Number.isInteger(value.choicesMade) ||
+    !Number.isInteger(value.activePlots) || !isRecord(value.dailyPrompt)
+  ) throw invalidBackendResponse();
+  const prompt = value.dailyPrompt;
+  if (
+    typeof prompt.label !== 'string' || typeof prompt.premise !== 'string' ||
+    !isMood(prompt.mood) || typeof prompt.characterName !== 'string'
+  ) throw invalidBackendResponse();
+  return {
+    currentStreakDays: Number(value.currentStreakDays),
+    choicesMade: Number(value.choicesMade),
+    activePlots: Number(value.activePlots),
+    dailyPrompt: {
+      label: prompt.label,
+      premise: prompt.premise,
+      mood: prompt.mood,
+      characterName: prompt.characterName,
+    },
   };
 }
 
@@ -198,6 +256,16 @@ function mapHttpError(status: number, payload: unknown): StoryClientError {
 
 function resetLabel(resetAt: string): string {
   return Number.isFinite(Date.parse(resetAt)) ? 'Resets at 00:00 UTC' : 'UTC daily reset';
+}
+
+function relativeUpdatedLabel(updatedAt: number, nowMs: number): string {
+  const deltaMinutes = Math.max(0, Math.floor((nowMs - updatedAt) / 60_000));
+  if (deltaMinutes < 2) return 'Just now';
+  if (deltaMinutes < 60) return `${deltaMinutes}m ago`;
+  const hours = Math.floor(deltaMinutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'Yesterday' : `${Math.min(days, 99)}d ago`;
 }
 
 function invalidBackendResponse(): StoryClientError {

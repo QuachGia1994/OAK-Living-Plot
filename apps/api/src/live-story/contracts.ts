@@ -42,6 +42,21 @@ export interface LiveStoryPlotSummary {
   updatedAt: number;
   episodeNumber: number;
   status: 'awaiting_choice' | 'ready_for_next';
+  resumeLine: string;
+}
+
+export interface LiveStoryDailyPrompt {
+  label: string;
+  premise: string;
+  mood: LiveStoryMood;
+  characterName: string;
+}
+
+export interface LiveStoryRetention {
+  currentStreakDays: number;
+  choicesMade: number;
+  activePlots: number;
+  dailyPrompt: LiveStoryDailyPrompt;
 }
 
 export interface LiveStoryQuotaDisplay {
@@ -55,6 +70,7 @@ export interface LiveStoryQuotaDisplay {
 export interface LiveStoryHome {
   recentPlots: LiveStoryPlotSummary[];
   quota: LiveStoryQuotaDisplay;
+  retention: LiveStoryRetention;
 }
 
 export interface LiveStoryCreateInput {

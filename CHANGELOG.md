@@ -31,6 +31,15 @@ All notable changes to Living Plot will be documented in this file.
 - Clerk Expo 4 mobile identity with SecureStore-backed token cache and privacy-preserving email-code sign-in-or-up flow.
 - Protected live-story HTTP core loop for home/create/resume/generate/commit using internal ownership, server-derived state versions, backend quota, and existing Gemini/publication/choice boundaries.
 - Idempotent live plot creation metadata (`creation_key`, locale, initial mood) plus mobile HTTP story client and shared `/v1/me` internal identity for RevenueCat.
+- Non-production live-development readiness checks and isolated Cloudflare development binding contract without production provisioning.
+- Retry-safe mobile story generation keys and canonical resync after stale/conflicting choice state.
+- Authenticated Expo private-audio generation, status polling, playback, pause, replay, and progress over the existing R2/TTS boundary.
+- RevenueCat Test Store public-key selection for native purchase-flow validation while D1 remains entitlement authority.
+- Reduced-motion-aware mobile entrance motion, semantic visual tokens, richer empty/error/store/audio states, and removal of raw TSX color values.
+- Choice-history retention metadata with UTC streaks, per-plot resume context, and deterministic daily story sparks that prefill the existing create flow.
+
+### Changed
+- Pinned project orchestration and default implementation to GPT-5.6 Sol; GPT-5.6 Luna is used only when the user explicitly requests a worker handoff.
 
 ### Fixed
 - Unified ESLint 9 across workspaces and loaded Cloudflare Vitest test types so clean-install quality gates pass.

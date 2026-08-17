@@ -1,6 +1,7 @@
 # Living Plot project guidance
 
 Use the shared Aki rule router at `~/.claude/skills/akirule/SKILL.md` before work that matches its signals.
+Follow `AGENTS.md` for project-scoped agent orchestration and stage handoff.
 
 ## Product boundary
 - Phase 1 targets iOS and Android through Expo/React Native.

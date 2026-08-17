@@ -13,7 +13,9 @@
 - [Phase 1 RevenueCat entitlements](arch/revenuecat-entitlements.md) — verified webhook/provider sync, D1 Free/Plus authority, and mobile paywall/restore trust boundary.
 - [Phase 1 analytics and AI cost telemetry](arch/analytics-cost.md) — privacy-safe Analytics Engine schema, fail-open semantics, retry-aware Gemini token usage, and exact nano-USD rate-card arithmetic.
 - [Phase 1 narrative quality evaluations](arch/narrative-evals.md) — deterministic continuity/branch/consequence/repetition fixtures and adversarial regression thresholds.
-- [Phase 1 mobile auth and live story](arch/mobile-auth-live-story.md) — Clerk email OTP, internal identity, protected core-loop HTTP routes, idempotent creation, and shared billing trust chain.
+- [Phase 1 mobile auth and live story](arch/mobile-auth-live-story.md) — Clerk email OTP, internal identity, protected core-loop HTTP routes, retry convergence, and shared billing trust chain.
+- [Phase 1 retention loop](arch/retention.md) — canonical choice-history streaks, resume context, deterministic UTC daily sparks, and anti-dark-pattern guardrails.
+- [Live development setup](ref/live-development.md) — secret-safe readiness checks, non-production Cloudflare environment, and mobile/provider configuration.
 - [Foundation implementation slice 1](plan/done/foundation-slice1.md) — completed workspace/CI foundation and verification evidence.
 - [D1 implementation slice 2](plan/done/d1-slice2.md) — completed D1/domain baseline and verification evidence.
 - [Authentication implementation slice 3](plan/done/auth-slice3.md) — completed auth/ownership boundary and verification evidence.
@@ -27,3 +29,9 @@
 - [Analytics/cost telemetry implementation slice 11](plan/done/analytics-cost-slice11.md) — completed observational Analytics Engine telemetry and exact revisioned Gemini cost-accounting evidence.
 - [Narrative/evals implementation slice 12](plan/done/narrative-evals-slice12.md) — completed Gemini 3.5 Flash-Lite migration plus deterministic narrative-quality regression evidence.
 - [Authenticated live-story integration slice 13](plan/done/live-story-integration-slice13.md) — completed Clerk Expo identity, protected live-story core loop, internal-user billing identity, and local integration evidence.
+- [Live development readiness slice 15](plan/done/live-development-slice15.md) — completed secret-safe dev configuration/readiness work with external provider/resource gates recorded as blocked.
+- [Live story resilience slice 16](plan/done/story-resilience-slice16.md) — completed retry-key convergence and canonical conflict resync behavior.
+- [Voice playback slice 17](plan/done/voice-playback-slice17.md) — completed authenticated mobile private-audio status/playback integration.
+- [RevenueCat Test Store slice 18](plan/done/revenuecat-test-store-slice18.md) — completed Test Store selection boundary while preserving backend entitlement authority.
+- [Production UI pass slice 19](plan/done/production-ui-slice19.md) — completed semantic-token, reduced-motion, empty/error, audio, and store-status presentation pass.
+- [Retention loop slice 20](plan/done/retention-slice20.md) — completed canonical-history streak, resume line, and UTC daily-spark retention loop.

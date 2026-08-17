@@ -1,6 +1,6 @@
 # Phase 1 mobile auth and live-story integration
 
-> updated 2026-08-16 · 0.0.0
+> updated 2026-08-17 · 0.0.0
 
 ## Identity trust chain
 The mobile client never chooses its canonical owner ID.
@@ -32,13 +32,13 @@ No Clerk secret key is present in the mobile workspace.
 ## Live story HTTP contract
 All routes below are protected by the existing Clerk session verifier and internal-user resolver.
 
-- `GET /v1/story/home` — recent owned plots plus backend quota projection.
+- `GET /v1/story/home` — recent owned plots, backend quota projection, and retention metadata derived from canonical choice history.
 - `POST /v1/story/plots` — idempotent plot creation and first episode generation.
 - `GET /v1/story/plots/:plotId` — latest canonical episode for one owned plot.
 - `POST /v1/story/plots/:plotId/episodes` — generate/publish the next episode after a committed choice.
 - `POST /v1/story/plots/:plotId/episodes/:episodeId/choices/:choiceId` — commit exactly one server-owned choice.
 
-The create request carries a client-generated `creationKey` and a generation key, but never an owner ID. `creationKey` is unique per internal user and lets a lost mobile response converge on the same plot rather than create a duplicate. Episode generation uses the existing server quota ledger, Gemini provider boundary, D1 episode publisher, and publication idempotency. Choice commit derives its expected state version from D1 rather than accepting a client version.
+The create request carries a client-generated `creationKey` and a generation key, but never an owner ID. `creationKey` is unique per internal user and lets a lost mobile response converge on the same plot rather than create a duplicate. The mobile client retains both creation and generation keys across uncertain network failures. Next-episode requests similarly retain one generation key per plot until canonical success or a definite invalid request. Episode generation uses the existing server quota ledger, Gemini provider boundary, D1 episode publisher, and publication idempotency. Choice commit derives its expected state version from D1 rather than accepting a client version; stale/conflicting mobile responses reload canonical server state.
 
 ## Plot integration metadata
 Migration `0007_live_story_integration.sql` adds:
@@ -57,5 +57,5 @@ Provider failure, quota exhaustion, auth expiry, stale state, and ownership fail
 ## Billing identity reuse
 After Clerk sign-in, mobile resolves `/v1/me` once to obtain the internal Living Plot user ID. RevenueCat configuration uses that internal ID as App User ID. Backend entitlement refresh still obtains a current Clerk bearer token at request time rather than retaining one session JWT indefinitely.
 
-## Deferred real integration
-This slice does not provision a Clerk production instance, deploy the Worker/D1/Queue/R2/Analytics Engine resources, perform a real email delivery, run RevenueCat/App Store/Google Play sandbox purchases, or submit either store build. Those remain environment/device integration work rather than source-architecture work.
+## External environment gate
+Source now includes an isolated Cloudflare `development` environment contract and a secret-safe readiness checker, but this does not prove external resources exist. Real Clerk email delivery, remote Worker/D1/R2/Queue/Analytics provisioning, live Gemini/TTS requests, RevenueCat provider convergence, and store submission remain unverified until the required development credentials/resources are supplied.

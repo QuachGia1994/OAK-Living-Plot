@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { EpisodeVoiceCard } from '@/features/audio/episode-voice-card';
 import type { StoryChoice, StoryPlotSession } from '@/features/story/contracts';
 import { StoryClientError } from '@/features/story/contracts';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
@@ -163,6 +164,8 @@ export default function StoryScreen() {
         <Text style={styles.episodeTitle}>{episode.title}</Text>
         <Text style={styles.episodeBody}>{episode.body}</Text>
       </View>
+
+      <EpisodeVoiceCard key={episode.id} episodeId={episode.id} />
 
       {error ? (
         <ErrorState
@@ -331,7 +334,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.9,
   },
   episodeBody: {
-    color: '#DED8CE',
+    color: colors.storyInk,
     fontSize: 18,
     lineHeight: 31,
   },
@@ -371,7 +374,7 @@ const styles = StyleSheet.create({
   },
   choiceCardSelected: {
     borderColor: colors.accent,
-    backgroundColor: '#221C14',
+    backgroundColor: colors.surfaceWarmDeep,
   },
   choicePressed: {
     opacity: 0.78,
@@ -414,7 +417,7 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   commitCard: {
-    backgroundColor: '#111114',
+    backgroundColor: colors.overlay,
   },
   commitLabel: {
     color: colors.inkMuted,
@@ -442,8 +445,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   consequenceCard: {
-    borderColor: '#35513F',
-    backgroundColor: '#101A14',
+    borderColor: colors.borderSuccess,
+    backgroundColor: colors.surfaceSuccess,
   },
   consequenceTitle: {
     color: colors.success,

@@ -3,13 +3,9 @@ import Purchases from 'react-native-purchases';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 import type { PaywallActionResult, PurchaseGateway } from './contracts';
 import { BillingClientError } from './contracts';
+import { resolveRevenueCatConfig, type RevenueCatPublicKeys } from './revenuecat-config';
 
 const PLUS_ENTITLEMENT_ID = 'plus';
-
-export interface RevenueCatPublicKeys {
-  ios: string;
-  android: string;
-}
 
 export class RevenueCatPurchaseGateway implements PurchaseGateway {
   private configuredAppUserId: string | null = null;
@@ -21,9 +17,11 @@ export class RevenueCatPurchaseGateway implements PurchaseGateway {
     if (!normalized) throw new BillingClientError('invalid_session', 'RevenueCat App User ID is required.');
     if (this.configuredAppUserId === normalized && await Purchases.isConfigured()) return;
 
-    const apiKey = Platform.select({ ios: this.keys.ios, android: this.keys.android });
-    if (!apiKey?.trim()) {
-      throw new BillingClientError('billing_not_configured', 'RevenueCat public SDK key is not configured for this platform.');
+    const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : null;
+    if (!platform) throw new BillingClientError('billing_not_configured', 'RevenueCat purchases require an iOS or Android development build.');
+    const config = resolveRevenueCatConfig(platform, this.keys);
+    if (!config.apiKey) {
+      throw new BillingClientError('billing_not_configured', 'RevenueCat Test Store or platform SDK key is not configured.');
     }
 
     try {
@@ -31,7 +29,7 @@ export class RevenueCatPurchaseGateway implements PurchaseGateway {
         const current = await Purchases.getAppUserID();
         if (current !== normalized) await Purchases.logIn(normalized);
       } else {
-        Purchases.configure({ apiKey, appUserID: normalized });
+        Purchases.configure({ apiKey: config.apiKey, appUserID: normalized });
       }
       this.configuredAppUserId = normalized;
     } catch {
@@ -69,11 +67,4 @@ export class RevenueCatPurchaseGateway implements PurchaseGateway {
       throw new BillingClientError('billing_not_configured', 'RevenueCat is not configured for a signed-in user.');
     }
   }
-}
-
-export function revenueCatPublicKeysFromEnv(): RevenueCatPublicKeys {
-  return {
-    ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? '',
-    android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ?? '',
-  };
 }
