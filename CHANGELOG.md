@@ -68,6 +68,7 @@ All notable changes to Living Plot will be documented in this file.
 - Narrative prompt guidance now keeps the canonical protagonist visible, requires durable scene progress, and keeps narrative/branch output in the requested locale.
 
 ### Fixed
+- Added bounded CocoaPods retry/backoff to unsigned iOS RC builds so transient CDN/GitHub `429 Too Many Requests` responses do not fail a release candidate immediately.
 - Reworked the remote retention summary from a compound `UNION ALL` file execution that failed on D1 into a single aggregate row executed through a Node/Wrangler command runner, so development activation/D1/D7/depth metrics are visible.
 - Unified ESLint 9 across workspaces and loaded Cloudflare Vitest test types so clean-install quality gates pass.
 - Prevented publishing a new episode while a previous episode is still ready and awaiting a committed choice.

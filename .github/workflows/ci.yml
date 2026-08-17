@@ -104,8 +104,19 @@ jobs:
         working-directory: apps/mobile
 
       - name: Install CocoaPods
-        run: pod install
         working-directory: apps/mobile/ios
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4; do
+            echo "CocoaPods install attempt ${attempt}/4"
+            if pod install; then
+              exit 0
+            fi
+            if [ "$attempt" = "4" ]; then
+              exit 1
+            fi
+            sleep 45
+          done
 
       - name: Build unsigned Release app
         run: |
