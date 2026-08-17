@@ -103,6 +103,13 @@ jobs:
         run: npx expo prebuild --platform ios --clean --no-install
         working-directory: apps/mobile
 
+      - name: Pin RevenueCat iOS sources locally
+        working-directory: apps/mobile
+        run: |
+          git clone --depth 1 --branch 18.30.0 https://github.com/RevenueCat/purchases-hybrid-common.git ios/vendor/purchases-hybrid-common
+          git clone --depth 1 --branch 5.83.1 https://github.com/RevenueCat/purchases-ios.git ios/vendor/purchases-ios
+          node ../../scripts/patch-ios-revenuecat-local-pods.mjs ios/Podfile
+
       - name: Install CocoaPods
         working-directory: apps/mobile/ios
         run: |
