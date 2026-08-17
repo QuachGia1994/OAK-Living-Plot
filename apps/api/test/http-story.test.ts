@@ -7,6 +7,7 @@ import migrationFour from '../migrations/0004_quota_ledger.sql?raw';
 import migrationFive from '../migrations/0005_tts_audio.sql?raw';
 import migrationSix from '../migrations/0006_revenuecat_entitlements.sql?raw';
 import migrationSeven from '../migrations/0007_live_story_integration.sql?raw';
+import migrationEight from '../migrations/0008_user_preferences.sql?raw';
 import type { EpisodeGenerationInput, EpisodeProposal, StoryGenerator } from '../src/ai/contracts';
 import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
@@ -32,7 +33,7 @@ const testEnv: AppEnv = {
 const nowMs = Date.parse('2026-08-16T12:00:00.000Z');
 
 beforeAll(async () => {
-  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven]) {
+  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven, migrationEight]) {
     await applySqlMigration(db, migration);
   }
 });

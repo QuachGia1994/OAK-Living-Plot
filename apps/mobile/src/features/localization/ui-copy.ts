@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { useUserPreferences } from '@/features/preferences/preferences-context';
-import type { UiLocale } from '@/features/preferences/contracts';
+import { useUserPreferences } from '../preferences/preferences-context';
+import type { UiLocale } from '../preferences/contracts';
 
 export interface LocalizedCopy {
   en: string;
