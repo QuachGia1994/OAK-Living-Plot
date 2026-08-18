@@ -1,41 +1,50 @@
 # Phase 1 preferences, sharing, and account-data boundary
 
-> updated 2026-08-17 · 0.0.0
+> updated 2026-08-18 · current application contract
 
-## User preferences
-Migration `0008_user_preferences.sql` adds one owner-scoped preference row per internal user. The row stores only bounded application defaults:
+## Preferences SSoT
 
-- interface-language preference: `en` or `vi`;
-- default locale for newly created stories: `en-US` or `vi-VN`;
-- approved narrator variant: `en-narrator-female` or `vi-narrator-female`.
+`UserPreferences` is the application owner of:
+- `uiLocale: en | vi`;
+- `dramaLocale: en-US | vi-VN` for newly created dramas;
+- approved narrator variant.
 
-`GET /v1/preferences` returns defaults when a row does not exist. `POST /v1/preferences` validates every value and derives ownership from the authenticated internal user; client-supplied identity is ignored. Preferences do not rewrite existing plots. A plot's persisted `plots.locale` remains canonical for that story.
+`GET/POST /v1/preferences` are authenticated and owner-scoped. The existing D1 column remains named `story_locale` for migration compatibility; `D1UserPreferencesRepository` validates and maps it to application `dramaLocale`. Mobile does not use the physical column name.
 
-The saved interface-language preference now drives the native product shell and core-loop copy in English or Vietnamese, including auth, home/onboarding, create, story controls, history, library, Plus, Settings/Data, validation, and narration controls. Generated episode text remains in the plot's own persisted story locale; switching interface language never rewrites canonical plot content. Daily-spark copy is returned in the saved interface locale, while the new-story locale and narrator remain separate preferences.
+Changing UI language does not rewrite existing drama content. A drama keeps the locale captured on creation. Preview SecureStore accepts legacy `storyLocale` only as a one-way compatibility read, then exposes `dramaLocale`.
 
-## Spoiler-safe native share
-Sharing is a client-only native Share action. Copy is deterministically built from the plot title, current episode number, and a bounded premise hook plus a generic Living Plot call-to-action.
+When VI is selected, user-facing UI copy follows VI keys. Provider/model proper nouns may remain unchanged.
 
-Share copy does not contain internal IDs, auth identity, bearer tokens, full episode scripts, selected-choice consequences, provider metadata, or private audio information. No public story endpoint, public deep link, or generated video is introduced.
+## Spoiler-safe share
 
-## Owner data export
-`GET /v1/account/export` returns a versioned read-only snapshot for the authenticated internal user. The export includes application-owned preferences, effective entitlement summary, UTC usage counters, plots, characters, validated episode scripts/summaries, choices/commit markers, and client-safe audio metadata.
+Sharing is a client-only native Share action built from a bounded drama title, current scene number, premise hook, and generic Living Plot copy. The share builder follows `uiLocale` and uses Scene/Cảnh terminology.
 
-The export excludes Clerk subjects/tokens, provider credentials, RevenueCat raw webhook bodies or secrets, Analytics Engine rows, quota reservation keys, provider voice IDs, private R2 object keys, and audio bytes. The mobile client exposes the JSON snapshot only through a user-initiated native Share sheet.
+It excludes IDs, bearer tokens, full scene scripts, committed consequences, provider metadata, and private media information. There is no public drama endpoint or public deep-link backend in Phase 1.
+
+## Owner data export v2
+
+`GET /v1/account/export` returns `schemaVersion: 2` with application vocabulary:
+- preferences and effective entitlement;
+- UTC usage as generated/voiced scenes;
+- `dramas[]` with characters and `scenes[]`;
+- client-safe voice media metadata.
+
+The export excludes Clerk subjects/tokens, provider credentials, RevenueCat secrets/raw webhook bodies, Analytics Engine rows, reservation keys, provider voice IDs, private R2 object keys, and audio bytes.
+
+D1 queries may still read `plots/episodes/story_locale`; those names are normalized before the export crosses the HTTP boundary.
 
 ## Application-data erasure
-`POST /v1/account/delete` requires the exact phrase `DELETE MY LIVING PLOT DATA`. It is a mutation and therefore receives no automatic network retry from the shared transport.
 
-Deletion order is fail-closed:
+`POST /v1/account/delete` requires the exact phrase `DELETE MY LIVING PLOT DATA`. Mutation requests are never automatically retried.
 
-1. resolve owned private audio object keys server-side;
+Deletion is fail-closed:
+1. resolve owner-scoped private voice object keys;
 2. delete those R2 objects;
-3. only if all private-audio cleanup succeeds, delete the internal D1 user;
-4. rely on D1 foreign-key cascades for plots, episodes, choices, preferences, usage/quota rows, RevenueCat audit/materialized entitlement rows, and audio metadata.
+3. only after private-object cleanup succeeds, delete the internal D1 user;
+4. D1 foreign-key cascades remove application-owned drama/media/preference/quota/billing rows.
 
-If R2 cleanup fails, D1 is retained so the operation can be safely retried. This boundary deletes Living Plot application data only. It does not claim to delete or cancel the separate Clerk identity or RevenueCat/store account.
+This deletes Living Plot application data, not the separate Clerk identity or store/RevenueCat account.
 
-## Release-candidate diagnostics
-The Settings surface displays only safe runtime facts: app version, preview/live mode, API configured state, Clerk configured/signed-in state, RevenueCat mode, and a bounded `/health` result. The health check aborts after five seconds.
+## Safe diagnostics
 
-The diagnostics share payload contains only those status values. It excludes API URLs, user IDs, tokens, story text, provider responses, and secret values.
+Settings exposes only bounded runtime/configuration/health facts. Diagnostics never include API URLs, internal user IDs, tokens, drama text, provider payloads, or secret values.

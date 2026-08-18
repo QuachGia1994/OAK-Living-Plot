@@ -1,38 +1,39 @@
 # Phase 1 retention loop
 
-> updated 2026-08-17 · 0.0.0
+> updated 2026-08-18 · current application contract
 
-## Purpose
-Retention stays subordinate to the product value test: users should return because they want to see consequences, not because the app manufactures pressure.
+Retention remains subordinate to the product value test: users return to see branch consequences, not because the app manufactures pressure.
 
 ## Canonical sources
-No retention-only database state is introduced.
 
-- active plot count comes from owned active plots that already have episodes;
-- total choices and daily activity come from append-only `choice_commits` joined through owned plots;
-- current streak is derived from UTC commit days and remains alive when the latest committed choice is today or yesterday;
-- recent-story `resumeLine` is derived from the current episode summary or the committed consequence.
+No retention-only mutable story state exists.
+- `activeDramas` is derived from owner-scoped active dramas with persisted scenes.
+- total choices/daily activity derive from append-only `choice_commits` joined through owned persisted drama rows.
+- streak is derived from UTC commit days.
+- each `DramaSummary.resumeLine` derives from the current scene summary or canonical committed consequence.
 
-This keeps D1 story history as the single source of truth and makes streaks rebuildable rather than mutable counters.
+The underlying D1 tables still use `plots/episodes`; `D1DramaRepository` normalizes them to application Drama/Scene terminology.
 
 ## Daily spark
-`GET /v1/story/home` includes one deterministic UTC daily story prompt. The prompt contains a label, premise, mood, and character name. It is selected from a bounded in-code Phase 1 prompt set by UTC day, so all users see a stable prompt during that UTC day without additional persistence.
 
-The mobile home surface can pass the prompt directly into `/create`, where it prefills the existing three-field setup. The user can still edit every field before generation.
+`GET /v1/dramas/home` includes one deterministic UTC daily drama prompt with label, premise, mood, and lead name. The prompt set is bounded in code and localized using the saved `uiLocale`; the user's `dramaLocale` remains the generation-language default for newly created dramas.
 
-## Home retention surface
+The mobile Home surface passes the prompt into `/create` as editable setup data. Generation remains an explicit user action.
+
+## Home contract
+
 The authenticated home payload returns:
-
+- `recentDramas`;
 - `currentStreakDays`;
 - `choicesMade`;
-- `activePlots`;
+- `activeDramas`;
 - `dailyPrompt`;
-- per-plot `resumeLine`.
+- per-drama `resumeLine`.
 
-Preview mode mirrors the same DTO with deterministic sample data so UI work does not fork the screen contract.
+Preview mode implements the same application contract rather than a separate screen model.
 
-## Trust and behavior floor
-Streaks are descriptive only. They do not change quota, entitlement, story outcomes, pricing, or access. Phase 1 sends no streak-loss notifications and adds no confirm-shaming, forced continuity, countdown pressure, or reward currency.
+## Trust floor
 
-## Verification
-Pure retention tests cover consecutive UTC days, yesterday continuity, gap reset, total choice aggregation, and stable daily prompt selection. Live-story HTTP tests verify retention is emitted from canonical owned history.
+Streaks do not change quota, entitlement, branch outcomes, pricing, or access. Phase 1 sends no streak-loss notifications and introduces no confirm-shaming, forced continuity, countdown pressure, or reward currency.
+
+Retention tests cover UTC streak derivation and stable localized prompt selection. `http-drama.test.ts` proves the HTTP home projection is derived from canonical owned state.

@@ -1,89 +1,51 @@
-# Phase 1 choice-commit boundary
+# Phase 1 branch / choice-commit boundary
 
-> updated 2026-08-16 · 0.0.0
+> updated 2026-08-18 · current application contract
 
 ## Responsibility
-Slice 6 converts one offered episode choice into canonical long-term plot memory. The committer does not call Gemini, charge quota, synthesize audio, or publish the next episode.
 
-A successful choice commit performs three canonical mutations atomically:
+A user may select a provisional choice in the player, but only the server can commit a canonical branch. `DramaService` maps product `dramaId/sceneId` into the existing D1 choice-commit adapter; `D1ChoiceCommitter` performs the atomic storage mutation.
 
-1. append one durable `choice_commits` history row;
-2. mark the ready episode `completed`;
-3. replace `plots.state_json` with the new canonical v2 state and advance `plots.version` once.
+A successful commit:
+1. appends one durable `choice_commits` row;
+2. marks the persisted D1 scene row (`episodes`) completed;
+3. applies the selected choice delta to `DramaState` in `plots.state_json`;
+4. advances the persisted state version once;
+5. is re-projected as `Branch { state: 'committed', choiceId, consequence }` by `D1DramaRepository`.
 
-## Canonical state v2
-The original Slice 2 materialized state used a legacy v1 shape with a single relationship score and unkeyed fact/thread strings. That representation cannot safely apply Slice 4 choice deltas, which reference three relationship dimensions and keyed facts/threads.
+The UI never sets a canonical branch from local selection.
 
-Runtime canonical state is now v2:
+## DramaState
 
-```json
-{
-  "schemaVersion": 2,
-  "relationships": [
-    {
-      "fromKey": "hero",
-      "toKey": "linh",
-      "affinity": 40,
-      "trust": 35,
-      "tension": 45,
-      "status": "strained"
-    }
-  ],
-  "facts": [{ "key": "fact-hidden-message", "text": "An hid a message from Linh." }],
-  "openThreads": [{ "key": "thread-trust", "title": "Linh questions An’s honesty.", "urgency": 80 }],
-  "tone": "tense"
-}
-```
+`apps/api/src/domain/drama-state.ts` owns relationship/fact/thread/tone memory. Current state is schema v2 and uses keyed facts/threads plus affinity/trust/tension relationship dimensions. Legacy persisted state can be upgraded when parsed; new state is serialized in the current shape.
 
-`parseStructuredPlotState()` still accepts legacy v1. It upgrades legacy relationship scores to a preserved `legacy -> key` relationship, assigns deterministic `legacy-fact-N` and `legacy-thread-N` keys, and keeps all legacy text. New committed state is always serialized as v2.
+The choice application order is deterministic:
+1. apply scene-level fact/thread changes from the validated `SceneProposal`;
+2. apply the selected relationship deltas;
+3. resolve/add selected facts and threads;
+4. set next tone;
+5. reject duplicate keys or scores outside canonical bounds.
 
-## State application order
-For the selected choice, the server applies state in this order:
+Unknown references or malformed persisted data return an explicit failure and write no canonical branch.
 
-1. resolve episode-level thread keys;
-2. add episode-level opened threads and established facts using deterministic episode-scoped keys;
-3. apply selected relationship deltas;
-4. resolve selected fact keys and add selected facts with deterministic choice-scoped keys;
-5. resolve selected thread keys and add selected threads with deterministic choice-scoped keys;
-6. set the selected next tone;
-7. validate duplicate keys and relationship score bounds.
+## Idempotency and concurrency
 
-Unknown resolution keys, malformed stored data, or relationship values outside canonical bounds return `invalid_state` and write nothing.
+The D1 schema allows one commit per persisted scene row. The committer first checks owner-scoped existing state:
+- replaying the same choice converges on the original commit;
+- a different second choice returns `choice_conflict` with the canonical committed choice ID.
 
-## Idempotency
-`choice_commits` already enforces one commit per episode. The server first reads the owner-scoped existing commit before checking state version.
+New commits are guarded by both the drama state version and the state version captured when the scene was published. The insert/update batch is conditioned on owner, drama, scene, choice membership, active lifecycle, ready scene, and expected version.
 
-- retry of the same `choiceId`: returns the original commit with `replayed: true`;
-- retry with another `choiceId`: returns `already_committed` and the canonical committed choice ID.
+This prevents two conflicting choices from both advancing drama state. The mobile HTTP client resynchronizes the canonical drama after a conflict rather than trusting its provisional selection.
 
-This means a network retry after a successful commit remains idempotent even though the caller's old expected state version is now stale.
+## Publication sequencing
 
-## Optimistic concurrency
-A new commit requires both:
+A new scene cannot publish while the previous persisted scene is still awaiting a choice. `D1EpisodePublisher` retains its storage-oriented name because it writes the existing D1 `episodes` table, but its input is a provider-neutral `SceneProposal`.
 
-- `plots.version == expectedStateVersion`;
-- `episodes.state_version_after_publish == expectedStateVersion`.
+## Verification
 
-The append statement is an `INSERT ... SELECT` guarded by owner, plot, episode, selected choice membership, active plot, ready episode, and exact state version.
-
-The episode-completion and plot-state updates are conditioned on the newly generated commit ID existing. Therefore, if the guarded insert produces no row, later statements in the same batch are no-ops. After the batch, the server re-reads canonical commit/state and classifies the race as replay, `already_committed`, `stale_state`, or persistence failure.
-
-Concurrent different choices therefore cannot both mutate plot state. Concurrent retries of the same choice converge on one commit.
-
-## Publication sequencing fix
-Slice 6 also closes a cross-slice invariant discovered while wiring commits: Slice 5 publication now refuses a different generation key while any episode on the plot is still `ready`.
-
-A blocked second publication returns `pending_episode` with the canonical ready episode ID. The transactional publication guard also checks that no ready episode exists. This prevents advancing `plots.version` past an uncommitted choice and making that choice permanently stale.
-
-## Migration 0003
-`0003_choice_commit.sql` adds immutable commit provenance:
-
-- committed choice key, intent, and consequence;
-- state version before/after commit;
-- `state_json_after`, the canonical materialized state snapshot after the commit;
-- an episode/choice lookup index.
-
-The original append-only `choice_commits` row remains the durable decision history.
-
-## Deferred
-Quota accounting, entitlement enforcement, TTS, RevenueCat, remote D1 provisioning, deployment, notifications, and mobile story UI remain outside this slice.
+- `test/http-drama.test.ts` — canonical commit, conflicting second choice, idempotent replay, next scene uses committed consequence.
+- `test/choice-commit.test.ts` — D1 transaction/version/idempotency behavior.
+- `test/choice-state.test.ts` — deterministic `DramaState` application.
+- mobile `test/http-drama-client.test.ts` — conflict resync.
+- mobile `test/drama-domain.test.ts` — provisional selection/commit/consequence playback phases.

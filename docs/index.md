@@ -1,23 +1,24 @@
 # Living Plot docs
 
 - [Product baseline](biz/product.md) — audience, value proposition, monetization guardrails, and Phase 1 exclusions.
-- [Phase 1 foundation architecture](arch/foundation.md) — current workspace/runtime boundaries and deferred infrastructure.
-- [Phase 1 D1 data model](arch/data-model.md) — canonical story state, schema invariants, and local migration workflow.
+- [Canonical drama runtime ownership](arch/drama-runtime.md) — current end-to-end owner map for Drama/Scene/Branch/generation/media/playback/locale/failure state. Start here for implementation work.
+- [Phase 1 foundation architecture](arch/foundation.md) — workspace/runtime boundaries and deferred infrastructure.
+- [Phase 1 D1 data model](arch/data-model.md) — persistence schema invariants and local migration workflow; D1 `plots/episodes` names are storage vocabulary, not application terminology.
 - [Phase 1 auth and ownership boundary](arch/auth-security.md) — Clerk session verification, internal-user mapping, and owner-scoped access rules.
-- [Phase 1 story-generation boundary](arch/story-generation.md) — bounded prompt context, Gemini structured output, validation, retry, and provider isolation.
+- [Phase 1 scene-generation boundary](arch/scene-generation.md) — provider-neutral `SceneGenerator`, bounded prompt context, Gemini adapter, strict normalization, controlled retry, and provider isolation.
 - [Phase 1 episode publication boundary](arch/episode-publication.md) — atomic D1 publish, generation-key idempotency, and optimistic version guards.
-- [Phase 1 choice-commit boundary](arch/choice-commit.md) — canonical state v2, choice idempotency, state application, and commit concurrency.
+- [Phase 1 branch / choice-commit boundary](arch/choice-commit.md) — `DramaState`, exactly-one canonical branch, idempotency, state application, and commit concurrency.
 - [Phase 1 quota ledger](arch/quota-ledger.md) — UTC daily limits, atomic reservations, terminal transitions, and reconciliation.
-- [Phase 1 mobile core loop](arch/mobile-core-loop.md) — Expo localized first-run, episode, exactly-three-choice, consequence, next-episode, and resume UI boundary.
+- [Phase 1 mobile core loop](arch/mobile-core-loop.md) — Expo localized first-run, scene playback, exactly-three-choice branch, consequence, continuation, and resume UI boundary.
 - [Phase 1 TTS and private audio](arch/tts-audio.md) — Google OAuth/TTS, Queue/DLQ processing, voice quota, and private R2 delivery.
 - [Phase 1 RevenueCat entitlements](arch/revenuecat-entitlements.md) — verified webhook/provider sync, D1 Free/Plus authority, and mobile paywall/restore trust boundary.
 - [Phase 1 analytics and AI cost telemetry](arch/analytics-cost.md) — privacy-safe Analytics Engine schema, fail-open semantics, retry-aware Gemini token usage, and exact nano-USD rate-card arithmetic.
 - [Phase 1 narrative quality evaluations](arch/narrative-evals.md) — deterministic continuity/thread/branch/consequence/repetition/protagonist/locale/progression fixtures and adversarial regression thresholds.
-- [Phase 1 mobile auth and live story](arch/mobile-auth-live-story.md) — Clerk email OTP, internal identity, protected core-loop HTTP routes, retry convergence, and shared billing trust chain.
+- [Phase 1 mobile auth and live drama](arch/mobile-auth-live-drama.md) — Clerk email OTP, internal identity, protected `/v1/dramas` core-loop routes, retry convergence, and shared billing trust chain.
 - [Phase 1 retention loop](arch/retention.md) — canonical choice-history streaks, resume context, deterministic UTC daily sparks, and anti-dark-pattern guardrails.
-- [Phase 1 story library and history](arch/story-library-history.md) — reversible archive/restore lifecycle, owner-scoped library, and canonical read-only recap.
+- [Phase 1 drama library and history](arch/drama-library-history.md) — reversible archive/restore lifecycle, owner-scoped library, persisted restoration, and canonical read-only branch recap.
 - [Phase 1 mobile resilience and accessibility](arch/mobile-resilience.md) — bounded authenticated networking, safe GET retry, foreground refresh, UI recovery, and accessibility behavior.
-- [Phase 1 preferences and account data](arch/account-data-preferences.md) — EN/VI interface plus story/narrator defaults, spoiler-safe sharing, portable export, fail-closed application-data erasure, and safe diagnostics.
+- [Phase 1 preferences and account data](arch/account-data-preferences.md) — EN/VI interface plus `dramaLocale`/narrator defaults, spoiler-safe Scene/Cảnh sharing, export schema v2, fail-closed application-data erasure, and safe diagnostics.
 - [Live development setup](ref/live-development.md) — secret-safe readiness checks, non-production Cloudflare environment, and mobile/provider configuration.
 - [Closed Beta RC runbook](ref/beta-rc-runbook.md) — current development provisioning, provider blockers, abuse/cost guardrails, live bring-up order, and exact-SHA release verification.
 - [iOS unsigned Native RC](ref/ios-unsigned-rc.md) — reproducible macOS/Xcode device Release build with signing disabled and `Payload/*.app` IPA packaging verification.

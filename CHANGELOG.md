@@ -5,6 +5,9 @@ All notable changes to Living Plot will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Canonical drama runtime ownership map covering `Drama`, `Scene`, `Character`, `Choice`, `Branch`, `GenerationJob`, `MediaAsset`, `PlaybackState`, locale ownership, failure paths, and the verification tests that prove each transition.
+- Provider-neutral `SceneGenerator`/`SceneProposal` boundary with strict scene normalization, bounded prompt context, controlled invalid-response retry, and Gemini isolated as the current adapter.
+- Explicit mobile playback orchestration owner (`useDramaPlayback` + `PlaybackState`) and bounded product-level voice media lifecycle independent from scene readiness.
 - Initial npm workspace with Expo mobile and Cloudflare Worker API foundations.
 - Strict TypeScript, lint, test, and GitHub Actions CI baseline.
 - Cloudflare D1 schema/migration baseline for users, plots, characters, episodes, choices, committed choice history, and daily usage counters.
@@ -59,6 +62,10 @@ All notable changes to Living Plot will be documented in this file.
 - iOS unsigned Native RC pipeline on GitHub macOS: explicit Expo iOS identity, clean prebuild/CocoaPods, Release `iphoneos` Xcode build with code signing disabled, negative signature verification, `Payload/LivingPlot.app` IPA packaging, and artifact upload.
 
 ### Changed
+- Replaced application-level Story/Plot/Episode vocabulary with the canonical Drama/Scene/Branch model across mobile contracts, `/v1/dramas` HTTP routes, runtime services, history/library summaries, product telemetry, sharing, and EN/VI UI terminology. Existing D1 `plots/episodes/story_locale` names remain persistence-only compatibility vocabulary.
+- Renamed saved application generation locale from `storyLocale` to `dramaLocale`; the preview store reads the legacy key only as a compatibility migration, while authenticated preferences and new-drama creation use the canonical field.
+- Account export is now schema v2 with `dramas[]`, `scenes[]`, generated/voiced scene usage, and provider-neutral media metadata instead of projecting D1 plot/episode/audio naming.
+- Removed the duplicate legacy `/v1/plots/:id` application read path and `D1StoryRepository`; `D1DramaRepository` is the single owner for persisted Drama restoration/projection.
 - Completed the visual-first correction pass for Big Stages C+D: Home/Library/Create now share a persistent four-destination drama navigation dock, story playback gives the scene frame priority over utility metadata, History adds a compact branch map, Settings returns to a consumer-facing experience with diagnostics hidden behind Advanced, and Plus removes backend/store jargon from the primary subscription surface.
 - Replaced the former head/body silhouette scene rig with deterministic illustrated character portraits (face, hair, eyes, clothing, rim lighting) while preserving the existing mood- and content-derived scene motifs and avoiding a backend media-schema change.
 - Completed final cinematic RC productization: localized EN/VI cinematic interaction copy and accessibility cues, semantic scene progress, localized form labels, History empty-state recovery, and final small-screen/reduced-motion audit without changing canonical business logic.
@@ -70,6 +77,8 @@ All notable changes to Living Plot will be documented in this file.
 - Narrative prompt guidance now keeps the canonical protagonist visible, requires durable scene progress, and keeps narrative/branch output in the requested locale.
 
 ### Fixed
+- Fixed an integration mismatch where the API emitted `recentDramas/sceneNumber/ready_for_next_scene/activeDramas` while the mobile HTTP parser still expected the older plot/episode field names; both sides now share one canonical contract.
+- Fixed live Vietnamese metadata localization for relative update/reset labels and localized spoiler-safe share copy while preserving each existing drama's creation locale.
 - Fixed preview localization so `storyLocale` actually controls seeded stories, Episode 1, continuations, choices, intents and consequences; Vietnamese preview stories no longer fall back to English while the UI is Vietnamese. Locale-specific preview clients now share story state, so existing plots remain visible across EN/VI preference changes and each plot keeps its original story locale for future continuation episodes. Preview summary timestamps and episode labels are localized as well.
 - Preview preferences now persist on-device through SecureStore, and choosing the Vietnamese interface defaults new-story locale plus narrator to Vietnamese while still allowing those two preferences to be changed independently afterward.
 - Fixed the final subtitle-beat accessibility state so a scene no longer announces itself as an actionable button when no further beat can be advanced.
