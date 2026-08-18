@@ -1,6 +1,6 @@
 # Phase 1 TTS and private-audio boundary
 
-> updated 2026-08-17 · 0.0.0
+> updated 2026-08-19 · 0.0.0
 
 ## Responsibility
 Slice 9 adds derived voice generation without making audio part of canonical story state. Text episodes remain canonical and usable when voice is queued, retrying, failed, or unavailable.
@@ -54,7 +54,7 @@ Terminal failure is `failed`.
 `object_key` is backend-only canonical metadata. It is never returned by the HTTP API.
 
 ## Request flow
-`POST /v1/episodes/:episodeId/audio`:
+`POST /v1/scenes/:sceneId/voice`:
 
 1. authenticate Clerk session and resolve internal user;
 2. verify episode ownership;
@@ -85,9 +85,9 @@ The consumer writes deterministic MP3 keys:
 
 `audio/{episodeId}/{voiceVariant}.mp3`
 
-`GET /v1/audio/:assetId/status` authenticates the user and returns only client-safe lifecycle metadata for polling. `GET /v1/audio/:assetId` separately authenticates the owner through episode → plot before reading R2; non-ready reads return HTTP 202 metadata and ready assets stream `audio/mpeg` with private cache headers. The object key and provider voice ID are never exposed.
+`GET /v1/media/:assetId/status` authenticates the user and returns only client-safe lifecycle metadata for polling. `GET /v1/media/:assetId` separately authenticates the owner through scene → drama ownership before reading R2; non-ready reads return HTTP 202 metadata and ready assets stream `audio/mpeg` with private cache headers. The object key and provider voice ID are never exposed.
 
-The Expo client requests one approved narrator variant, polls the status route while work is pending, and uses Expo Audio with the protected stream URL plus an Authorization header after `ready`. Playback failure never invalidates or hides the text episode.
+The Expo client requests one approved narrator variant, polls the status route while work is pending, and uses Expo Audio with the protected stream URL plus an Authorization header after `ready`. Public live configuration and signed-in session state are separate concerns: API URL + Clerk configuration select the authenticated HTTP client, while a missing session produces `auth_required` at the transport boundary. A deliberately unconfigured preview build exposes voice as unavailable and never fabricates audio. Playback failure never invalidates or hides the text scene.
 
 ## Idempotency and failure semantics
 - same episode/voice request while work exists returns the canonical asset;
@@ -100,4 +100,4 @@ The Expo client requests one approved narrator variant, polls the status route w
 - R2 remains private even if D1 finalization fails.
 
 ## External environment gate
-Live Google credential/network synthesis and remote development Queue/R2 provisioning remain unverified until credentials/resources exist. Production deployment and store submission are not part of the current Phase 1 development gate.
+Live Google credential/network synthesis and remote development Queue/R2 provisioning remain external gates until the required credentials/resources and public mobile API/Clerk values exist. Preview-safe APK/IPA artifacts therefore keep text scenes functional and expose voice as unavailable rather than substituting fixture audio. Production deployment and store submission are not part of the current Phase 1 development gate.

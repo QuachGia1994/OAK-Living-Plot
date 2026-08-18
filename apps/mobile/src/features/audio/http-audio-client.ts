@@ -3,6 +3,11 @@ import type { SceneVoiceClient, SceneVoicePlaybackSource } from './contracts';
 import { SceneVoiceClientError } from './contracts';
 import { AuthenticatedJsonTransport, HttpTransportError, type FetchLike, type TokenProvider } from '../../lib/http-transport';
 
+export function createSceneVoiceClient(apiBaseUrl: string, authConfigured: boolean, tokenProvider: TokenProvider): SceneVoiceClient {
+  if (!apiBaseUrl.trim() || !authConfigured) return new UnavailableSceneVoiceClient();
+  return new HttpSceneVoiceClient(apiBaseUrl, tokenProvider);
+}
+
 export class HttpSceneVoiceClient implements SceneVoiceClient {
   readonly configured: boolean;
   private readonly transport: AuthenticatedJsonTransport;

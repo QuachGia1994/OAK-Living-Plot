@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SceneVoiceClientError } from '../src/features/audio/contracts';
-import { HttpSceneVoiceClient } from '../src/features/audio/http-audio-client';
+import { HttpSceneVoiceClient, UnavailableSceneVoiceClient } from '../src/features/audio/http-audio-client';
 
 describe('HttpSceneVoiceClient', () => {
   it('requests and polls private scene voice with fresh bearer tokens', async () => {
@@ -35,6 +35,15 @@ describe('HttpSceneVoiceClient', () => {
     );
 
     await expect(client.loadStatus('media-1')).rejects.toMatchObject({ code: 'backend_unavailable' });
+  });
+
+  it('keeps preview voice explicitly unavailable without attempting live transport', async () => {
+    const client = new UnavailableSceneVoiceClient();
+
+    expect(client.configured).toBe(false);
+    await expect(client.request()).rejects.toMatchObject({ code: 'not_configured' });
+    await expect(client.loadStatus()).rejects.toMatchObject({ code: 'not_configured' });
+    await expect(client.playbackSource()).rejects.toMatchObject({ code: 'not_configured' });
   });
 
   it('maps server voice quota and rejects missing auth', async () => {

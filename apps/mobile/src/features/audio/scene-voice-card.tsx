@@ -69,10 +69,6 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
   }, [asset, client, locale, player]);
 
   async function requestVoice() {
-    if (!client.configured) {
-      setError(t('Voice is not connected in this preview build yet. You can still read the full scene.', 'Giọng đọc chưa được kết nối trong bản xem trước. Bạn vẫn có thể đọc toàn bộ cảnh.'));
-      return;
-    }
     if (asset?.status === 'failed') reservationKey.current = createIdempotencyKey('voice');
     setBusy(true);
     setAutoPollCount(0);
@@ -125,12 +121,14 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text style={styles.kicker}>{t('Voice', 'Giọng đọc')}</Text>
-          <Text style={styles.title} numberOfLines={1}>{voiceLabel(asset, locale)}</Text>
+          <Text style={styles.title} numberOfLines={1}>{client.configured ? voiceLabel(asset, locale) : t('Unavailable', 'Chưa khả dụng')}</Text>
         </View>
-        <Pill tone={asset?.status === 'ready' ? 'success' : 'neutral'}>{asset?.status === 'ready' ? t('Ready', 'Sẵn sàng') : t('Optional', 'Tùy chọn')}</Pill>
+        <Pill tone={asset?.status === 'ready' ? 'success' : 'neutral'}>{!client.configured ? t('Preview', 'Bản xem trước') : asset?.status === 'ready' ? t('Ready', 'Sẵn sàng') : t('Optional', 'Tùy chọn')}</Pill>
       </View>
 
-      {asset?.status === 'ready' ? (
+      {!client.configured ? (
+        <Text style={styles.notice} accessibilityLiveRegion="polite">{t('Voice is unavailable in this preview build. Story text remains fully available.', 'Giọng đọc chưa khả dụng trong bản xem trước này. Bạn vẫn có thể đọc toàn bộ cảnh.')}</Text>
+      ) : asset?.status === 'ready' ? (
         <>
           <View
             style={styles.track}
@@ -192,8 +190,8 @@ function audioMessage(error: unknown, locale: 'en' | 'vi'): string {
   const vi = locale === 'vi';
   if (!(error instanceof SceneVoiceClientError)) return vi ? 'Không thể chuẩn bị giọng đọc. Bạn vẫn có thể đọc cảnh bình thường.' : 'Voice could not be prepared. You can keep reading the scene normally.';
   if (error.code === 'quota_exceeded') return vi ? 'Bạn đã dùng lượt giọng mới hôm nay. Bản đã tạo vẫn có thể phát lại.' : 'You have used today’s fresh narration. Existing narration can still replay.';
-  if (error.code === 'auth_required') return vi ? 'Đăng nhập lại trước khi tạo giọng đọc.' : 'Sign in again before generating narration.';
-  if (error.code === 'not_configured') return vi ? 'Giọng đọc chưa được kết nối trong bản xem trước.' : 'Voice is not connected in this preview build yet.';
+  if (error.code === 'auth_required') return vi ? 'Đăng nhập trước khi tạo hoặc phát giọng đọc.' : 'Sign in before generating or playing narration.';
+  if (error.code === 'not_configured') return vi ? 'Giọng đọc chưa khả dụng trong bản xem trước này.' : 'Voice is unavailable in this preview build.';
   return error.message;
 }
 

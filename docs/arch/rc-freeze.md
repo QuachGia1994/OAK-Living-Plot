@@ -1,6 +1,6 @@
 # Living Plot RC freeze — state ownership
 
-> updated 2026-08-18 · beta RC
+> updated 2026-08-19 · 0.0.0
 
 ## Feature freeze
 UI/visual systems are frozen for beta RC unless a functional/accessibility/platform bug requires a minimal fix.
@@ -26,6 +26,7 @@ Frozen surfaces: Home, Create, Playback A/B/C, Library, Settings, Plus, LP brand
 - One choice lock per episode: `choice_commits` + episode `ready → completed` guarded batch; replay is idempotent.
 - Quota cannot double-charge: reservation key + ledger transitions; release on provider failure.
 - Voice replay: existing non-failed `audio_assets` returns without new reservation.
+- Voice configuration != auth session: public API URL + Clerk configuration select the authenticated HTTP voice client; a missing session surfaces `auth_required`, while only an intentionally unconfigured preview uses the unavailable client.
 - Navigation params carry identity only (`dramaId`), not business DB.
 
 ## Client concurrency
@@ -34,3 +35,6 @@ Frozen surfaces: Home, Create, Playback A/B/C, Library, Settings, Plus, LP brand
 ## Platform
 - Android: `DynamicColorIOS` only under `Platform.OS === 'ios'`.
 - iOS: NativeTabs + `minimizeBehavior="onScrollDown"` retained.
+
+## External live gate
+Preview-safe APK/IPA builds remain valid RC artifacts when public live configuration is absent. Private narration becomes live only after the mobile API/Clerk values and backend Queue/TTS/R2 credentials/resources are provisioned; the client must report that state honestly and never fall back to fixture audio.

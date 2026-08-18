@@ -87,6 +87,7 @@ All notable changes to Living Plot will be documented in this file.
 - Narrative prompt guidance now keeps the canonical protagonist visible, requires durable scene progress, and keeps narrative/branch output in the requested locale.
 
 ### Fixed
+- Closed the RC voice-client state gap: configured builds now keep the authenticated HTTP voice client before sign-in and surface `auth_required` truthfully, while deliberately unconfigured preview builds show a neutral unavailable state without a dead generate action; TTS architecture docs now match the current `/v1/scenes/:sceneId/voice` and `/v1/media/:assetId` routes.
 - Replaced the shared `SceneArtwork` flat face/hair/eyes primitive rig with bundled shaded anime character artwork, so story playback and every drama surface using that renderer no longer show the old geometric portrait; Plus now uses the same replacement artwork.
 - Aligned Free/Plus quota metrics on one typographic baseline and constrained Vietnamese Settings privacy/delete-data headers so long copy wraps cleanly without the old danger signal protruding beyond its card.
 - Fixed an integration mismatch where the API emitted `recentDramas/sceneNumber/ready_for_next_scene/activeDramas` while the mobile HTTP parser still expected the older plot/episode field names; both sides now share one canonical contract.
