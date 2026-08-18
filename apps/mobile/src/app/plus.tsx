@@ -88,7 +88,7 @@ export default function PlusScreen() {
         detail={t('More daily scenes and fresh narration when the cliffhanger should not end here.', 'Thêm cảnh và giọng đọc mới mỗi ngày khi cao trào chưa nên dừng lại.')}
         mood="romantic"
         characterName="Plus"
-        artworkSource={require('../../assets/living-plot-plus-hero.jpg')}
+        artworkSource={require('../../assets/living-plot-scene-lead-01.png')}
       />
 
       <View style={styles.pass}>

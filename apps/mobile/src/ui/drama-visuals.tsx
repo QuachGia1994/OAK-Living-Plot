@@ -548,47 +548,28 @@ function CharacterPortrait({
   alignRight: boolean;
   compact: boolean;
 }) {
-  const palette = characterPaletteFor(characterName);
+  const clothingAccent = characterClothingAccentFor(characterName);
   return (
     <View style={[
       styles.portraitRig,
       alignRight ? styles.portraitRight : styles.portraitLeft,
       compact && styles.portraitRigCompact,
     ]}>
-      <View style={[styles.portraitAura, { backgroundColor: tone.rim }]} />
-      <View style={[styles.portraitHairBack, { backgroundColor: palette.hair }]} />
-      <View style={[styles.portraitShoulder, { backgroundColor: palette.clothing, borderColor: tone.rim }]} />
-      <View style={[styles.portraitNeck, { backgroundColor: palette.skin }]} />
-      <View style={[styles.portraitFace, { backgroundColor: palette.skin }]}>
-        <View style={styles.portraitBrows}>
-          <View style={[styles.portraitBrow, { backgroundColor: palette.hair }]} />
-          <View style={[styles.portraitBrow, { backgroundColor: palette.hair }]} />
-        </View>
-        <View style={styles.portraitEyes}>
-          <View style={styles.portraitEye}><View style={[styles.portraitIris, { backgroundColor: palette.eye }]} /></View>
-          <View style={styles.portraitEye}><View style={[styles.portraitIris, { backgroundColor: palette.eye }]} /></View>
-        </View>
-        <View style={styles.portraitNose} />
-        <View style={styles.portraitMouth} />
-      </View>
-      <View style={[styles.portraitHairCap, { backgroundColor: palette.hair }]} />
-      <View style={[styles.portraitHairSide, styles.portraitHairSideLeft, { backgroundColor: palette.hair }]} />
-      <View style={[styles.portraitHairSide, styles.portraitHairSideRight, { backgroundColor: palette.hair }]} />
-      <View style={[styles.portraitHighlight, { borderColor: tone.rim }]} />
-      <View style={[styles.portraitEarring, { backgroundColor: tone.rim }]} />
+      <View style={[styles.portraitAura, { backgroundColor: tone.rim, borderColor: clothingAccent }]} />
+      <Image
+        source={require('../../assets/living-plot-scene-lead-01.png')}
+        style={styles.portraitArtwork}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
+      />
     </View>
   );
 }
 
-function characterPaletteFor(characterName: string): { skin: string; hair: string; clothing: string; eye: string } {
+function characterClothingAccentFor(characterName: string): string {
   const value = [...characterName].reduce((total, character) => total + character.charCodeAt(0), 0);
-  const palettes = [
-    { skin: '#E5B49A', hair: '#201617', clothing: '#24304C', eye: '#2D251F' },
-    { skin: '#D6A07F', hair: '#191418', clothing: '#4A2437', eye: '#33241D' },
-    { skin: '#F0C3A9', hair: '#33221D', clothing: '#283D38', eye: '#26362E' },
-    { skin: '#B98264', hair: '#16191E', clothing: '#3A2E54', eye: '#1D252C' },
-  ] as const;
-  return palettes[value % palettes.length];
+  const accents = ['#24304C', '#4A2437', '#283D38', '#3A2E54'] as const;
+  return accents[value % accents.length];
 }
 
 function SceneMotifLayer({ motif, tone }: { motif: SceneMotif; tone: SceneTone }) {
@@ -937,28 +918,12 @@ const styles = StyleSheet.create({
   lightOrbPrimary: { width: 430, height: 430, top: -105, right: -145 },
   lightOrbSecondary: { width: 320, height: 320, top: 150, left: -150 },
   horizonGlow: { position: 'absolute', left: -80, right: -80, bottom: 120, height: 170, opacity: 0.42, borderRadius: radius.pill },
-  portraitRig: { position: 'absolute', bottom: 84, width: 230, height: 390, alignItems: 'center', justifyContent: 'flex-start' },
-  portraitRigCompact: { bottom: 18, transform: [{ scale: 0.68 }] },
-  portraitLeft: { left: -2 },
-  portraitRight: { right: -2 },
-  portraitAura: { position: 'absolute', top: 12, width: 190, height: 260, borderRadius: 96, opacity: 0.12 },
-  portraitHairBack: { position: 'absolute', top: 38, width: 142, height: 186, borderTopLeftRadius: 74, borderTopRightRadius: 74, borderBottomLeftRadius: 48, borderBottomRightRadius: 48 },
-  portraitShoulder: { position: 'absolute', bottom: 0, width: 220, height: 174, borderTopLeftRadius: 92, borderTopRightRadius: 92, borderWidth: 1, opacity: 0.98 },
-  portraitNeck: { position: 'absolute', top: 164, width: 50, height: 66, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
-  portraitFace: { position: 'absolute', top: 70, width: 100, height: 124, borderRadius: 48, alignItems: 'center' },
-  portraitHairCap: { position: 'absolute', top: 48, width: 110, height: 62, borderTopLeftRadius: 55, borderTopRightRadius: 55, borderBottomLeftRadius: 28, borderBottomRightRadius: 16, transform: [{ rotate: '-5deg' }] },
-  portraitHairSide: { position: 'absolute', top: 88, width: 26, height: 128, borderRadius: 18 },
-  portraitHairSideLeft: { left: 58, transform: [{ rotate: '5deg' }] },
-  portraitHairSideRight: { right: 58, transform: [{ rotate: '-7deg' }] },
-  portraitBrows: { position: 'absolute', top: 42, left: 19, right: 19, flexDirection: 'row', justifyContent: 'space-between' },
-  portraitBrow: { width: 22, height: 3, borderRadius: 2, opacity: 0.76 },
-  portraitEyes: { position: 'absolute', top: 53, left: 17, right: 17, flexDirection: 'row', justifyContent: 'space-between' },
-  portraitEye: { width: 26, height: 11, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#F6EEE6' },
-  portraitIris: { width: 7, height: 7, borderRadius: 4 },
-  portraitNose: { position: 'absolute', top: 70, width: 2, height: 17, borderRadius: 2, backgroundColor: 'rgba(91,53,44,0.35)' },
-  portraitMouth: { position: 'absolute', top: 94, width: 27, height: 4, borderRadius: 3, backgroundColor: '#914D50', opacity: 0.9 },
-  portraitHighlight: { position: 'absolute', top: 62, width: 112, height: 142, borderRadius: 58, borderWidth: 1, opacity: 0.22 },
-  portraitEarring: { position: 'absolute', top: 139, right: 58, width: 4, height: 22, borderRadius: 3, opacity: 0.9 },
+  portraitRig: { position: 'absolute', bottom: 70, width: 290, height: 430, alignItems: 'center', justifyContent: 'flex-end' },
+  portraitRigCompact: { bottom: 4, transform: [{ scale: 0.62 }] },
+  portraitLeft: { left: -24 },
+  portraitRight: { right: -24 },
+  portraitAura: { position: 'absolute', top: 34, width: 230, height: 300, borderRadius: 116, borderWidth: StyleSheet.hairlineWidth, opacity: 0.16 },
+  portraitArtwork: { width: '100%', height: '100%' },
   characterRig: { position: 'absolute', bottom: 128, width: 190, height: 330, alignItems: 'center' },
   characterRigCompact: { bottom: 54, transform: [{ scale: 0.72 }] },
   characterLeft: { left: 18 },
