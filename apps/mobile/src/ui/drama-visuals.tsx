@@ -421,7 +421,7 @@ export function DramaChoiceCard({
   choice,
   selected,
   disabled,
-  mood,
+  mood: _mood,
   locale,
   onPress,
 }: {
@@ -432,7 +432,7 @@ export function DramaChoiceCard({
   locale: UiLocale;
   onPress: () => void;
 }) {
-  const tone = cinematic.scene[mood];
+  void _mood;
   const copy = dramaVisualCopyFor(locale);
   return (
     <Pressable
@@ -443,22 +443,21 @@ export function DramaChoiceCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.choiceCard,
-        selected && { borderColor: tone.rim, backgroundColor: tone.haze },
+        selected && { borderColor: colors.accent, backgroundColor: colors.surfaceWarmDeep },
         pressed && !disabled && styles.choicePressed,
         disabled && styles.choiceDisabled,
       ]}
     >
-      <View style={styles.choiceTopRow}>
-        <View style={[styles.choiceKey, selected && { borderColor: tone.rim, backgroundColor: tone.rim }]}> 
-          <Text style={[styles.choiceKeyText, selected && { color: tone.deep }]}>{choice.key}</Text>
-        </View>
-        <Text style={styles.choiceIntent}>{choice.intent}</Text>
+      <View style={[styles.choiceKey, selected && { borderColor: colors.accent, backgroundColor: colors.accent }]}>
+        <Text style={[styles.choiceKeyText, selected && { color: colors.accentInk }]}>{choice.key}</Text>
       </View>
-      <Text style={[styles.choiceLabel, selected && { color: colors.ink }]}>{choice.label}</Text>
-      <View style={styles.choiceBottomRow}>
-        <View style={[styles.choiceLight, { backgroundColor: selected ? tone.rim : tone.glow }]} />
-        <Text style={[styles.choiceState, selected && { color: tone.rim }]}>{selected ? copy.choiceSelected : copy.choicePrompt}</Text>
+      <View style={styles.choiceCopy}>
+        <Text style={[styles.choiceLabel, selected && { color: colors.ink }]} numberOfLines={2}>{choice.label}</Text>
+        <Text style={styles.choiceIntent} numberOfLines={1}>{choice.intent}</Text>
       </View>
+      <Text style={[styles.choiceChevron, selected && { color: colors.accentStrong }]} accessibilityElementsHidden>
+        {selected ? '✓' : '›'}
+      </Text>
     </Pressable>
   );
 }
@@ -923,7 +922,8 @@ const styles = StyleSheet.create({
   recapConsequence: { color: colors.ink, fontFamily: typography.display, fontSize: 15, lineHeight: 23 },
   recapPending: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, lineHeight: 15, fontWeight: '800', letterSpacing: 0.55, textTransform: 'uppercase' },
   sceneStage: {
-    minHeight: 620,
+    minHeight: 420,
+    maxHeight: 540,
     overflow: 'hidden',
     borderBottomLeftRadius: cinematic.radius.scene,
     borderBottomRightRadius: cinematic.radius.scene,
@@ -941,9 +941,9 @@ const styles = StyleSheet.create({
   portraitAura: { position: 'absolute', top: 34, width: 230, height: 300, borderRadius: 116, borderWidth: StyleSheet.hairlineWidth, opacity: 0.16 },
   portraitCrop: { width: '100%', height: '100%', overflow: 'hidden', borderRadius: 24 },
   portraitArtwork: { width: '100%', height: '100%' },
-  portraitArtworkHero: { transform: [{ scale: 1.12 }, { translateY: 18 }] },
-  portraitArtworkCard: { transform: [{ scale: 1.2 }, { translateY: 28 }] },
-  portraitArtworkScene: { transform: [{ scale: 1.08 }, { translateY: 12 }] },
+  portraitArtworkHero: { transform: [{ scale: 1.02 }, { translateY: 6 }] },
+  portraitArtworkCard: { transform: [{ scale: 1.08 }, { translateY: 14 }] },
+  portraitArtworkScene: { transform: [{ scale: 1.0 }, { translateY: 4 }] },
   signalRig: { position: 'absolute', top: 170, right: 38, width: 96, height: 168, alignItems: 'center', justifyContent: 'center' },
   signalHalo: { position: 'absolute', width: 132, height: 132, borderRadius: 66, opacity: 0.14 },
   signalDevice: { width: 72, height: 132, gap: 10, paddingHorizontal: 12, paddingTop: 24, borderRadius: 16, borderWidth: 1, backgroundColor: 'rgba(3,3,3,0.72)' },
@@ -992,25 +992,53 @@ const styles = StyleSheet.create({
   subtitleCue: { color: '#918B83', fontFamily: typography.mono, fontSize: 8, fontWeight: '800', letterSpacing: 0.8 },
   subtitleText: { color: '#FFF9EF', fontSize: 18, lineHeight: 27, fontWeight: '700' },
   choiceCard: {
-    minHeight: 128,
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: cinematic.radius.choice,
+    minHeight: 72,
+    maxHeight: 96,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
   },
-  choicePressed: { opacity: 0.8, transform: [{ scale: 0.99 }] },
-  choiceDisabled: { opacity: 0.46 },
-  choiceTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  choiceKey: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
-  choiceKeyText: { color: colors.ink, fontFamily: typography.mono, fontSize: 13, fontWeight: '900' },
-  choiceIntent: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 9, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
-  choiceLabel: { color: colors.narrativeInk, fontFamily: typography.display, fontSize: 21, lineHeight: 26, fontWeight: '700' },
-  choiceBottomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  choiceLight: { width: 34, height: 2, borderRadius: radius.pill, opacity: 0.82 },
-  choiceState: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '800', letterSpacing: 0.8 },
+  choicePressed: { opacity: 0.88, transform: [{ scale: 0.995 }] },
+  choiceDisabled: { opacity: 0.5 },
+  choiceKey: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceQuiet,
+  },
+  choiceKeyText: { color: colors.ink, fontFamily: typography.mono, fontSize: 12, fontWeight: '900' },
+  choiceCopy: { flex: 1, minWidth: 0, gap: 2 },
+  choiceIntent: {
+    color: colors.quietInk,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  choiceLabel: {
+    color: colors.narrativeInk,
+    fontFamily: typography.display,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '700',
+  },
+  choiceChevron: {
+    color: colors.quietInk,
+    fontSize: 18,
+    fontWeight: '600',
+    paddingLeft: spacing.xs,
+  },
   consequenceOverlay: {
     position: 'absolute',
     left: spacing.md,

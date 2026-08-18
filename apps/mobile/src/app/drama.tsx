@@ -9,7 +9,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeDramaShareText } from '@/features/share/drama-share';
 import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, MotionReveal, Screen } from '@/ui/primitives';
-import { colors, spacing, typography } from '@/ui/theme';
+import { colors, radius, spacing, typography } from '@/ui/theme';
 
 export default function DramaScreen() {
   const router = useRouter();
@@ -144,18 +144,18 @@ export default function DramaScreen() {
                 ))}
               </View>
 
-              <View style={styles.commitDock}>
-                <View style={styles.commitCopy}>
-                  <Text style={styles.commitLabel}>{playback.selectedChoice ? t('READY TO LOCK', 'SẴN SÀNG CHỐT') : t('YOUR MOVE', 'LƯỢT CỦA BẠN')}</Text>
-                  <Text style={styles.commitText} numberOfLines={2}>{playback.selectedChoice?.label ?? t('Pick a branch to continue the drama.', 'Chọn một nhánh để tiếp tục drama.')}</Text>
+              {!playback.selectedChoice ? (
+                <Text style={styles.choiceHint}>{t('Pick a branch to continue the drama.', 'Chọn một nhánh để tiếp tục drama.')}</Text>
+              ) : (
+                <View style={styles.commitDock}>
+                  <Text style={styles.commitText} numberOfLines={1}>{playback.selectedChoice.label}</Text>
+                  <ActionButton
+                    label={t('Lock this choice', 'Chốt lựa chọn')}
+                    busy={playback.playbackState.phase === 'committing_choice'}
+                    onPress={() => void playback.commitChoice()}
+                  />
                 </View>
-                <ActionButton
-                  label={t('Lock this choice', 'Chốt lựa chọn')}
-                  busy={playback.playbackState.phase === 'committing_choice'}
-                  disabled={!playback.selectedChoice}
-                  onPress={() => void playback.commitChoice()}
-                />
-              </View>
+              )}
             </View>
           </MotionReveal>
         ) : consequenceVisible ? (
@@ -279,37 +279,34 @@ const styles = StyleSheet.create({
     maxWidth: 520,
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 33,
-    lineHeight: 38,
+    fontSize: 22,
+    lineHeight: 27,
     fontWeight: '700',
-    letterSpacing: -0.7,
+    letterSpacing: -0.3,
   },
   choiceGrid: {
-    gap: spacing.sm,
-  },
-  commitDock: {
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceRaised,
-  },
-  commitCopy: {
     gap: spacing.xs,
   },
-  commitLabel: {
-    color: colors.accentStrong,
+  choiceHint: {
+    color: colors.quietInk,
     fontFamily: typography.mono,
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.3,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  commitDock: {
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.accentSoft,
+    backgroundColor: colors.surfaceWarmDeep,
   },
   commitText: {
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '700',
   },
   nextSection: {
@@ -321,8 +318,8 @@ const styles = StyleSheet.create({
   nextTitle: {
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 30,
-    lineHeight: 36,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: '700',
   },
   readOnlyDock: {

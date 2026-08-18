@@ -5,7 +5,7 @@ import { useUiCopy } from '@/features/localization/ui-copy';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
 import type { MediaAsset } from '@/features/drama/domain';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
-import { ActionButton, Eyebrow, Pill } from '@/ui/primitives';
+import { ActionButton, Pill } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
 import { SceneVoiceClientError } from './contracts';
 import { useSceneVoiceClient } from './audio-client-context';
@@ -124,15 +124,11 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Eyebrow>{t('Scene voice', 'Giọng đọc cảnh')}</Eyebrow>
-          <Text style={styles.title}>{t('Hear the scene narrated', 'Nghe cảnh được kể lại')}</Text>
+          <Text style={styles.kicker}>{t('Voice', 'Giọng đọc')}</Text>
+          <Text style={styles.title} numberOfLines={1}>{voiceLabel(asset, locale)}</Text>
         </View>
-        <Pill tone={asset?.status === 'ready' ? 'success' : 'neutral'}>{voiceLabel(asset, locale)}</Pill>
+        <Pill tone={asset?.status === 'ready' ? 'success' : 'neutral'}>{asset?.status === 'ready' ? t('Ready', 'Sẵn sàng') : t('Optional', 'Tùy chọn')}</Pill>
       </View>
-
-      <Text style={styles.body}>
-        {t('Generate narration once, then replay it anytime without using another fresh-voice slot.', 'Tạo giọng đọc một lần rồi phát lại bất kỳ lúc nào mà không dùng thêm lượt giọng mới.')}
-      </Text>
 
       {asset?.status === 'ready' ? (
         <>
@@ -168,7 +164,7 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
         />
       )}
 
-      {error ? <Text style={styles.error} accessibilityLiveRegion="assertive">{error}</Text> : null}
+      {error ? <Text style={styles.notice} accessibilityLiveRegion="polite">{error}</Text> : null}
     </View>
   );
 }
@@ -224,5 +220,6 @@ const styles = StyleSheet.create({
   time: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 10, fontWeight: '700', textAlign: 'right' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   flexButton: { flex: 1 },
-  error: { color: colors.danger, fontSize: 12, lineHeight: 18 },
+  kicker: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
+  notice: { color: colors.inkMuted, fontSize: 12, lineHeight: 18 },
 });
