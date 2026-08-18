@@ -6,6 +6,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { StoryHomeSnapshot, StoryPlotSummary } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
+import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { DramaCoverTile, DramaLoadingStage, DramaPoster, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
@@ -111,11 +112,14 @@ export default function HomeScreen() {
             style={styles.heroPoster}
           />
 
-          <View style={styles.heroQuickActions}>
-            <ActionButton label={t('Create my drama', 'Tạo drama của tôi')} variant="secondary" onPress={() => router.push('/create')} style={styles.heroQuickAction} />
-            <ActionButton label={t('My shelf', 'Kệ của tôi')} variant="ghost" onPress={() => router.push('/library')} />
-            <ActionButton label={t('Settings', 'Cài đặt')} variant="ghost" onPress={() => router.push('/settings')} />
-          </View>
+          <DramaNavigationDock
+            active="home"
+            locale={locale}
+            onNavigate={(destination) => {
+              if (destination === 'home') return;
+              router.push(destination === 'create' ? '/create' : destination === 'library' ? '/library' : '/settings');
+            }}
+          />
         </>
       ) : null}
 
@@ -130,8 +134,6 @@ export default function HomeScreen() {
 
       {snapshot ? (
         <>
-          <StoryHud snapshot={snapshot} t={t} />
-
           {featuredPlot ? (
             <UpNextShelf
               snapshot={snapshot}
@@ -149,6 +151,8 @@ export default function HomeScreen() {
               <Text style={styles.firstRunTitle}>{t('THREE PATHS', 'BA HƯỚNG ĐI')}</Text>
             </View>
           )}
+
+          <StoryHud snapshot={snapshot} t={t} />
 
           <View style={styles.plusRow}>
             <View style={styles.plusCopy}>
@@ -233,7 +237,7 @@ function UpNextShelf({
               premise={plot.resumeLine || plot.premise}
               characterName={plot.characterName}
               mood={plot.mood}
-              episodeLabel={`EP ${String(plot.episodeNumber).padStart(2, '0')}`}
+              episodeLabel={`${t('EP', 'TẬP')} ${String(plot.episodeNumber).padStart(2, '0')}`}
               statusLabel={plot.status === 'awaiting_choice'
                 ? t('Your choice is waiting', 'Đang chờ lựa chọn')
                 : t('Next scene ready', 'Cảnh tiếp theo sẵn sàng')}

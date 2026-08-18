@@ -10,7 +10,7 @@ import { buildSpoilerSafeShareText } from '@/features/share/story-share';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, ErrorState, Eyebrow, MotionReveal, Pill, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, ErrorState, Eyebrow, MotionReveal, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
 export default function StoryScreen() {
@@ -181,22 +181,6 @@ export default function StoryScreen() {
       </MotionReveal>
 
       <View style={styles.playerBody}>
-        <View style={styles.plotRail}>
-          <View style={styles.plotRailTop}>
-            <Pill tone={awaitingChoice ? 'accent' : 'success'}>{awaitingChoice ? t('Decision point', 'Điểm quyết định') : t('Choice locked', 'Đã chốt lựa chọn')}</Pill>
-            <Text style={styles.plotMeta}>{session.characterName} · {session.mood}</Text>
-          </View>
-          <Text style={styles.plotTitle}>{session.title}</Text>
-          <View style={styles.storyActions}>
-            <ActionButton
-              label={t('Share', 'Chia sẻ')}
-              variant="ghost"
-              onPress={() => void Share.share({ message: buildSpoilerSafeShareText({ title: session.title, episodeNumber: episode.number, premise: session.premise }) })}
-            />
-            <ActionButton label={t('History', 'Lịch sử')} variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
-          </View>
-        </View>
-
         {error ? (
           <ErrorState
             title={t('That action didn’t finish', 'Thao tác chưa hoàn tất')}
@@ -266,9 +250,32 @@ export default function StoryScreen() {
         )}
 
         <EpisodeVoiceCard key={episode.id} episodeId={episode.id} />
+
+        <View style={styles.storyUtilityRail}>
+          <View style={styles.storyUtilityCopy}>
+            <Text style={styles.storyUtilityKicker}>{awaitingChoice ? t('Decision point', 'Điểm quyết định') : t('Choice locked', 'Đã chốt lựa chọn')}</Text>
+            <Text style={styles.storyUtilityTitle} numberOfLines={2}>{session.title}</Text>
+            <Text style={styles.storyUtilityMeta}>{session.characterName} · {moodLabel(session.mood, locale)}</Text>
+          </View>
+          <View style={styles.storyActions}>
+            <ActionButton
+              label={t('Share', 'Chia sẻ')}
+              variant="ghost"
+              onPress={() => void Share.share({ message: buildSpoilerSafeShareText({ title: session.title, episodeNumber: episode.number, premise: session.premise }) })}
+            />
+            <ActionButton label={t('History', 'Lịch sử')} variant="ghost" onPress={() => router.push({ pathname: '/history', params: { plotId: session.id } })} />
+          </View>
+        </View>
       </View>
     </Screen>
   );
+}
+
+function moodLabel(mood: StoryPlotSession['mood'], locale: 'en' | 'vi'): string {
+  const labels = locale === 'vi'
+    ? { tense: 'Căng thẳng', romantic: 'Lãng mạn', mysterious: 'Bí ẩn', hopeful: 'Hy vọng' }
+    : { tense: 'Tense', romantic: 'Romantic', mysterious: 'Mysterious', hopeful: 'Hopeful' };
+  return labels[mood];
 }
 
 function readParam(value: string | string[] | undefined): string | null {
@@ -337,6 +344,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
+  storyUtilityRail: {
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
+  },
+  storyUtilityCopy: { gap: 4 },
+  storyUtilityKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
+  storyUtilityTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 22, lineHeight: 27, fontWeight: '700' },
+  storyUtilityMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   storyActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

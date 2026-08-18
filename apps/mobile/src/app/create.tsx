@@ -8,6 +8,7 @@ import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { createStoryRequestKey } from '@/features/story/request-key';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
+import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
@@ -86,8 +87,17 @@ export default function CreatePlotScreen() {
       <View style={styles.intro}>
         <Eyebrow>{t('Direct a new mini-drama', 'Dựng một mini-drama mới')}</Eyebrow>
         <Text style={styles.title}>{t('Frame the first scene.', 'Dựng cảnh đầu tiên.')}</Text>
-        <Text style={styles.subtitle}>{t('Spark · lead · mood · play.', 'Tia lửa · nhân vật · không khí · phát.')}</Text>
+        <Text style={styles.subtitle}>{t('One spark. One lead. One mood.', 'Một tia lửa. Một nhân vật. Một không khí.')}</Text>
       </View>
+
+      <DramaNavigationDock
+        active="create"
+        locale={locale}
+        onNavigate={(destination) => {
+          if (destination === 'create') return;
+          router.replace(destination === 'home' ? '/' : destination === 'library' ? '/library' : '/settings');
+        }}
+      />
 
       <DramaComposerPreview
         premise={draft.premise}
@@ -230,8 +240,8 @@ const styles = StyleSheet.create({
   title: {
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 42,
-    lineHeight: 47,
+    fontSize: 36,
+    lineHeight: 41,
     fontWeight: '700',
     letterSpacing: -1.2,
   },
@@ -286,7 +296,7 @@ const styles = StyleSheet.create({
     borderColor: colors.danger,
   },
   sparkInput: {
-    minHeight: 170,
+    minHeight: 132,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,

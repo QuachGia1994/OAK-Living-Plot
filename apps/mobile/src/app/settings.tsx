@@ -10,7 +10,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
 import type { NarratorVariant, StoryLocale, UiLocale } from '@/features/preferences/contracts';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
-import { DramaUtilityHero } from '@/ui/drama-visuals';
+import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
 import { colors, cinematic, radius, spacing, typography } from '@/ui/theme';
 
@@ -39,6 +39,7 @@ export default function SettingsScreen() {
   const [confirmation, setConfirmation] = useState('');
   const [postDeleteSignOutFailed, setPostDeleteSignOutFailed] = useState(false);
   const [apiHealth, setApiHealth] = useState<'unchecked' | 'ok' | 'unreachable'>(apiBaseUrl ? 'unchecked' : 'unreachable');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   async function savePreferences() {
     setBusy('preferences');
@@ -46,7 +47,9 @@ export default function SettingsScreen() {
     try {
       await save({ uiLocale, storyLocale, narratorVariant });
       setPreferenceDraft({});
-      setMessage(t('Preferences saved. Existing plots keep their original story locale.', 'Đã lưu tùy chọn. Cốt truyện hiện có vẫn giữ ngôn ngữ ban đầu.'));
+      setMessage(uiLocale === 'vi'
+        ? 'Đã lưu tùy chọn. Cốt truyện hiện có vẫn giữ ngôn ngữ ban đầu.'
+        : 'Preferences saved. Existing plots keep their original story locale.');
     } catch {
       setMessage(t('Preferences could not be saved.', 'Không thể lưu tùy chọn.'));
     } finally {
@@ -134,12 +137,19 @@ export default function SettingsScreen() {
         <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => router.back()} />
       </View>
 
-      <DramaUtilityHero
-        kicker={t('CONTROL ROOM', 'PHÒNG ĐIỀU KHIỂN')}
-        title={t('Set the defaults. Leave the canon untouched.', 'Đặt mặc định. Không chạm vào câu chuyện chuẩn.')}
-        detail={t('Preferences shape new stories and narration; past episodes and locked choices remain unchanged.', 'Tùy chọn định hình câu chuyện và giọng đọc mới; tập cũ và lựa chọn đã chốt không thay đổi.')}
-        mood="hopeful"
-        characterName="Settings"
+      <View style={styles.settingsIntro}>
+        <Text style={styles.settingsKicker}>{t('YOUR EXPERIENCE', 'TRẢI NGHIỆM CỦA BẠN')}</Text>
+        <Text style={styles.settingsTitle}>{t('Make Living Plot feel like yours.', 'Biến Living Plot thành không gian của bạn.')}</Text>
+        <Text style={styles.settingsBody}>{t('Language and narration affect new scenes. Your existing story canon stays untouched.', 'Ngôn ngữ và giọng kể áp dụng cho cảnh mới. Cốt truyện đã có vẫn được giữ nguyên.')}</Text>
+      </View>
+
+      <DramaNavigationDock
+        active="settings"
+        locale={locale}
+        onNavigate={(destination) => {
+          if (destination === 'settings') return;
+          router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/library');
+        }}
       />
 
       {preferenceError ? <ErrorState title={t('Preferences unavailable', 'Tùy chọn không khả dụng')} message={locale === 'vi' ? t('Preferences could not be loaded.', 'Không thể tải tùy chọn.') : preferenceError} /> : null}
@@ -147,16 +157,16 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <SectionHeader index="01" title={t('Story defaults', 'Mặc định câu chuyện')} meta={t('NEW REQUESTS', 'YÊU CẦU MỚI')} />
         <PreferenceRow label={t('Interface language', 'Ngôn ngữ giao diện')}>
-          <Option label="English" selected={uiLocale === 'en'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'en' }))} />
-          <Option label="Tiếng Việt" selected={uiLocale === 'vi'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'vi' }))} />
+          <Option locale={locale} label="English" selected={uiLocale === 'en'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'en', storyLocale: 'en-US', narratorVariant: 'en-narrator-female' }))} />
+          <Option locale={locale} label="Tiếng Việt" selected={uiLocale === 'vi'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'vi', storyLocale: 'vi-VN', narratorVariant: 'vi-narrator-female' }))} />
         </PreferenceRow>
         <PreferenceRow label={t('New story language', 'Ngôn ngữ câu chuyện mới')}>
-          <Option label="English" selected={storyLocale === 'en-US'} onPress={() => setPreferenceDraft((current) => ({ ...current, storyLocale: 'en-US' }))} />
-          <Option label="Tiếng Việt" selected={storyLocale === 'vi-VN'} onPress={() => setPreferenceDraft((current) => ({ ...current, storyLocale: 'vi-VN' }))} />
+          <Option locale={locale} label="English" selected={storyLocale === 'en-US'} onPress={() => setPreferenceDraft((current) => ({ ...current, storyLocale: 'en-US' }))} />
+          <Option locale={locale} label="Tiếng Việt" selected={storyLocale === 'vi-VN'} onPress={() => setPreferenceDraft((current) => ({ ...current, storyLocale: 'vi-VN' }))} />
         </PreferenceRow>
         <PreferenceRow label={t('Narrator', 'Giọng kể')}>
-          <Option label={t('English female', 'Nữ tiếng Anh')} selected={narratorVariant === 'en-narrator-female'} onPress={() => setPreferenceDraft((current) => ({ ...current, narratorVariant: 'en-narrator-female' }))} />
-          <Option label={t('Vietnamese female', 'Nữ tiếng Việt')} selected={narratorVariant === 'vi-narrator-female'} onPress={() => setPreferenceDraft((current) => ({ ...current, narratorVariant: 'vi-narrator-female' }))} />
+          <Option locale={locale} label={t('English female', 'Nữ tiếng Anh')} selected={narratorVariant === 'en-narrator-female'} onPress={() => setPreferenceDraft((current) => ({ ...current, narratorVariant: 'en-narrator-female' }))} />
+          <Option locale={locale} label={t('Vietnamese female', 'Nữ tiếng Việt')} selected={narratorVariant === 'vi-narrator-female'} onPress={() => setPreferenceDraft((current) => ({ ...current, narratorVariant: 'vi-narrator-female' }))} />
         </PreferenceRow>
         <Text style={styles.compactNote}>{t('Saved changes affect future requests only.', 'Thay đổi đã lưu chỉ áp dụng cho yêu cầu tương lai.')}</Text>
         <ActionButton label={t('Save preferences', 'Lưu tùy chọn')} busy={busy === 'preferences' || loading} onPress={() => void savePreferences()} />
@@ -165,11 +175,11 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <View style={styles.sectionStatusHeader}>
           <SectionHeader index="02" title={t('Privacy & data', 'Quyền riêng tư & dữ liệu')} meta={t('OWNED DATA', 'DỮ LIỆU SỞ HỮU')} />
-          <Pill tone={account.configured ? 'success' : 'neutral'}>{account.configured ? t('Live account', 'Tài khoản live') : t('Preview only', 'Chỉ xem trước')}</Pill>
+          <Pill tone={account.configured ? 'success' : 'neutral'}>{account.configured ? t('Connected', 'Đã kết nối') : t('Preview only', 'Chỉ xem trước')}</Pill>
         </View>
         <View style={styles.policyGrid}>
-          <PolicyTile kicker="D1" title={t('Canonical state', 'Trạng thái chuẩn')} body={t('Stories, choices and application-owned account state.', 'Câu chuyện, lựa chọn và trạng thái tài khoản thuộc ứng dụng.')} />
-          <PolicyTile kicker="R2" title={t('Private audio', 'Audio riêng tư')} body={t('Narration stays private and owned cleanup runs before account deletion.', 'Giọng đọc giữ riêng tư và được dọn trước khi xóa tài khoản.')} />
+          <PolicyTile kicker={t('STORIES', 'CỐT TRUYỆN')} title={t('Your story history', 'Lịch sử câu chuyện')} body={t('Stories and locked choices stay attached to your account.', 'Câu chuyện và lựa chọn đã chốt luôn gắn với tài khoản của bạn.')} />
+          <PolicyTile kicker={t('VOICE', 'GIỌNG ĐỌC')} title={t('Private narration', 'Giọng đọc riêng tư')} body={t('Generated narration remains private and is cleaned up with your account.', 'Giọng đọc đã tạo được giữ riêng tư và dọn cùng tài khoản của bạn.')} />
           <PolicyTile kicker={t('PRIVACY', 'RIÊNG TƯ')} title={t('No story text in analytics', 'Không đưa nội dung truyện vào analytics')} body={t('Exports exclude auth tokens, provider secrets, telemetry rows and private object keys.', 'Bản xuất loại trừ token, secret nhà cung cấp, telemetry và khóa object riêng tư.')} />
         </View>
         <ActionButton label={t('Export my Living Plot data', 'Xuất dữ liệu Living Plot của tôi')} variant="secondary" busy={busy === 'export'} disabled={!account.configured} onPress={() => void exportData()} />
@@ -183,7 +193,7 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.dangerSignal} />
         </View>
-        <Text style={styles.dangerBody}>{t('Private audio cleanup must succeed before canonical D1 deletion. Type the exact phrase to unlock the action.', 'Audio riêng tư phải được dọn thành công trước khi xóa D1 chuẩn. Nhập chính xác cụm từ để mở khóa thao tác.')}</Text>
+        <Text style={styles.dangerBody}>{t('Private narration is cleaned up before your story data is erased. Type the exact phrase to unlock the action.', 'Giọng đọc riêng tư được dọn trước khi dữ liệu câu chuyện bị xóa. Nhập chính xác cụm từ để mở khóa thao tác.')}</Text>
         <View style={styles.confirmDock}>
           <Text style={styles.confirmLabel}>{t('CONFIRMATION PHRASE', 'CỤM TỪ XÁC NHẬN')}</Text>
           <Text style={styles.confirmPhrase}>{ACCOUNT_DELETE_CONFIRMATION}</Text>
@@ -208,25 +218,39 @@ export default function SettingsScreen() {
         {postDeleteSignOutFailed ? <ActionButton label={t('Retry Clerk sign out', 'Thử đăng xuất Clerk lại')} busy={busy === 'signout'} onPress={() => void retrySignOut()} /> : null}
       </View>
 
-      <View style={styles.section}>
-        <View style={styles.sectionStatusHeader}>
-          <SectionHeader index="03" title={t('Safe diagnostics', 'Chẩn đoán an toàn')} meta={t('STATUS ONLY', 'CHỈ TRẠNG THÁI')} />
-          <Pill tone={apiHealth === 'ok' ? 'success' : 'neutral'}>{runtimeMode}</Pill>
+      <View style={styles.advancedGate}>
+        <View style={styles.advancedCopy}>
+          <Text style={styles.advancedTitle}>{t('Advanced & diagnostics', 'Nâng cao & chẩn đoán')}</Text>
+          <Text style={styles.compactNote}>{t('Technical status for testing and support.', 'Trạng thái kỹ thuật dành cho kiểm thử và hỗ trợ.')}</Text>
         </View>
-        <View style={styles.console}>
-          <Text style={styles.consoleHeader}>LIVING_PLOT / SAFE_DIAGNOSTICS</Text>
-          <Diagnostic label={t('App version', 'Phiên bản ứng dụng')} value={Constants.expoConfig?.version ?? t('unknown', 'không rõ')} />
-          <Diagnostic label="API" value={apiBaseUrl ? t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
-          <Diagnostic label="Clerk" value={auth.configured ? auth.isSignedIn ? t('signed in', 'đã đăng nhập') : t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
-          <Diagnostic label="RevenueCat" value={revenueCatMode} />
-          <Diagnostic label={t('API health', 'Trạng thái API')} value={apiHealth} />
-        </View>
-        <View style={styles.actions}>
-          <ActionButton label={t('Check API health', 'Kiểm tra API')} variant="secondary" busy={busy === 'health'} disabled={!apiBaseUrl} onPress={() => void checkHealth()} style={styles.flexAction} />
-          <ActionButton label={t('Share diagnostics', 'Chia sẻ chẩn đoán')} variant="ghost" onPress={() => void Share.share({ message: diagnostics })} style={styles.flexAction} />
-        </View>
-        <Text style={styles.compactNote}>{t('No tokens, internal user IDs, API URL, story text or secret values are included.', 'Không gồm token, ID người dùng nội bộ, URL API, nội dung truyện hay secret.')}</Text>
+        <ActionButton
+          label={advancedOpen ? t('Hide', 'Ẩn') : t('Open', 'Mở')}
+          variant="ghost"
+          onPress={() => setAdvancedOpen((current) => !current)}
+        />
       </View>
+
+      {advancedOpen ? (
+        <View style={styles.section}>
+          <View style={styles.sectionStatusHeader}>
+            <SectionHeader index="03" title={t('Safe diagnostics', 'Chẩn đoán an toàn')} meta={t('STATUS ONLY', 'CHỈ TRẠNG THÁI')} />
+            <Pill tone={apiHealth === 'ok' ? 'success' : 'neutral'}>{runtimeMode === 'live' ? t('Live', 'Trực tuyến') : t('Preview', 'Xem trước')}</Pill>
+          </View>
+          <View style={styles.console}>
+            <Text style={styles.consoleHeader}>LIVING_PLOT / SAFE_DIAGNOSTICS</Text>
+            <Diagnostic label={t('App version', 'Phiên bản ứng dụng')} value={Constants.expoConfig?.version ?? t('unknown', 'không rõ')} />
+            <Diagnostic label="API" value={apiBaseUrl ? t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
+            <Diagnostic label="Clerk" value={auth.configured ? auth.isSignedIn ? t('signed in', 'đã đăng nhập') : t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
+            <Diagnostic label="RevenueCat" value={revenueCatMode} />
+            <Diagnostic label={t('API health', 'Trạng thái API')} value={apiHealth} />
+          </View>
+          <View style={styles.actions}>
+            <ActionButton label={t('Check API health', 'Kiểm tra API')} variant="secondary" busy={busy === 'health'} disabled={!apiBaseUrl} onPress={() => void checkHealth()} style={styles.flexAction} />
+            <ActionButton label={t('Share diagnostics', 'Chia sẻ chẩn đoán')} variant="ghost" onPress={() => void Share.share({ message: diagnostics })} style={styles.flexAction} />
+          </View>
+          <Text style={styles.compactNote}>{t('No tokens, internal user IDs, API URL, story text or secret values are included.', 'Không gồm token, ID người dùng nội bộ, URL API, nội dung truyện hay secret.')}</Text>
+        </View>
+      ) : null}
 
       {message ? <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text> : null}
     </Screen>
@@ -249,7 +273,7 @@ function PreferenceRow({ label, children }: { label: string; children: ReactNode
   return <View style={styles.preferenceRow}><Text style={styles.preferenceLabel}>{label}</Text><View style={styles.options}>{children}</View></View>;
 }
 
-function Option({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+function Option({ locale, label, selected, onPress }: { locale: UiLocale; label: string; selected: boolean; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -259,7 +283,7 @@ function Option({ label, selected, onPress }: { label: string; selected: boolean
     >
       <View style={[styles.optionSignal, selected && styles.optionSignalSelected]} />
       <Text style={[styles.optionText, selected && styles.optionTextSelected]} numberOfLines={2}>{label}</Text>
-      <Text style={styles.optionState}>{selected ? 'SELECTED' : 'OPTION'}</Text>
+      <Text style={styles.optionState}>{selected ? (locale === 'vi' ? 'ĐÃ CHỌN' : 'SELECTED') : (locale === 'vi' ? 'TÙY CHỌN' : 'OPTION')}</Text>
     </Pressable>
   );
 }
@@ -285,6 +309,13 @@ function revenueCatStoreModeFromEnvForRuntime(): string {
 
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  settingsIntro: { gap: spacing.sm, paddingVertical: spacing.md },
+  settingsKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
+  settingsTitle: { maxWidth: 560, color: colors.ink, fontFamily: typography.display, fontSize: 34, lineHeight: 39, fontWeight: '700', letterSpacing: -0.8 },
+  settingsBody: { maxWidth: 560, color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
+  advancedGate: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
+  advancedCopy: { flex: 1, minWidth: 190, gap: 4 },
+  advancedTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 20, lineHeight: 24, fontWeight: '700' },
   section: { gap: spacing.md, paddingVertical: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
   sectionStatusHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   sectionHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },

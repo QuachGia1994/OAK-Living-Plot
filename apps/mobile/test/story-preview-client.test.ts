@@ -115,4 +115,35 @@ describe('PreviewStoryExperienceClient', () => {
     expect(resumed.episode.status).toBe('awaiting_choice');
     expect(resumed.episode.choices).toEqual(first.episode.choices);
   });
+
+  it('keeps seeded preview story content Vietnamese when story locale is vi-VN', async () => {
+    const client = new PreviewStoryExperienceClient('vi', 'vi-VN');
+    const home = await client.loadHome();
+    const plot = await client.loadPlot(home.recentPlots[0].id);
+
+    expect(home.recentPlots[0].title).toBe('Tin Nhắn Lúc Nửa Đêm');
+    expect(home.recentPlots[0].updatedLabel).toBe('Vừa xong');
+    expect(home.retention.dailyPrompt.label).toBe('Tin nhắn sai thời điểm');
+    expect(plot.episode.title).toBe('Giọng Nói Từ Ba Năm Trước');
+    expect(plot.episode.choices[0].label).toContain('Mở cửa');
+  });
+
+  it('generates preview episodes and continuations in the selected Vietnamese story locale', async () => {
+    const client = new PreviewStoryExperienceClient('vi', 'vi-VN');
+    const plot = await client.createPlot({
+      premise: 'Một nhiếp ảnh gia nhìn thấy cùng một người lạ trong những bức ảnh cách nhau mười năm.',
+      mood: 'mysterious',
+      characterName: 'Mai',
+    });
+
+    expect(plot.episode.title).toBe('Bước Ngoặt Đầu Tiên');
+    expect(plot.episode.summary).toContain('Mai');
+    expect(plot.episode.choices[1].intent).toBe('điều tra trước');
+
+    const committed = await client.commitChoice(plot.id, plot.episode.id, plot.episode.choices[1].id);
+    const next = await client.requestNextEpisode(plot.id);
+    expect(next.episode.title).toBe('Hậu Quả Ập Đến');
+    expect(next.episode.body).toContain(committed.episode.committedConsequence);
+    expect(next.episode.summary).toContain('Tập 2');
+  });
 });

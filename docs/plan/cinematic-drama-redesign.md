@@ -124,12 +124,12 @@ The palette avoids generic neon SaaS gradients. Light is treated as scene lighti
 
 ### Scene surfaces
 
-- Player scene minimum height: 560px-equivalent native points.
-- Home poster minimum height: 500.
+- Player scene minimum height: 620 native points so the scene remains the dominant surface.
+- Home poster minimum height: 430 native points to preserve cinematic presence without pushing discovery/navigation below the fold.
 - Scene radius token: 28.
 - Choice radius token: 20.
 - Subtitle dock uses a high-opacity near-black overlay for legible text over lighting/art.
-- Character silhouette remains visible behind the dialogue layer.
+- Deterministic illustrated character portrait remains visible behind the dialogue layer; the former head/body silhouette rig is no longer the primary character treatment.
 
 ### Branching choices
 
@@ -175,7 +175,7 @@ Reduced-motion preference disables or collapses these animations to static state
 ### Story player
 
 - Full visual scene is the primary surface.
-- Main character is visibly present as a rim-lit silhouette.
+- Main character is visibly present as a deterministic illustrated portrait with face, hair, eyes, clothing and mood rim lighting.
 - Scene motif reflects episode language where possible.
 - Canonical body is shown as subtitle beats, not a long paragraph.
 - User taps the scene to advance subtitle beats.
@@ -208,7 +208,7 @@ Reduced-motion preference disables or collapses these animations to static state
 ### Library
 
 - Active and paused stories now render as cinematic cover tiles rather than title/resume rows.
-- Covers reuse the same mood lighting, character silhouette and content-derived scene motifs as the core player.
+- Covers reuse the same mood lighting, illustrated character portrait and content-derived scene motifs as the core player.
 - Episode number and decision status are visible directly on the cover.
 - Open/read remains a cover interaction; pause/restore stays a separate explicit action so archive semantics are unchanged.
 - Paused covers are visually subdued without hiding their identity.
@@ -281,6 +281,36 @@ Final RC productization closes the redesign without expanding backend/media scop
 - Final release acceptance requires exact-SHA GitHub Actions quality, iOS static export, unsigned native IPA, and Android APK gates to pass.
 
 The cinematic redesign is considered complete after that exact-SHA native gate. Real generated scene media remains a separately gated product expansion.
+
+## Big Stage C — Visual Drama Core correction — COMPLETE
+
+The screenshot-based product review exposed two gaps in the earlier RC: visual hierarchy was still too close to an editorial reader, and preview mode could mix Vietnamese UI with English story content. Stage C corrects both without changing canonical backend story rules.
+
+- Preview story clients are keyed by both `uiLocale` and `storyLocale`; `storyLocale` now controls the seed plot, Episode 1, continuation episodes, choices, intents and consequences.
+- Vietnamese preview content now includes the seed story, Daily Spark, episode titles/body/summary, branch labels and `Vừa xong` metadata instead of falling back to English.
+- Preview preferences persist through SecureStore so a selected Vietnamese experience survives app relaunch in unsigned/APK test builds.
+- Selecting Vietnamese UI sets Vietnamese story/narrator defaults in the same draft operation; story and narrator remain independently adjustable afterward.
+- The procedural head/body silhouette is replaced by a deterministic illustrated portrait rig with face, brows, eyes, hair, skin, clothing, earring/highlight and mood rim lighting. Scene motifs and mood lighting remain content-derived.
+- Home and Library episode labels use `TẬP` in Vietnamese rather than leaking `EP`.
+- Story playback removes the large pre-scene metadata rail; the scene/subtitle/choice loop now occupies the primary visual hierarchy, with share/history/mood metadata moved into a lower utility rail.
+- Home reduces oversized poster height and moves the visual `Up next` shelf before retention/quota HUD metrics.
+
+No artwork URL/video/media field is invented in the API contract in this stage.
+
+## Big Stage D — Product Surface completion — COMPLETE
+
+Stage D applies the visual-first correction to the remaining consumer surfaces instead of extending developer-facing styling.
+
+- Home, Create and Library share a four-destination native drama navigation dock: Explore, Create, Shelf and Settings, localized in EN/VI.
+- Create is compressed into a clearer director flow: smaller scene preview, shorter premise composer and tighter mood swatches while preserving the same `PlotDraft`, validation and generation request behavior.
+- History adds a compact branch map above canonical episode chronology, showing completed nodes/branch keys and the next A/B/C decision without changing history ordering.
+- Settings drops the `CONTROL ROOM` framing, uses consumer-facing language, removes D1/R2 implementation terms from primary privacy copy and hides safe diagnostics behind an explicit Advanced control.
+- Selecting interface language Vietnamese defaults story locale and narrator to Vietnamese in the preference draft, fixing the common one-tap VN setup while preserving independent advanced choices.
+- Plus removes backend/paywall/store terminology from primary consumer copy; recovery/testing details remain in secondary utility text where required.
+- The final subtitle beat no longer exposes an actionable accessibility button role when there is no next beat.
+- Kiro read-only review found no credible blocker/high business-state regression; one final-beat accessibility issue was accepted and fixed. Agy was retried with an explicit repo path but its CLI invocation still failed, so no unverified Agy findings were used.
+
+Release acceptance for C+D is the same exact-SHA gate: quality (lint/type/tests/migrations/dry-run), iOS static, unsigned native iOS IPA and Android APK.
 
 ### Stage F — Real generated scene media gate
 

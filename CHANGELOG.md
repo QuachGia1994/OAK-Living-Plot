@@ -59,6 +59,8 @@ All notable changes to Living Plot will be documented in this file.
 - iOS unsigned Native RC pipeline on GitHub macOS: explicit Expo iOS identity, clean prebuild/CocoaPods, Release `iphoneos` Xcode build with code signing disabled, negative signature verification, `Payload/LivingPlot.app` IPA packaging, and artifact upload.
 
 ### Changed
+- Completed the visual-first correction pass for Big Stages C+D: Home/Library/Create now share a persistent four-destination drama navigation dock, story playback gives the scene frame priority over utility metadata, History adds a compact branch map, Settings returns to a consumer-facing experience with diagnostics hidden behind Advanced, and Plus removes backend/store jargon from the primary subscription surface.
+- Replaced the former head/body silhouette scene rig with deterministic illustrated character portraits (face, hair, eyes, clothing, rim lighting) while preserving the existing mood- and content-derived scene motifs and avoiding a backend media-schema change.
 - Completed final cinematic RC productization: localized EN/VI cinematic interaction copy and accessibility cues, semantic scene progress, localized form labels, History empty-state recovery, and final small-screen/reduced-motion audit without changing canonical business logic.
 - Completed the cinematic surface redesign across History, Plus, Auth, and Settings: visual recap filmstrip, Plus stage-pass metrics, ambient email-code identity flow, structured privacy/data control room, safer diagnostic console, and reduced explanatory copy across Home/Create/Story without changing canonical business logic.
 - Reworked the Phase 1 native mobile presentation into a Huashu-inspired Cinematic Editorial system: warmer low-chroma surfaces, restrained amber/rust accent, narrative display type, mono operational metadata, flatter controls, ruled reading lists/timelines, and fewer generic dashboard cards across Home, Create, Story, Library, History, Plus, Auth, and Settings.
@@ -68,6 +70,9 @@ All notable changes to Living Plot will be documented in this file.
 - Narrative prompt guidance now keeps the canonical protagonist visible, requires durable scene progress, and keeps narrative/branch output in the requested locale.
 
 ### Fixed
+- Fixed preview localization so `storyLocale` actually controls seeded stories, Episode 1, continuations, choices, intents and consequences; Vietnamese preview stories no longer fall back to English while the UI is Vietnamese. Preview summary timestamps and episode labels are localized as well.
+- Preview preferences now persist on-device through SecureStore, and choosing the Vietnamese interface defaults new-story locale plus narrator to Vietnamese while still allowing those two preferences to be changed independently afterward.
+- Fixed the final subtitle-beat accessibility state so a scene no longer announces itself as an actionable button when no further beat can be advanced.
 - Hardened unsigned iOS RC dependency resolution against CocoaPods/GitHub `429 Too Many Requests`: the job now builds a minimal local CocoaPods Specs repo from exact pinned RevenueCat upstream podspecs (`PurchasesHybridCommon 18.30.0`, `RevenueCat 5.83.1`) so dependencies remain transitive with normal pod semantics while the throttled public Specs CDN is excluded from the RC install path.
 - Reworked the remote retention summary from a compound `UNION ALL` file execution that failed on D1 into a single aggregate row executed through a Node/Wrangler command runner, so development activation/D1/D7/depth metrics are visible.
 - Unified ESLint 9 across workspaces and loaded Cloudflare Vitest test types so clean-install quality gates pass.

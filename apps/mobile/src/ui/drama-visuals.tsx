@@ -283,6 +283,7 @@ export function DramaRecapFrame({
   choiceLabel,
   consequence,
   pendingLabel,
+  locale,
 }: {
   episodeNumber: number;
   title: string;
@@ -290,16 +291,17 @@ export function DramaRecapFrame({
   choiceLabel?: string;
   consequence?: string;
   pendingLabel: string;
+  locale: UiLocale;
 }) {
   const tone = cinematic.scene.mysterious;
   const sceneText = `${title} ${summary} ${consequence ?? ''}`;
   return (
     <View style={styles.recapFrame}>
       <View style={[styles.recapVisual, { backgroundColor: tone.base }]}>
-        <SceneArtwork mood="mysterious" characterName={`EP ${episodeNumber}`} sceneText={sceneText} compact />
+        <SceneArtwork mood="mysterious" characterName={`${locale === 'vi' ? 'TẬP' : 'EP'} ${episodeNumber}`} sceneText={sceneText} compact />
         <View style={styles.recapShade} />
         <View style={styles.recapVisualMeta}>
-          <Text style={styles.recapEpisode}>EP {String(episodeNumber).padStart(2, '0')}</Text>
+          <Text style={styles.recapEpisode}>{locale === 'vi' ? 'TẬP' : 'EP'} {String(episodeNumber).padStart(2, '0')}</Text>
           <View style={[styles.recapSignal, { backgroundColor: tone.rim }]} />
         </View>
         <Text style={styles.recapTitle} numberOfLines={2}>{title}</Text>
@@ -345,7 +347,7 @@ export function DramaSceneStage({
 
   return (
     <Pressable
-      accessibilityRole={consequence ? undefined : 'button'}
+      accessibilityRole={consequence || !hasNextBeat ? undefined : 'button'}
       accessibilityLabel={consequence ? undefined : `${characterName}. ${beat}`}
       accessibilityHint={consequence ? undefined : hasNextBeat ? copy.sceneAdvanceHint : copy.sceneFinalHint}
       disabled={Boolean(consequence) || !hasNextBeat}
@@ -356,7 +358,7 @@ export function DramaSceneStage({
       <View style={styles.sceneTopShade} />
       <View style={styles.sceneHeader}>
         <View>
-          <Text style={styles.sceneEpisode}>EP {String(episodeNumber).padStart(2, '0')}</Text>
+          <Text style={styles.sceneEpisode}>{locale === 'vi' ? 'TẬP' : 'EP'} {String(episodeNumber).padStart(2, '0')}</Text>
           <Text style={styles.sceneTitle} numberOfLines={2}>{title}</Text>
         </View>
         <View
@@ -500,21 +502,70 @@ function SceneArtwork({
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <View style={[styles.sceneBase, { backgroundColor: tone.deep }]} />
-      <View style={[styles.lightOrb, styles.lightOrbPrimary, { backgroundColor: tone.glow, opacity: compact ? 0.48 : 0.62 }]} />
-      <View style={[styles.lightOrb, styles.lightOrbSecondary, { backgroundColor: tone.rim, opacity: compact ? 0.11 : 0.16 }]} />
+      <View style={[styles.lightOrb, styles.lightOrbPrimary, { backgroundColor: tone.glow, opacity: compact ? 0.5 : 0.7 }]} />
+      <View style={[styles.lightOrb, styles.lightOrbSecondary, { backgroundColor: tone.rim, opacity: compact ? 0.13 : 0.2 }]} />
       <View style={[styles.horizonGlow, { backgroundColor: tone.haze }]} />
-      <View style={[styles.characterRig, alignRight ? styles.characterRight : styles.characterLeft, compact && styles.characterRigCompact]}>
-        <View style={[styles.characterRimBody, { backgroundColor: tone.rim }]} />
-        <View style={styles.characterBody} />
-        <View style={[styles.characterRimHead, { backgroundColor: tone.rim }]} />
-        <View style={styles.characterHead} />
-      </View>
       <SceneMotifLayer motif={motif} tone={tone} />
       <View style={[styles.setPanel, styles.setPanelOne, { borderColor: tone.rim }]} />
       <View style={[styles.setPanel, styles.setPanelTwo, { borderColor: tone.glow }]} />
+      <CharacterPortrait characterName={characterName} tone={tone} alignRight={alignRight} compact={compact} />
       <View style={styles.floorShadow} />
     </View>
   );
+}
+
+function CharacterPortrait({
+  characterName,
+  tone,
+  alignRight,
+  compact,
+}: {
+  characterName: string;
+  tone: SceneTone;
+  alignRight: boolean;
+  compact: boolean;
+}) {
+  const palette = characterPaletteFor(characterName);
+  return (
+    <View style={[
+      styles.portraitRig,
+      alignRight ? styles.portraitRight : styles.portraitLeft,
+      compact && styles.portraitRigCompact,
+    ]}>
+      <View style={[styles.portraitAura, { backgroundColor: tone.rim }]} />
+      <View style={[styles.portraitHairBack, { backgroundColor: palette.hair }]} />
+      <View style={[styles.portraitShoulder, { backgroundColor: palette.clothing, borderColor: tone.rim }]} />
+      <View style={[styles.portraitNeck, { backgroundColor: palette.skin }]} />
+      <View style={[styles.portraitFace, { backgroundColor: palette.skin }]}>
+        <View style={styles.portraitBrows}>
+          <View style={[styles.portraitBrow, { backgroundColor: palette.hair }]} />
+          <View style={[styles.portraitBrow, { backgroundColor: palette.hair }]} />
+        </View>
+        <View style={styles.portraitEyes}>
+          <View style={styles.portraitEye}><View style={[styles.portraitIris, { backgroundColor: palette.eye }]} /></View>
+          <View style={styles.portraitEye}><View style={[styles.portraitIris, { backgroundColor: palette.eye }]} /></View>
+        </View>
+        <View style={styles.portraitNose} />
+        <View style={styles.portraitMouth} />
+      </View>
+      <View style={[styles.portraitHairCap, { backgroundColor: palette.hair }]} />
+      <View style={[styles.portraitHairSide, styles.portraitHairSideLeft, { backgroundColor: palette.hair }]} />
+      <View style={[styles.portraitHairSide, styles.portraitHairSideRight, { backgroundColor: palette.hair }]} />
+      <View style={[styles.portraitHighlight, { borderColor: tone.rim }]} />
+      <View style={[styles.portraitEarring, { backgroundColor: tone.rim }]} />
+    </View>
+  );
+}
+
+function characterPaletteFor(characterName: string): { skin: string; hair: string; clothing: string; eye: string } {
+  const value = [...characterName].reduce((total, character) => total + character.charCodeAt(0), 0);
+  const palettes = [
+    { skin: '#E5B49A', hair: '#201617', clothing: '#24304C', eye: '#2D251F' },
+    { skin: '#D6A07F', hair: '#191418', clothing: '#4A2437', eye: '#33241D' },
+    { skin: '#F0C3A9', hair: '#33221D', clothing: '#283D38', eye: '#26362E' },
+    { skin: '#B98264', hair: '#16191E', clothing: '#3A2E54', eye: '#1D252C' },
+  ] as const;
+  return palettes[value % palettes.length];
 }
 
 function SceneMotifLayer({ motif, tone }: { motif: SceneMotif; tone: SceneTone }) {
@@ -650,7 +701,7 @@ function usePulse(): Animated.AnimatedInterpolation<number> | Animated.Value {
 
 const styles = StyleSheet.create({
   poster: {
-    minHeight: 500,
+    minHeight: 430,
     overflow: 'hidden',
     borderRadius: cinematic.radius.scene,
     borderWidth: StyleSheet.hairlineWidth,
@@ -686,7 +737,7 @@ const styles = StyleSheet.create({
   posterAction: { color: '#FFF9EF', fontSize: 15, fontWeight: '900' },
   posterArrow: { fontSize: 24, fontWeight: '400' },
   coverTile: {
-    minHeight: 310,
+    minHeight: 260,
     overflow: 'hidden',
     borderRadius: cinematic.radius.choice,
     borderWidth: StyleSheet.hairlineWidth,
@@ -734,7 +785,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 30, lineHeight: 34, fontWeight: '700' },
   emptyDetail: { color: '#D6CEC3', fontSize: 13, lineHeight: 20 },
   composerPreview: {
-    minHeight: 360,
+    minHeight: 285,
     overflow: 'hidden',
     borderRadius: cinematic.radius.scene,
     borderWidth: StyleSheet.hairlineWidth,
@@ -769,7 +820,7 @@ const styles = StyleSheet.create({
   composerPremise: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 20, lineHeight: 27, fontWeight: '700' },
   moodSwatch: {
     minWidth: 145,
-    minHeight: 180,
+    minHeight: 154,
     flex: 1,
     flexBasis: '46%',
     overflow: 'hidden',
@@ -786,11 +837,11 @@ const styles = StyleSheet.create({
   moodSwatchTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   moodSwatchState: { color: '#BDB5AA', fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   moodSwatchSignal: { width: 22, height: 2, borderRadius: radius.pill },
-  moodSwatchCopy: { gap: 5, paddingTop: spacing.xxl },
+  moodSwatchCopy: { gap: 5, paddingTop: spacing.lg },
   moodSwatchLabel: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 22, lineHeight: 26, fontWeight: '700' },
   moodSwatchDescription: { color: '#C8C0B5', fontSize: 11, lineHeight: 16 },
   castingPreview: {
-    minHeight: 290,
+    minHeight: 250,
     overflow: 'hidden',
     borderRadius: cinematic.radius.scene,
     borderWidth: StyleSheet.hairlineWidth,
@@ -844,7 +895,7 @@ const styles = StyleSheet.create({
   recapConsequence: { color: colors.ink, fontFamily: typography.display, fontSize: 15, lineHeight: 23 },
   recapPending: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, lineHeight: 15, fontWeight: '800', letterSpacing: 0.55, textTransform: 'uppercase' },
   sceneStage: {
-    minHeight: 560,
+    minHeight: 620,
     overflow: 'hidden',
     borderBottomLeftRadius: cinematic.radius.scene,
     borderBottomRightRadius: cinematic.radius.scene,
@@ -854,6 +905,28 @@ const styles = StyleSheet.create({
   lightOrbPrimary: { width: 430, height: 430, top: -105, right: -145 },
   lightOrbSecondary: { width: 320, height: 320, top: 150, left: -150 },
   horizonGlow: { position: 'absolute', left: -80, right: -80, bottom: 120, height: 170, opacity: 0.42, borderRadius: radius.pill },
+  portraitRig: { position: 'absolute', bottom: 84, width: 230, height: 390, alignItems: 'center', justifyContent: 'flex-start' },
+  portraitRigCompact: { bottom: 18, transform: [{ scale: 0.68 }] },
+  portraitLeft: { left: -2 },
+  portraitRight: { right: -2 },
+  portraitAura: { position: 'absolute', top: 12, width: 190, height: 260, borderRadius: 96, opacity: 0.12 },
+  portraitHairBack: { position: 'absolute', top: 38, width: 142, height: 186, borderTopLeftRadius: 74, borderTopRightRadius: 74, borderBottomLeftRadius: 48, borderBottomRightRadius: 48 },
+  portraitShoulder: { position: 'absolute', bottom: 0, width: 220, height: 174, borderTopLeftRadius: 92, borderTopRightRadius: 92, borderWidth: 1, opacity: 0.98 },
+  portraitNeck: { position: 'absolute', top: 164, width: 50, height: 66, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
+  portraitFace: { position: 'absolute', top: 70, width: 100, height: 124, borderRadius: 48, alignItems: 'center' },
+  portraitHairCap: { position: 'absolute', top: 48, width: 110, height: 62, borderTopLeftRadius: 55, borderTopRightRadius: 55, borderBottomLeftRadius: 28, borderBottomRightRadius: 16, transform: [{ rotate: '-5deg' }] },
+  portraitHairSide: { position: 'absolute', top: 88, width: 26, height: 128, borderRadius: 18 },
+  portraitHairSideLeft: { left: 58, transform: [{ rotate: '5deg' }] },
+  portraitHairSideRight: { right: 58, transform: [{ rotate: '-7deg' }] },
+  portraitBrows: { position: 'absolute', top: 42, left: 19, right: 19, flexDirection: 'row', justifyContent: 'space-between' },
+  portraitBrow: { width: 22, height: 3, borderRadius: 2, opacity: 0.76 },
+  portraitEyes: { position: 'absolute', top: 53, left: 17, right: 17, flexDirection: 'row', justifyContent: 'space-between' },
+  portraitEye: { width: 26, height: 11, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#F6EEE6' },
+  portraitIris: { width: 7, height: 7, borderRadius: 4 },
+  portraitNose: { position: 'absolute', top: 70, width: 2, height: 17, borderRadius: 2, backgroundColor: 'rgba(91,53,44,0.35)' },
+  portraitMouth: { position: 'absolute', top: 94, width: 27, height: 4, borderRadius: 3, backgroundColor: '#914D50', opacity: 0.9 },
+  portraitHighlight: { position: 'absolute', top: 62, width: 112, height: 142, borderRadius: 58, borderWidth: 1, opacity: 0.22 },
+  portraitEarring: { position: 'absolute', top: 139, right: 58, width: 4, height: 22, borderRadius: 3, opacity: 0.9 },
   characterRig: { position: 'absolute', bottom: 128, width: 190, height: 330, alignItems: 'center' },
   characterRigCompact: { bottom: 54, transform: [{ scale: 0.72 }] },
   characterLeft: { left: 18 },

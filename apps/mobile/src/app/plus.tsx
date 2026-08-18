@@ -34,8 +34,8 @@ export default function PlusScreen() {
       const result = await coordinator.presentPaywall(session);
       setEntitlement(result.entitlement);
       setMessage(result.entitlement.plusActive
-        ? t('Plus is active on the backend.', 'Plus đã hoạt động trên backend.')
-        : t('Store action finished. Backend Plus is not active yet; retry refresh after RevenueCat webhook sync.', 'Thao tác cửa hàng đã xong nhưng Plus trên backend chưa hoạt động; hãy làm mới sau khi webhook RevenueCat đồng bộ.'));
+        ? t('Plus access is active.', 'Quyền Plus đã hoạt động.')
+        : t('The store action finished, but Plus access is still syncing. Refresh access in a moment.', 'Thao tác cửa hàng đã xong nhưng quyền Plus vẫn đang đồng bộ. Hãy làm mới sau một chút.'));
     } catch (error) {
       setMessage(billingMessage(error, locale));
     } finally {
@@ -50,7 +50,7 @@ export default function PlusScreen() {
     try {
       const result = await coordinator.refresh(session);
       setEntitlement(result.entitlement);
-      setMessage(result.entitlement.plusActive ? t('Backend Plus is active.', 'Backend Plus đang hoạt động.') : t('Backend entitlement is still Free.', 'Quyền truy cập trên backend vẫn là Free.'));
+      setMessage(result.entitlement.plusActive ? t('Plus access is active.', 'Quyền Plus đang hoạt động.') : t('Your account is still on Free.', 'Tài khoản của bạn vẫn ở gói miễn phí.'));
     } catch (error) {
       setMessage(billingMessage(error, locale));
     } finally {
@@ -65,7 +65,7 @@ export default function PlusScreen() {
     try {
       const result = await coordinator.restore(session);
       setEntitlement(result.entitlement);
-      setMessage(result.entitlement.plusActive ? t('Purchases restored and Plus is active.', 'Đã khôi phục giao dịch và Plus đang hoạt động.') : t('Restore completed; backend entitlement remains Free.', 'Đã khôi phục; quyền truy cập trên backend vẫn là Free.'));
+      setMessage(result.entitlement.plusActive ? t('Purchases restored and Plus is active.', 'Đã khôi phục giao dịch và Plus đang hoạt động.') : t('Restore completed; this account is still on Free.', 'Đã khôi phục; tài khoản này vẫn ở gói miễn phí.'));
     } catch (error) {
       setMessage(billingMessage(error, locale));
     } finally {
@@ -94,22 +94,21 @@ export default function PlusScreen() {
         <View style={styles.passTopRow}>
           <View>
             <Eyebrow>{t('Daily story pass', 'Thẻ drama mỗi ngày')}</Eyebrow>
-            <Text style={styles.passTitle}>{entitlementActive ? t('Plus is active', 'Plus đang hoạt động') : t('Free → Plus', 'Free → Plus')}</Text>
+            <Text style={styles.passTitle}>{entitlementActive ? t('Plus is active', 'Plus đang hoạt động') : t('Free → Plus', 'Miễn phí → Plus')}</Text>
           </View>
           <View style={styles.passPills}>
-            <Pill tone={entitlementActive ? 'success' : 'accent'}>{entitlementActive ? t('PLUS ACTIVE', 'PLUS ĐANG BẬT') : 'PLUS'}</Pill>
-            <Pill tone={storeMode === 'test_store' ? 'success' : 'neutral'}>{storeModeLabel(storeMode, locale)}</Pill>
+            <Pill tone={entitlementActive ? 'success' : 'accent'}>{entitlementActive ? t('PLUS ACTIVE', 'PLUS ĐANG BẬT') : t('FREE', 'MIỄN PHÍ')}</Pill>
           </View>
         </View>
 
         <View style={styles.metricGrid}>
-          <PlanMetric label={t('Story episodes', 'Tập truyện')} free="3" plus="20" />
-          <PlanMetric label={t('Fresh narration', 'Giọng đọc mới')} free="1" plus="10" />
+          <PlanMetric locale={locale} label={t('Story episodes', 'Tập truyện')} free="3" plus="20" />
+          <PlanMetric locale={locale} label={t('Fresh narration', 'Giọng đọc mới')} free="1" plus="10" />
         </View>
 
         <View style={styles.passFooter}>
           <Text style={styles.passFootnote}>{t('Replaying narration you already generated never uses another voice slot.', 'Phát lại giọng đã tạo không dùng thêm lượt giọng.')}</Text>
-          {entitlement ? <Text style={styles.backendState}>BACKEND · {entitlement.tier.toUpperCase()}</Text> : null}
+          {entitlement ? <Text style={styles.backendState}>{t('ACCESS', 'QUYỀN')} · {entitlement.plusActive ? 'PLUS' : t('FREE', 'MIỄN PHÍ')}</Text> : null}
         </View>
       </View>
 
@@ -124,7 +123,7 @@ export default function PlusScreen() {
 
       <View style={styles.primaryAction}>
         {auth.configured && !auth.isSignedIn ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} variant="secondary" onPress={() => router.push('/auth')} /> : null}
-        <ActionButton label={entitlementActive ? t('Open Plus access', 'Mở quyền Plus') : t('Open Plus paywall', 'Mở paywall Plus')} busy={busyAction === 'paywall'} disabled={busyAction !== null && busyAction !== 'paywall'} onPress={presentPaywall} />
+        <ActionButton label={entitlementActive ? t('Plus is ready', 'Plus đã sẵn sàng') : t('Upgrade to Plus', 'Nâng cấp lên Plus')} busy={busyAction === 'paywall'} disabled={busyAction !== null && busyAction !== 'paywall'} onPress={presentPaywall} />
       </View>
 
       <View style={styles.utilityBar}>
@@ -143,13 +142,13 @@ export default function PlusScreen() {
   );
 }
 
-function PlanMetric({ label, free, plus }: { label: string; free: string; plus: string }) {
+function PlanMetric({ locale, label, free, plus }: { locale: 'en' | 'vi'; label: string; free: string; plus: string }) {
   return (
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
       <View style={styles.metricValues}>
         <View>
-          <Text style={styles.metricTier}>FREE</Text>
+          <Text style={styles.metricTier}>{locale === 'vi' ? 'MIỄN PHÍ' : 'FREE'}</Text>
           <Text style={styles.metricFree}>{free}</Text>
         </View>
         <Text style={styles.metricArrow}>→</Text>
@@ -160,12 +159,6 @@ function PlanMetric({ label, free, plus }: { label: string; free: string; plus: 
       </View>
     </View>
   );
-}
-
-function storeModeLabel(mode: 'test_store' | 'platform_store' | 'not_configured', locale: 'en' | 'vi'): string {
-  if (mode === 'test_store') return 'Test Store';
-  if (mode === 'platform_store') return locale === 'vi' ? 'Cửa hàng nền tảng' : 'Platform Store';
-  return locale === 'vi' ? 'Cửa hàng offline' : 'Store offline';
 }
 
 function storeModeDetail(mode: 'test_store' | 'platform_store' | 'not_configured', locale: 'en' | 'vi'): string {

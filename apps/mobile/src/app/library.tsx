@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { StoryLibrarySnapshot, StoryPlotSummary } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
+import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { DramaCoverTile, DramaEmptyStage, DramaLoadingStage } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
@@ -61,7 +62,6 @@ export default function StoryLibraryScreen() {
     <Screen>
       <View style={styles.topBar}>
         <BrandMark />
-        <ActionButton label={sharedUiCopy.home[locale]} variant="ghost" onPress={() => router.replace('/')} />
       </View>
 
       <View style={styles.hero}>
@@ -69,6 +69,15 @@ export default function StoryLibraryScreen() {
         <Text style={styles.title}>{t('Every story has a face.', 'Mỗi câu chuyện đều có một gương mặt.')}</Text>
         <Text style={styles.body}>{t('Continue the scene that is calling you back.', 'Tiếp tục cảnh đang gọi bạn quay lại.')}</Text>
       </View>
+
+      <DramaNavigationDock
+        active="library"
+        locale={locale}
+        onNavigate={(destination) => {
+          if (destination === 'library') return;
+          router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/settings');
+        }}
+      />
 
       {error ? (
         <ErrorState
@@ -174,7 +183,7 @@ function LibrarySection({
                 premise={plot.resumeLine || plot.premise}
                 characterName={plot.characterName}
                 mood={plot.mood}
-                episodeLabel={`EP ${String(plot.episodeNumber).padStart(2, '0')}`}
+                episodeLabel={`${t('EP', 'TẬP')} ${String(plot.episodeNumber).padStart(2, '0')}`}
                 statusLabel={status}
                 subdued={action === 'restore'}
                 onPress={() => onOpen(plot)}

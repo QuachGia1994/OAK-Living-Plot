@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
-import type { StoryHistorySnapshot } from '@/features/story/contracts';
+import type { StoryHistoryItem, StoryHistorySnapshot } from '@/features/story/contracts';
 import { useStoryExperienceClient } from '@/features/story/story-client-context';
 import { DramaEmptyStage, DramaLoadingStage, DramaRecapFrame, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
@@ -89,7 +89,9 @@ export default function StoryHistoryScreen() {
       ) : null}
 
       {history && history.items.length > 0 ? (
-        <View style={styles.timeline}>
+        <>
+          <BranchJourney items={history.items} locale={locale} />
+          <View style={styles.timeline}>
           <View style={styles.timelineRail} />
           {history.items.map((item, index) => {
             const locked = item.status === 'choice_committed';
@@ -103,7 +105,7 @@ export default function StoryHistoryScreen() {
                 <View style={styles.timelineContent}>
                   <View style={styles.itemHeader}>
                     <Pill tone={locked ? 'success' : 'accent'}>{locked ? t('LOCKED', 'ĐÃ CHỐT') : t('NOW', 'HIỆN TẠI')}</Pill>
-                    <Text style={styles.itemMeta}>EP {String(item.episodeNumber).padStart(2, '0')}</Text>
+                    <Text style={styles.itemMeta}>{locale === 'vi' ? 'TẬP' : 'EP'} {String(item.episodeNumber).padStart(2, '0')}</Text>
                   </View>
                   <DramaRecapFrame
                     episodeNumber={item.episodeNumber}
@@ -112,14 +114,47 @@ export default function StoryHistoryScreen() {
                     choiceLabel={item.choiceLabel ? t(`Choice ${item.choiceKey}: ${item.choiceLabel}`, `Lựa chọn ${item.choiceKey}: ${item.choiceLabel}`) : undefined}
                     consequence={item.consequence}
                     pendingLabel={t('Your next choice is still waiting inside this scene.', 'Lựa chọn tiếp theo vẫn đang chờ trong cảnh này.')}
+                    locale={locale}
                   />
                 </View>
               </View>
             );
           })}
-        </View>
+          </View>
+        </>
       ) : null}
     </Screen>
+  );
+}
+
+function BranchJourney({ items, locale }: { items: StoryHistoryItem[]; locale: 'en' | 'vi' }) {
+  const current = items[items.length - 1];
+  return (
+    <View style={styles.branchMap}>
+      <View style={styles.branchHeader}>
+        <Text style={styles.branchKicker}>{locale === 'vi' ? 'BẢN ĐỒ NHÁNH' : 'BRANCH MAP'}</Text>
+        <Text style={styles.branchMeta}>{items.length} {locale === 'vi' ? 'CẢNH' : 'SCENES'}</Text>
+      </View>
+      <View style={styles.branchPath}>
+        {items.map((item, index) => (
+          <View key={item.episodeId} style={styles.branchStep}>
+            <View style={[styles.branchNode, item.status === 'choice_committed' && styles.branchNodeLocked]}>
+              <Text style={styles.branchNodeText}>{String(item.episodeNumber).padStart(2, '0')}</Text>
+            </View>
+            {item.choiceKey ? <Text style={styles.branchChoice}>{item.choiceKey}</Text> : null}
+            {index < items.length - 1 ? <View style={styles.branchConnector} /> : null}
+          </View>
+        ))}
+      </View>
+      {current?.status === 'awaiting_choice' ? (
+        <View style={styles.branchFuture}>
+          <Text style={styles.branchFutureLabel}>{locale === 'vi' ? 'LỰA CHỌN TIẾP THEO' : 'NEXT TURN'}</Text>
+          <View style={styles.branchFutureChoices}>
+            {['A', 'B', 'C'].map((key) => <View key={key} style={styles.branchGhost}><Text style={styles.branchGhostText}>{key}</Text></View>)}
+          </View>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -131,6 +166,22 @@ function readParam(value: string | string[] | undefined): string | null {
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   emptyState: { gap: spacing.md },
+  branchMap: { gap: spacing.md, padding: spacing.md, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceQuiet },
+  branchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  branchKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  branchMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  branchPath: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
+  branchStep: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  branchNode: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, borderWidth: 1, borderColor: colors.accentSoft, backgroundColor: colors.background },
+  branchNodeLocked: { borderColor: colors.success, backgroundColor: colors.surfaceSuccess },
+  branchNodeText: { color: colors.ink, fontFamily: typography.mono, fontSize: 10, fontWeight: '900' },
+  branchChoice: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 11, fontWeight: '900' },
+  branchConnector: { width: 28, height: 1, backgroundColor: colors.borderStrong },
+  branchFuture: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
+  branchFutureLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
+  branchFutureChoices: { flexDirection: 'row', gap: spacing.xs },
+  branchGhost: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.accentSoft, backgroundColor: colors.surfaceWarmDeep },
+  branchGhostText: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900' },
   timeline: { position: 'relative', gap: spacing.lg, paddingTop: spacing.sm },
   timelineRail: { position: 'absolute', top: spacing.md, bottom: spacing.xl, left: 17, width: 1, backgroundColor: colors.borderStrong },
   timelineItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
