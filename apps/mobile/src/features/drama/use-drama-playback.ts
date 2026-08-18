@@ -15,6 +15,7 @@ export interface DramaFailure {
 export function useDramaPlayback(input: { dramaId: string | null; enabled: boolean }) {
   const client = useDramaExperienceClient();
   const currentSceneId = useRef<string | null>(null);
+  const loadVersion = useRef(0);
   const [drama, setDrama] = useState<Drama | null>(null);
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [sceneComplete, setSceneComplete] = useState(false);
@@ -31,6 +32,7 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
   }, []);
 
   const load = useCallback(async () => {
+    const requestVersion = ++loadVersion.current;
     if (!input.dramaId) {
       setFailure({ source: 'load', code: 'not_found' });
       setLoading(false);
@@ -39,11 +41,12 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
     setLoading(true);
     setFailure(null);
     try {
-      adoptDrama(await client.loadDrama(input.dramaId));
+      const next = await client.loadDrama(input.dramaId);
+      if (requestVersion === loadVersion.current) adoptDrama(next);
     } catch (error) {
-      setFailure(toFailure('load', error));
+      if (requestVersion === loadVersion.current) setFailure(toFailure('load', error));
     } finally {
-      setLoading(false);
+      if (requestVersion === loadVersion.current) setLoading(false);
     }
   }, [adoptDrama, client, input.dramaId]);
 
@@ -61,28 +64,14 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
 
   useEffect(() => {
     if (!input.enabled) return;
-    let active = true;
-    setLoading(true);
-    setFailure(null);
-    if (!input.dramaId) {
-      setFailure({ source: 'load', code: 'not_found' });
-      setLoading(false);
-      return;
-    }
-    void client.loadDrama(input.dramaId)
-      .then((next) => {
-        if (active) adoptDrama(next);
-      })
-      .catch((error: unknown) => {
-        if (active) setFailure(toFailure('load', error));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    const timer = setTimeout(() => {
+      void load();
+    }, 0);
     return () => {
-      active = false;
+      clearTimeout(timer);
+      loadVersion.current += 1;
     };
-  }, [adoptDrama, client, input.dramaId, input.enabled]);
+  }, [input.enabled, load]);
 
   const commitChoice = useCallback(async () => {
     if (!drama || !selectedChoiceId || action) return;

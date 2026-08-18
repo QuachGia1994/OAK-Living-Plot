@@ -348,9 +348,10 @@ export function DramaSceneStage({
   const hasNextBeat = beatIndex < beats.length - 1;
 
   useEffect(() => {
-    setBeatIndex(0);
-    if (!consequence && beats.length <= 1) onPlaybackComplete?.();
-  }, [beats.length, body, consequence, onPlaybackComplete]);
+    if (consequence || beats.length > 1) return;
+    const timer = setTimeout(() => onPlaybackComplete?.(), 0);
+    return () => clearTimeout(timer);
+  }, [beats.length, consequence, onPlaybackComplete]);
 
   return (
     <Pressable

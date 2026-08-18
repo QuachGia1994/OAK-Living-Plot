@@ -29,10 +29,7 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
   useEffect(() => {
     if (!asset) return;
     const poll = nextMediaPoll(asset.status, autoPollCount);
-    if (!poll) {
-      if (isPending(asset.status) && !statusRetryNeeded) setStatusRetryNeeded(true);
-      return;
-    }
+    if (!poll) return;
     let active = true;
     const timer = setTimeout(() => {
       void client.loadStatus(asset.id)
@@ -52,7 +49,7 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [asset, autoPollCount, client, locale, statusRetryNeeded]);
+  }, [asset, autoPollCount, client, locale]);
 
   useEffect(() => {
     if (!asset || asset.status !== 'ready' || loadedAssetId.current === asset.id) return;
@@ -120,6 +117,8 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
   }
 
   const progress = playerStatus.duration > 0 ? Math.min(1, playerStatus.currentTime / playerStatus.duration) : 0;
+  const pollBudgetExhausted = Boolean(asset && isPending(asset.status) && !nextMediaPoll(asset.status, autoPollCount));
+  const needsStatusRefresh = statusRetryNeeded || pollBudgetExhausted;
 
   return (
     <View style={styles.card}>
@@ -160,11 +159,11 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
       ) : (
         <ActionButton
           label={asset && isPending(asset.status)
-            ? statusRetryNeeded ? t('Check voice status', 'Kiểm tra trạng thái giọng') : t('Preparing voice…', 'Đang chuẩn bị giọng…')
+            ? needsStatusRefresh ? t('Check voice status', 'Kiểm tra trạng thái giọng') : t('Preparing voice…', 'Đang chuẩn bị giọng…')
             : asset?.status === 'failed' ? t('Retry voice', 'Thử lại giọng đọc') : t('Generate voice', 'Tạo giọng đọc')}
           variant="secondary"
           busy={busy}
-          disabled={Boolean(asset && isPending(asset.status) && !statusRetryNeeded)}
+          disabled={Boolean(asset && isPending(asset.status) && !needsStatusRefresh)}
           onPress={() => void (asset && isPending(asset.status) ? refreshStatus() : requestVoice())}
         />
       )}
