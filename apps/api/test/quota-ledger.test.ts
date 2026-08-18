@@ -112,6 +112,25 @@ describe('D1QuotaLedger', () => {
     expect(reconciliation.daily).toMatchObject({ voiceConsumed: 0, voiceReserved: 1 });
   });
 
+  it('re-arms released logical work with the same key on the current UTC day', async () => {
+    const ledger = quotaLedger();
+    await ledger.reserve({ userId: 'user-1', reservationKey: 'retry-same-key-001', resourceType: 'text_episode', tier: 'free' });
+    await ledger.release({ userId: 'user-1', reservationKey: 'retry-same-key-001' });
+
+    nowMs = Date.parse('2026-08-17T00:00:00.100Z');
+    const retried = await ledger.reserve({ userId: 'user-1', reservationKey: 'retry-same-key-001', resourceType: 'text_episode', tier: 'free' });
+
+    expect(retried.ok).toBe(true);
+    if (!retried.ok) return;
+    expect(retried.value).toMatchObject({ status: 'reserved', utcDay: '2026-08-17', resourceId: null });
+    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textConsumed: 0, textReserved: 0 });
+    expect(await ledger.getDailyUsage('user-1', '2026-08-17')).toMatchObject({ textConsumed: 0, textReserved: 1 });
+    expect(await countEvents('retry-same-key-001', 'reserved')).toBe(2);
+    expect(await countEvents('retry-same-key-001', 'released')).toBe(1);
+    expect((await ledger.reconcileDay('user-1', '2026-08-16')).reconciled).toBe(true);
+    expect((await ledger.reconcileDay('user-1', '2026-08-17')).reconciled).toBe(true);
+  });
+
   it('consumes an idempotent reservation exactly once', async () => {
     const ledger = quotaLedger();
     await ledger.reserve({ userId: 'user-1', reservationKey: 'consume-001', resourceType: 'text_episode', tier: 'free' });

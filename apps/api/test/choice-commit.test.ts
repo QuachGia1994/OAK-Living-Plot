@@ -24,7 +24,7 @@ beforeEach(async () => {
 });
 
 describe('D1ChoiceCommitter', () => {
-  it('atomically commits one choice, completes the episode, applies state, and advances version once', async () => {
+  it('atomically commits one choice, completes the scene, applies state, and advances version once', async () => {
     const episode = await seedReadyEpisode('user-1', 'plot-1', 'generation-choice-1');
     const committer = new D1ChoiceCommitter(db);
 
@@ -50,7 +50,7 @@ describe('D1ChoiceCommitter', () => {
       status: 'relationship shifts',
     });
     expect(result.value.state.facts).toContainEqual({
-      key: `episode:${episode.id}:fact:1`,
+      key: `scene:${episode.id}:fact:1`,
       text: 'Linh knows An intentionally hid the message.',
     });
     expect(result.value.state.tone).toBe('raw');
@@ -168,7 +168,7 @@ describe('D1ChoiceCommitter', () => {
 
     const result = await committer.commit(commitInput(episode, episode.choices[0].id, 1));
 
-    expect(result).toEqual({ ok: false, error: { code: 'invalid_state', message: 'Stored episode, choice, or plot state is invalid.' } });
+    expect(result).toEqual({ ok: false, error: { code: 'invalid_state', message: 'Stored scene, choice, or drama state is invalid.' } });
     expect(await countRows('choice_commits')).toBe(0);
     expect((await loadPlot('plot-1'))?.version).toBe(1);
     expect(await loadEpisodeStatus(episode.id)).toBe('ready');

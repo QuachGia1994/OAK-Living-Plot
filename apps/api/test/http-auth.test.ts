@@ -4,7 +4,6 @@ import migrationSql from '../migrations/0001_initial.sql?raw';
 import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
 import { handleRequest } from '../src/http/app';
-import { D1UserRepository } from '../src/persistence/d1-user-repository';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
 
 const runtimeEnv = env as unknown as AppEnv;
@@ -71,26 +70,10 @@ describe('protected HTTP boundary', () => {
     expect(body.user.id).toBe(row?.id);
   });
 
-  it('returns an owned plot without exposing the internal owner id', async () => {
-    const owner = await seedOwnedPlot();
+  it('does not expose the removed legacy plot-read route', async () => {
     const response = await handleRequest(request('/v1/plots/plot-owner'), testEnv, {
       sessionVerifier: verifier('clerk-owner'),
     });
-
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { plot: Record<string, unknown> };
-    expect(body.plot.id).toBe('plot-owner');
-    expect(body.plot).not.toHaveProperty('userId');
-    expect(owner.id).toBeTruthy();
-  });
-
-  it('hides another user plot even when the client supplies the owner id', async () => {
-    const owner = await seedOwnedPlot();
-    const response = await handleRequest(
-      request('/v1/plots/plot-owner', { 'x-user-id': owner.id }),
-      testEnv,
-      { sessionVerifier: verifier('clerk-attacker') },
-    );
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: 'not_found' });
@@ -132,12 +115,3 @@ function request(path: string, headers?: HeadersInit): Request {
   return new Request(`https://living-plot.test${path}`, { headers });
 }
 
-async function seedOwnedPlot(): Promise<{ id: string }> {
-  const users = new D1UserRepository(db);
-  const owner = await users.resolveOrCreate('clerk-owner');
-  await db
-    .prepare('INSERT INTO plots (id, user_id, title, premise) VALUES (?, ?, ?, ?)')
-    .bind('plot-owner', owner.id, 'Private plot', 'A story that belongs only to its authenticated owner.')
-    .run();
-  return owner;
-}

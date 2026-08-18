@@ -4,7 +4,7 @@ import { applyCommittedChoiceState } from '../src/choice/state-application';
 import { makeValidProposal } from './drama-fixtures';
 
 describe('applyCommittedChoiceState', () => {
-  it('applies episode facts plus the selected choice delta into canonical v2 state', () => {
+  it('applies scene facts plus the selected choice delta into canonical v2 state', () => {
     const proposal = makeValidProposal();
     proposal.threadChanges = {
       open: [{ title: 'A new suspicion appears.', urgency: 70 }],
@@ -27,11 +27,11 @@ describe('applyCommittedChoiceState', () => {
       status: 'relationship shifts',
     });
     expect(result.value.facts).toEqual([
-      { key: 'episode:episode-1:fact:1', text: 'Linh knows An intentionally hid the message.' },
+      { key: 'scene:episode-1:fact:1', text: 'Linh knows An intentionally hid the message.' },
       { key: 'choice:choice-a:fact:1', text: 'Linh notices An is still withholding something.' },
     ]);
     expect(result.value.openThreads).toEqual([
-      { key: 'episode:episode-1:thread:1', title: 'A new suspicion appears.', urgency: 70 },
+      { key: 'scene:episode-1:thread:1', title: 'A new suspicion appears.', urgency: 70 },
       { key: 'choice:choice-a:thread:1', title: 'Linh tests An’s honesty.', urgency: 85 },
     ]);
     expect(result.value.tone).toBe('raw');

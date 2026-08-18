@@ -306,7 +306,73 @@ export class D1QuotaLedger {
 
   private async resolveReserveReplay(existing: ReservationRow, input: QuotaReserveInput): Promise<QuotaResult> {
     if (existing.resource_type !== input.resourceType) return keyConflict();
-    return { ok: true, value: await this.snapshot(existing, true) };
+    if (existing.status !== 'released') return { ok: true, value: await this.snapshot(existing, true) };
+    return this.reactivateReleasedReservation(existing, input);
+  }
+
+  private async reactivateReleasedReservation(existing: ReservationRow, input: QuotaReserveInput): Promise<QuotaResult> {
+    const now = this.clock();
+    const utcDay = utcDayFromMillis(now);
+    const limit = quotaLimitFor(input.tier, input.resourceType);
+    const eventId = crypto.randomUUID();
+    const usageExpression = input.resourceType === 'text_episode'
+      ? 'text_episodes + text_reserved'
+      : 'voiced_episodes + voice_reserved';
+    const counterColumn = input.resourceType === 'text_episode' ? 'text_reserved' : 'voice_reserved';
+
+    try {
+      await this.db.batch([
+        this.db
+          .prepare('INSERT OR IGNORE INTO daily_usage (user_id, usage_date) VALUES (?, ?)')
+          .bind(input.userId, utcDay),
+        this.db
+          .prepare(
+            `UPDATE quota_reservations
+             SET status = 'reserved', utc_day = ?, resource_id = NULL, last_event_id = ?, updated_at = ?
+             WHERE id = ? AND status = 'released'
+               AND EXISTS (
+                 SELECT 1 FROM daily_usage
+                 WHERE user_id = ? AND usage_date = ? AND ${usageExpression} < ?
+               )`,
+          )
+          .bind(utcDay, eventId, now, existing.id, input.userId, utcDay, limit),
+        this.db
+          .prepare(
+            `INSERT INTO usage_events (id, user_id, utc_day, resource_type, event_type, reservation_key, created_at)
+             SELECT ?, user_id, utc_day, resource_type, 'reserved', reservation_key, ?
+             FROM quota_reservations
+             WHERE id = ? AND status = 'reserved' AND last_event_id = ?`,
+          )
+          .bind(eventId, now, existing.id, eventId),
+        this.db
+          .prepare(
+            `UPDATE daily_usage SET ${counterColumn} = ${counterColumn} + 1, updated_at = ?
+             WHERE user_id = ? AND usage_date = ?
+               AND EXISTS (
+                 SELECT 1 FROM quota_reservations
+                 WHERE id = ? AND status = 'reserved' AND last_event_id = ?
+               )`,
+          )
+          .bind(now, input.userId, utcDay, existing.id, eventId),
+      ]);
+    } catch {
+      const raced = await this.loadReservation(input.userId, input.reservationKey);
+      if (raced?.status === 'reserved') return { ok: true, value: await this.snapshot(raced, true) };
+      return { ok: false, error: { code: 'persistence_error', message: 'Quota retry reservation failed.' } };
+    }
+
+    const current = await this.loadReservation(input.userId, input.reservationKey);
+    if (current?.status === 'reserved') return { ok: true, value: await this.snapshot(current, current.last_event_id !== eventId) };
+    return {
+      ok: false,
+      error: {
+        code: 'quota_exceeded',
+        message: 'Daily quota exhausted.',
+        resourceType: input.resourceType,
+        limit,
+        utcDay,
+      },
+    };
   }
 
   private async resolveTerminalRace(

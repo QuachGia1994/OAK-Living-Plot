@@ -67,8 +67,9 @@ Mobile `GenerationJob` represents user-visible generation state. Server mutation
 
 - initial drama creation reuses the caller creation key and a stable generation key;
 - continuation reuses its generation key after a lost response;
-- provider failure releases the reservation so an explicit retry is possible;
-- a published-but-response-lost mutation converges on persisted state rather than generating a second canonical scene.
+- provider failure releases the reservation; retrying the same logical generation key re-arms that released reservation against the current UTC-day quota instead of creating duplicate work;
+- a published-but-response-lost mutation converges on persisted state rather than generating a second canonical scene;
+- HTTP `201 Created` reflects the first successfully published canonical Drama, not the earlier insertion of an internal D1 `plots` row.
 
 ## Media pipeline
 

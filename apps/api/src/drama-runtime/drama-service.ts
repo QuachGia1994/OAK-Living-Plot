@@ -87,12 +87,12 @@ export class DramaService {
     if (existing) {
       const settled = await this.settleExistingReadyQuota(input.userId, existing);
       if (!settled.ok) return settled;
-      return { ok: true, value: { drama: existing.session, created: created.value.created } };
+      return { ok: true, value: { drama: existing.session, created: false } };
     }
 
     const generated = await this.generateForDrama(input.userId, created.value.id, input.generationKey);
     if (!generated.ok) return generated;
-    return { ok: true, value: { drama: generated.value, created: created.value.created } };
+    return { ok: true, value: { drama: generated.value, created: true } };
   }
 
   async loadDrama(userId: string, dramaId: string): Promise<DramaResult<Drama>> {
