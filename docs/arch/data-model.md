@@ -3,7 +3,7 @@
 > updated 2026-08-16 · 0.0.0
 
 ## Source of truth
-Cloudflare D1 is the canonical Phase 1 story/product state. `apps/api/migrations/*.sql` is the schema source of truth. AI/TTS/provider responses are not canonical until server validation succeeds and the resulting state is persisted.
+Cloudflare D1 is the canonical Phase 1 persistence store. `apps/api/migrations/*.sql` is the schema source of truth, while `Drama/Scene/Branch/DramaState` is the application model projected by `D1DramaRepository`. AI/TTS/provider responses are not canonical until server validation succeeds and the resulting state is persisted.
 
 ## Tables
 
@@ -26,10 +26,10 @@ The three candidate choices attached to an episode. SQL enforces positions 1–3
 Append-only committed choice history. An episode can be committed once, sequence numbers are unique within a plot, and composite foreign keys prevent committing a choice from another episode. Migration `0003_choice_commit.sql` adds choice key/intent/consequence, state versions before/after commit, and the canonical `state_json_after` snapshot.
 
 ### `usage_events`
-Append-only quota audit ledger added in migration `0004_quota_ledger.sql`. Records `reserved`, `consumed`, and `released` transitions for text/voice work on the reservation's original UTC day.
+Append-only quota transition ledger added in migration `0004_quota_ledger.sql`. Migration `0009_retryable_quota_reservations.sql` removes the old one-event-per-type uniqueness rule so an explicitly retried logical generation key can append a new reserve/release cycle. Each attempt remains guarded by a unique event ID and materialized reservation state.
 
 ### `quota_reservations`
-Materialized current quota-reservation lifecycle keyed by `(user_id, reservation_key)`. Used to make reserve/consume/release idempotent and race-safe.
+Materialized current quota-reservation lifecycle keyed by `(user_id, reservation_key)`. Used to make reserve/consume/release idempotent and race-safe. A released logical key may be re-armed for an explicit retry; its `utc_day` then moves to the retry's current server UTC day.
 
 ### `daily_usage`
 Materialized UTC-day enforcement counters. Migration 0004 rebuilds the table with independent text/voice consumed counters plus text/voice in-flight reservation counters. Effective quota usage is `consumed + reserved`; voice is no longer constrained by same-day text consumption.
@@ -82,8 +82,8 @@ The current Wrangler `database_id` is a non-production placeholder and `preview_
 - Only one choice can be committed per episode.
 - A choice cannot be committed against a different episode.
 - Free/Plus text and voice quotas are enforced atomically under concurrent reservation attempts.
-- Quota reserve/consume/release retries are idempotent and materialized counters reconcile with the append-only usage ledger.
-- Voice quota is independent from same-day text consumption and UTC rollover preserves the reservation's original day.
+- Quota reserve/consume/release retries are idempotent, released generation keys can be re-armed without duplicate logical work, and materialized counters reconcile with the append-only usage ledger.
+- Voice quota is independent from same-day text consumption; an in-flight attempt stays on its reservation day, while a released attempt re-armed after UTC rollover uses the new day.
 - Concurrent audio requests for one episode/voice converge on one asset, one voice reservation, and one Queue job.
 - Ready audio replay does not reserve or consume fresh voice quota.
 - R2 object keys remain backend-only and audio reads are owner-scoped through the Worker.

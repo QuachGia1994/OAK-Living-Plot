@@ -4,6 +4,7 @@ import migrationOne from '../migrations/0001_initial.sql?raw';
 import migrationTwo from '../migrations/0002_episode_publication.sql?raw';
 import migrationThree from '../migrations/0003_choice_commit.sql?raw';
 import migrationFour from '../migrations/0004_quota_ledger.sql?raw';
+import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?raw';
 import type { AppEnv } from '../src/env';
 import { D1QuotaLedger } from '../src/quota/d1-quota-ledger';
 import { quotaPolicyFor } from '../src/quota/policy';
@@ -17,6 +18,7 @@ beforeAll(async () => {
   await applySqlMigration(db, migrationTwo);
   await applySqlMigration(db, migrationThree);
   await applySqlMigration(db, migrationFour);
+  await applySqlMigration(db, migrationNine);
 });
 
 beforeEach(async () => {
