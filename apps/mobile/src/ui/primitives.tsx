@@ -252,8 +252,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     gap: spacing.lg,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xxxl + spacing.lg,
   },
   screenContentWithFooter: {
     paddingBottom: spacing.lg,

@@ -5,6 +5,7 @@ All notable changes to Living Plot will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- Premium core-flow polish: tighter display type scale, shared Mina artwork crop variants (hero/card/scene), native-tab-safe scroll bottom inset, and top-level Create/Settings without redundant Cancel/Back chrome.
 - Living Plot brand system: LP serif monogram assets, app/adaptive/splash icons, stronger BrandMark lockup, and Expo app config pointed at the new brand files.
 - Native system tab bar via `expo-router/unstable-native-tabs` for Home/Create/Library/Settings (SF Symbols + Material symbols); iOS 26 adopts Liquid Glass from the system tab bar; removed the custom RN capsule dock.
 - Professional app shell pass: shared `SectionHeader`/`SettingsRow` primitives without changing business logic.

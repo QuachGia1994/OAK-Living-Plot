@@ -508,20 +508,25 @@ export function DramaLoadingStage({ label, detail, locale }: { label: string; de
   );
 }
 
+type ArtworkVariant = 'hero' | 'card' | 'scene';
+
 function SceneArtwork({
   mood,
   characterName,
   sceneText = '',
   compact = false,
+  variant,
 }: {
   mood: DramaMood;
   characterName: string;
   sceneText?: string;
   compact?: boolean;
+  variant?: ArtworkVariant;
 }) {
   const tone = cinematic.scene[mood];
   const alignRight = characterName.length % 2 === 0;
   const motif = sceneMotifForText(sceneText);
+  const artworkVariant: ArtworkVariant = variant ?? (compact ? 'card' : 'scene');
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <View style={[styles.sceneBase, { backgroundColor: tone.deep }]} />
@@ -531,7 +536,7 @@ function SceneArtwork({
       <SceneMotifLayer motif={motif} tone={tone} />
       <View style={[styles.setPanel, styles.setPanelOne, { borderColor: tone.rim }]} />
       <View style={[styles.setPanel, styles.setPanelTwo, { borderColor: tone.glow }]} />
-      <CharacterPortrait characterName={characterName} tone={tone} alignRight={alignRight} compact={compact} />
+      <CharacterPortrait characterName={characterName} tone={tone} alignRight={alignRight} compact={compact} variant={artworkVariant} />
       <View style={styles.floorShadow} />
     </View>
   );
@@ -542,11 +547,13 @@ function CharacterPortrait({
   tone,
   alignRight,
   compact,
+  variant,
 }: {
   characterName: string;
   tone: SceneTone;
   alignRight: boolean;
   compact: boolean;
+  variant: ArtworkVariant;
 }) {
   const clothingAccent = characterClothingAccentFor(characterName);
   return (
@@ -554,14 +561,22 @@ function CharacterPortrait({
       styles.portraitRig,
       alignRight ? styles.portraitRight : styles.portraitLeft,
       compact && styles.portraitRigCompact,
+      variant === 'hero' && styles.portraitRigHero,
     ]}>
       <View style={[styles.portraitAura, { backgroundColor: tone.rim, borderColor: clothingAccent }]} />
-      <Image
-        source={require('../../assets/living-plot-scene-mina-3d.jpg')}
-        style={styles.portraitArtwork}
-        resizeMode="cover"
-        accessibilityIgnoresInvertColors
-      />
+      <View style={styles.portraitCrop}>
+        <Image
+          source={require('../../assets/living-plot-scene-mina-3d.jpg')}
+          style={[
+            styles.portraitArtwork,
+            variant === 'hero' && styles.portraitArtworkHero,
+            variant === 'card' && styles.portraitArtworkCard,
+            variant === 'scene' && styles.portraitArtworkScene,
+          ]}
+          resizeMode="cover"
+          accessibilityIgnoresInvertColors
+        />
+      </View>
     </View>
   );
 }
@@ -735,7 +750,7 @@ const styles = StyleSheet.create({
     backgroundColor: cinematic.overlay.strong,
   },
   posterCharacter: { fontFamily: typography.mono, fontSize: 10, fontWeight: '800', letterSpacing: 1.7, textTransform: 'uppercase' },
-  posterTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 37, lineHeight: 41, fontWeight: '700', letterSpacing: -1 },
+  posterTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 28, lineHeight: 33, fontWeight: '700', letterSpacing: -0.5 },
   posterPremise: { color: '#DDD5CA', fontSize: 14, lineHeight: 21 },
   posterActionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing.xs },
   posterAction: { color: '#FFF9EF', fontSize: 15, fontWeight: '900' },
@@ -886,7 +901,7 @@ const styles = StyleSheet.create({
     backgroundColor: cinematic.overlay.subtitle,
   },
   utilityHeroKicker: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
-  utilityHeroTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 30, lineHeight: 35, fontWeight: '700', letterSpacing: -0.6 },
+  utilityHeroTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700', letterSpacing: -0.5 },
   utilityHeroDetail: { color: '#D3CBC0', fontSize: 13, lineHeight: 20 },
   recapFrame: {
     overflow: 'hidden',
@@ -919,11 +934,16 @@ const styles = StyleSheet.create({
   lightOrbSecondary: { width: 320, height: 320, top: 150, left: -150 },
   horizonGlow: { position: 'absolute', left: -80, right: -80, bottom: 120, height: 170, opacity: 0.42, borderRadius: radius.pill },
   portraitRig: { position: 'absolute', bottom: 70, width: 290, height: 430, alignItems: 'center', justifyContent: 'flex-end' },
-  portraitRigCompact: { bottom: 4, transform: [{ scale: 0.62 }] },
-  portraitLeft: { left: -24 },
-  portraitRight: { right: -24 },
+  portraitRigCompact: { bottom: 8, transform: [{ scale: 0.68 }] },
+  portraitRigHero: { bottom: 40, width: 320, height: 460 },
+  portraitLeft: { left: -18 },
+  portraitRight: { right: -18 },
   portraitAura: { position: 'absolute', top: 34, width: 230, height: 300, borderRadius: 116, borderWidth: StyleSheet.hairlineWidth, opacity: 0.16 },
+  portraitCrop: { width: '100%', height: '100%', overflow: 'hidden', borderRadius: 24 },
   portraitArtwork: { width: '100%', height: '100%' },
+  portraitArtworkHero: { transform: [{ scale: 1.12 }, { translateY: 18 }] },
+  portraitArtworkCard: { transform: [{ scale: 1.2 }, { translateY: 28 }] },
+  portraitArtworkScene: { transform: [{ scale: 1.08 }, { translateY: 12 }] },
   signalRig: { position: 'absolute', top: 170, right: 38, width: 96, height: 168, alignItems: 'center', justifyContent: 'center' },
   signalHalo: { position: 'absolute', width: 132, height: 132, borderRadius: 66, opacity: 0.14 },
   signalDevice: { width: 72, height: 132, gap: 10, paddingHorizontal: 12, paddingTop: 24, borderRadius: 16, borderWidth: 1, backgroundColor: 'rgba(3,3,3,0.72)' },
@@ -950,7 +970,7 @@ const styles = StyleSheet.create({
   sceneTopShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: cinematic.overlay.top },
   sceneHeader: { position: 'absolute', top: spacing.lg, left: spacing.lg, right: spacing.lg, gap: spacing.md },
   sceneIndex: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
-  sceneTitle: { maxWidth: 280, color: '#FFF9EF', fontFamily: typography.display, fontSize: 27, lineHeight: 31, fontWeight: '700', letterSpacing: -0.6 },
+  sceneTitle: { maxWidth: 300, color: '#FFF9EF', fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: -0.5 },
   sceneProgress: { flexDirection: 'row', gap: 5 },
   sceneProgressSegment: { flex: 1, height: 2, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.16)' },
   subtitleDock: {

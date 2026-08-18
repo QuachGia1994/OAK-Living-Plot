@@ -6,7 +6,7 @@ import type { DramaDraft, DramaMood } from '@/features/drama/contracts';
 import { DramaClientError } from '@/features/drama/contracts';
 import { dramaMoodOptionsFor, hasDraftErrors, normalizeDramaDraft, validateDramaDraft } from '@/features/drama/setup';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
-import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
+import { useUiCopy } from '@/features/localization/ui-copy';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch, DramaUtilityHero } from '@/ui/drama-visuals';
@@ -71,17 +71,13 @@ export default function CreateDramaScreen() {
           characterName="Create"
         />
         {auth.isLoaded ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} onPress={() => router.replace('/auth')} /> : null}
-        <ActionButton label={sharedUiCopy.cancel[locale]} variant="ghost" onPress={() => router.replace('/')} />
       </Screen>
     );
   }
 
   return (
     <Screen>
-      <View style={styles.topBar}>
-        <BrandMark />
-        <ActionButton label={sharedUiCopy.cancel[locale]} variant="ghost" onPress={() => router.back()} />
-      </View>
+      <BrandMark />
 
       <View style={styles.intro}>
         <Eyebrow>{t('Direct a new mini-drama', 'Dựng một mini-drama mới')}</Eyebrow>
@@ -222,11 +218,6 @@ function FieldHeader({ step, label, hint }: { step: string; label: string; hint:
 }
 
 const styles = StyleSheet.create({
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   intro: {
     gap: spacing.sm,
     paddingTop: spacing.md,
@@ -234,10 +225,10 @@ const styles = StyleSheet.create({
   title: {
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 36,
-    lineHeight: 41,
+    fontSize: 28,
+    lineHeight: 33,
     fontWeight: '700',
-    letterSpacing: -1.2,
+    letterSpacing: -0.5,
   },
   subtitle: {
     color: colors.inkMuted,

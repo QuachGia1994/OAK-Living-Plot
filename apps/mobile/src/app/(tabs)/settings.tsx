@@ -6,7 +6,7 @@ import { ACCOUNT_DELETE_CONFIRMATION } from '@/features/account/contracts';
 import { deleteAccountThenSignOut } from '@/features/account/delete-flow';
 import { HttpAccountDataClient, UnavailableAccountDataClient } from '@/features/account/http-account-client';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
-import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
+import { useUiCopy } from '@/features/localization/ui-copy';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
 import type { DramaLocale, NarratorVariant, UiLocale } from '@/features/preferences/contracts';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
@@ -131,10 +131,7 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
-      <View style={styles.topBar}>
-        <BrandMark />
-        <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => router.back()} />
-      </View>
+      <BrandMark />
 
       <View style={styles.settingsIntro}>
         <Text style={styles.settingsKicker}>{t('YOUR EXPERIENCE', 'TRẢI NGHIỆM CỦA BẠN')}</Text>
@@ -297,10 +294,9 @@ function revenueCatStoreModeFromEnvForRuntime(): string {
 }
 
 const styles = StyleSheet.create({
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   settingsIntro: { gap: spacing.sm, paddingVertical: spacing.md },
   settingsKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
-  settingsTitle: { maxWidth: 560, color: colors.ink, fontFamily: typography.display, fontSize: 34, lineHeight: 39, fontWeight: '700', letterSpacing: -0.8 },
+  settingsTitle: { maxWidth: 560, color: colors.ink, fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700', letterSpacing: -0.4 },
   settingsBody: { maxWidth: 560, color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
   advancedGate: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
   advancedCopy: { flex: 1, minWidth: 190, gap: 4 },
@@ -310,7 +306,7 @@ const styles = StyleSheet.create({
   sectionHeader: { width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   sectionIndex: { width: 28, flexShrink: 0, color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 17, fontWeight: '900', letterSpacing: 1.2 },
   sectionHeaderCopy: { minWidth: 0, flex: 1, gap: 2 },
-  sectionTitle: { flexShrink: 1, color: colors.ink, fontFamily: typography.display, fontSize: 25, lineHeight: 29, fontWeight: '700' },
+  sectionTitle: { flexShrink: 1, color: colors.ink, fontFamily: typography.display, fontSize: 20, lineHeight: 24, fontWeight: '700' },
   sectionMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 13, fontWeight: '900', letterSpacing: 0.8 },
   preferenceRow: { gap: spacing.sm },
   preferenceLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
@@ -333,7 +329,7 @@ const styles = StyleSheet.create({
   dangerHeader: { width: '100%', alignItems: 'stretch' },
   dangerHeaderCopy: { width: '100%', minWidth: 0 },
   dangerKicker: { color: colors.danger, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
-  dangerTitle: { flexShrink: 1, marginTop: spacing.xs, color: colors.ink, fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700' },
+  dangerTitle: { flexShrink: 1, marginTop: spacing.xs, color: colors.ink, fontFamily: typography.display, fontSize: 22, lineHeight: 27, fontWeight: '700' },
   dangerBody: { color: colors.narrativeInk, fontSize: 12, lineHeight: 19 },
   confirmDock: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.background },
   confirmLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
