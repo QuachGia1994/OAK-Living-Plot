@@ -719,7 +719,7 @@ function usePulse(): Animated.AnimatedInterpolation<number> | Animated.Value {
 
 const styles = StyleSheet.create({
   poster: {
-    minHeight: 430,
+    minHeight: 380,
     overflow: 'hidden',
     borderRadius: cinematic.radius.scene,
     borderWidth: StyleSheet.hairlineWidth,
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
   posterAction: { color: '#FFF9EF', fontSize: 15, fontWeight: '900' },
   posterArrow: { fontSize: 24, fontWeight: '400' },
   coverTile: {
-    minHeight: 260,
+    minHeight: 200,
     overflow: 'hidden',
     borderRadius: cinematic.radius.choice,
     borderWidth: StyleSheet.hairlineWidth,
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
     backgroundColor: cinematic.overlay.strong,
   },
   coverCharacter: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
-  coverTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 21, lineHeight: 24, fontWeight: '700', letterSpacing: -0.35 },
+  coverTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 18, lineHeight: 22, fontWeight: '700', letterSpacing: -0.3 },
   coverPremise: { color: '#CFC7BC', fontSize: 11, lineHeight: 16 },
   coverStatus: { paddingTop: 3, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.75, textTransform: 'uppercase' },
   emptyStage: {
@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
   composerPremise: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 20, lineHeight: 27, fontWeight: '700' },
   moodSwatch: {
     minWidth: 145,
-    minHeight: 154,
+    minHeight: 112,
     flex: 1,
     flexBasis: '46%',
     overflow: 'hidden',
@@ -850,13 +850,13 @@ const styles = StyleSheet.create({
   moodSwatchPressed: { opacity: 0.8, transform: [{ scale: 0.99 }] },
   moodSwatchGlow: { position: 'absolute', width: 190, height: 190, top: -90, right: -72, borderRadius: 95, opacity: 0.6 },
   moodSwatchRim: { position: 'absolute', width: 52, height: 52, top: 49, right: 30, borderRadius: 26, opacity: 0.34 },
-  moodSwatchSilhouette: { position: 'absolute', width: 66, height: 116, right: 24, bottom: 32, borderTopLeftRadius: 38, borderTopRightRadius: 38, backgroundColor: '#050505', opacity: 0.94 },
+  moodSwatchSilhouette: { position: 'absolute', width: 28, height: 48, right: 16, bottom: 18, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: 'rgba(5,5,5,0.45)', opacity: 0.7 },
   moodSwatchShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.18)' },
   moodSwatchTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   moodSwatchState: { color: '#BDB5AA', fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   moodSwatchSignal: { width: 22, height: 2, borderRadius: radius.pill },
   moodSwatchCopy: { gap: 5, paddingTop: spacing.lg },
-  moodSwatchLabel: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 22, lineHeight: 26, fontWeight: '700' },
+  moodSwatchLabel: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 18, lineHeight: 22, fontWeight: '700' },
   moodSwatchDescription: { color: '#C8C0B5', fontSize: 11, lineHeight: 16 },
   castingPreview: {
     minHeight: 250,

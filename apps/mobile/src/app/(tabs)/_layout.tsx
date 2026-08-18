@@ -3,8 +3,12 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
 import { colors } from '@/ui/theme';
 
-const iosTint = DynamicColorIOS({ dark: colors.accentStrong, light: colors.accentSoft });
-const iosLabel = DynamicColorIOS({ dark: colors.ink, light: colors.accentInk });
+const iosTint = Platform.OS === 'ios'
+  ? DynamicColorIOS({ dark: colors.accentStrong, light: colors.accentSoft })
+  : colors.accentStrong;
+const iosLabel = Platform.OS === 'ios'
+  ? DynamicColorIOS({ dark: colors.ink, light: colors.accentInk })
+  : colors.inkMuted;
 
 export default function TabsLayout() {
   const { preferences } = useUserPreferences();

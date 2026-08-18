@@ -136,7 +136,7 @@ export default function HomeScreen() {
 
           <View style={styles.plusRow}>
             <View style={styles.plusCopy}><Text style={styles.plusKicker}>{t('PLUS · 20 SCENES / 10 VOICES', 'PLUS · 20 CẢNH / 10 GIỌNG')}</Text></View>
-            <ActionButton label={t('View Plus', 'Xem Plus')} variant="ghost" onPress={() => router.push('/plus')} />
+            <ActionButton label={t('Upgrade Plus', 'Nâng cấp Plus')} variant="ghost" onPress={() => router.push('/plus')} />
           </View>
         </>
       ) : null}

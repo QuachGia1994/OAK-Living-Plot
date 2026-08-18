@@ -113,6 +113,26 @@ export default function PlusScreen() {
         </View>
       </View>
 
+      <View style={styles.benefits}>
+        <Eyebrow>{t('WHY PLUS', 'VÌ SAO NÂNG CẤP PLUS')}</Eyebrow>
+        <BenefitRow
+          title={t('More story before the cliffhanger stops', 'Đi tiếp câu chuyện lâu hơn')}
+          detail={t('Generate up to 20 drama scenes per day instead of 3 on Free.', 'Tạo tối đa 20 cảnh drama mỗi ngày thay vì 3 cảnh ở gói Miễn phí.')}
+        />
+        <BenefitRow
+          title={t('More fresh narration', 'Nhiều giọng kể mới hơn')}
+          detail={t('Create up to 10 fresh narrations per day instead of 1 on Free.', 'Tạo tối đa 10 giọng đọc mới mỗi ngày thay vì 1 ở gói Miễn phí.')}
+        />
+        <BenefitRow
+          title={t('Replay without spending another voice slot', 'Phát lại không tốn thêm lượt giọng')}
+          detail={t('Narration you already generated can be replayed whenever you want.', 'Giọng đọc đã tạo có thể phát lại bất kỳ lúc nào mà không trừ thêm lượt.')}
+        />
+        <BenefitRow
+          title={t('Plus follows your account', 'Quyền Plus đi cùng tài khoản')}
+          detail={t('Signed-in access can be restored and refreshed across supported devices.', 'Khi đăng nhập, quyền mua có thể được khôi phục và đồng bộ trên các thiết bị được hỗ trợ.')}
+        />
+      </View>
+
       {!session ? (
         <ErrorState
           title={t('Sign in before upgrading', 'Đăng nhập trước khi nâng cấp')}
@@ -124,7 +144,7 @@ export default function PlusScreen() {
 
       <View style={styles.primaryAction}>
         {auth.configured && !auth.isSignedIn ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} variant="secondary" onPress={() => router.push('/auth')} /> : null}
-        <ActionButton label={entitlementActive ? t('Plus is ready', 'Plus đã sẵn sàng') : t('Upgrade to Plus', 'Nâng cấp lên Plus')} busy={busyAction === 'paywall'} disabled={busyAction !== null && busyAction !== 'paywall'} onPress={presentPaywall} />
+        <ActionButton label={entitlementActive ? t('Plus is ready', 'Plus đã sẵn sàng') : t('Upgrade Plus', 'Nâng cấp Plus')} busy={busyAction === 'paywall'} disabled={busyAction !== null && busyAction !== 'paywall'} onPress={presentPaywall} />
       </View>
 
       <View style={styles.utilityBar}>
@@ -140,6 +160,18 @@ export default function PlusScreen() {
 
       {message ? <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text> : null}
     </Screen>
+  );
+}
+
+function BenefitRow({ title, detail }: { title: string; detail: string }) {
+  return (
+    <View style={styles.benefitRow}>
+      <Text style={styles.benefitMark}>+</Text>
+      <View style={styles.benefitCopy}>
+        <Text style={styles.benefitTitle}>{title}</Text>
+        <Text style={styles.benefitDetail}>{detail}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -197,6 +229,12 @@ const styles = StyleSheet.create({
   passFooter: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
   passFootnote: { color: colors.narrativeInk, fontSize: 12, lineHeight: 18 },
   backendState: { color: colors.success, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 0.8 },
+  benefits: { gap: spacing.md, paddingVertical: spacing.sm },
+  benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
+  benefitMark: { width: 22, color: colors.accentStrong, fontFamily: typography.display, fontSize: 24, lineHeight: 26, fontWeight: '700' },
+  benefitCopy: { flex: 1, gap: 3 },
+  benefitTitle: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '800' },
+  benefitDetail: { color: colors.inkMuted, fontSize: 12, lineHeight: 18 },
   primaryAction: { gap: spacing.sm },
   utilityBar: { gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
   utilityCopy: { gap: spacing.xs },

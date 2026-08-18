@@ -296,7 +296,7 @@ function revenueCatStoreModeFromEnvForRuntime(): string {
 const styles = StyleSheet.create({
   settingsIntro: { gap: spacing.sm, paddingVertical: spacing.md },
   settingsKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
-  settingsTitle: { maxWidth: 560, color: colors.ink, fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700', letterSpacing: -0.4 },
+  settingsTitle: { maxWidth: 560, color: colors.ink, fontFamily: typography.display, fontSize: 22, lineHeight: 27, fontWeight: '700', letterSpacing: -0.3 },
   settingsBody: { maxWidth: 560, color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
   advancedGate: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
   advancedCopy: { flex: 1, minWidth: 190, gap: 4 },
