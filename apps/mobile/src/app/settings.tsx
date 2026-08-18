@@ -130,8 +130,19 @@ export default function SettingsScreen() {
     `apiHealth=${apiHealth}`,
   ].join('\n');
 
+  const navFooter = (
+    <DramaNavigationDock
+      active="settings"
+      locale={locale}
+      onNavigate={(destination) => {
+        if (destination === 'settings') return;
+        router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/library');
+      }}
+    />
+  );
+
   return (
-    <Screen>
+    <Screen footer={navFooter}>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => router.back()} />
@@ -142,15 +153,6 @@ export default function SettingsScreen() {
         <Text style={styles.settingsTitle}>{t('Make Living Plot feel like yours.', 'Biến Living Plot thành không gian của bạn.')}</Text>
         <Text style={styles.settingsBody}>{t('Language and narration affect new scenes. Your existing drama canon stays untouched.', 'Ngôn ngữ và giọng kể áp dụng cho cảnh mới. Cốt truyện đã có vẫn được giữ nguyên.')}</Text>
       </View>
-
-      <DramaNavigationDock
-        active="settings"
-        locale={locale}
-        onNavigate={(destination) => {
-          if (destination === 'settings') return;
-          router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/library');
-        }}
-      />
 
       {preferenceError ? <ErrorState title={t('Preferences unavailable', 'Tùy chọn không khả dụng')} message={locale === 'vi' ? t('Preferences could not be loaded.', 'Không thể tải tùy chọn.') : preferenceError} /> : null}
 

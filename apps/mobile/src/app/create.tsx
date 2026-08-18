@@ -77,8 +77,19 @@ export default function CreateDramaScreen() {
     );
   }
 
+  const navFooter = (
+    <DramaNavigationDock
+      active="create"
+      locale={locale}
+      onNavigate={(destination) => {
+        if (destination === 'create') return;
+        router.replace(destination === 'home' ? '/' : destination === 'library' ? '/library' : '/settings');
+      }}
+    />
+  );
+
   return (
-    <Screen>
+    <Screen footer={navFooter}>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={sharedUiCopy.cancel[locale]} variant="ghost" onPress={() => router.back()} />
@@ -89,15 +100,6 @@ export default function CreateDramaScreen() {
         <Text style={styles.title}>{t('Frame the first scene.', 'Dựng cảnh đầu tiên.')}</Text>
         <Text style={styles.subtitle}>{t('One spark. One lead. One mood.', 'Một tia lửa. Một nhân vật. Một không khí.')}</Text>
       </View>
-
-      <DramaNavigationDock
-        active="create"
-        locale={locale}
-        onNavigate={(destination) => {
-          if (destination === 'create') return;
-          router.replace(destination === 'home' ? '/' : destination === 'library' ? '/library' : '/settings');
-        }}
-      />
 
       <DramaComposerPreview
         premise={draft.premise}

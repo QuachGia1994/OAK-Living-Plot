@@ -56,19 +56,25 @@ export default function DramaLibraryScreen() {
 
   const emptyLibrary = Boolean(snapshot && snapshot.active.length === 0 && snapshot.archived.length === 0);
 
+  const navFooter = (
+    <DramaNavigationDock
+      active="library"
+      locale={locale}
+      onNavigate={(destination) => {
+        if (destination === 'library') return;
+        router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/settings');
+      }}
+    />
+  );
+
   return (
-    <Screen>
+    <Screen footer={navFooter}>
       <View style={styles.topBar}><BrandMark /></View>
       <View style={styles.hero}>
         <Eyebrow>{t('My drama shelf', 'Kệ drama của tôi')}</Eyebrow>
         <Text style={styles.title}>{t('Every drama has a face.', 'Mỗi drama đều có một gương mặt.')}</Text>
         <Text style={styles.body}>{t('Continue the scene that is calling you back.', 'Tiếp tục cảnh đang gọi bạn quay lại.')}</Text>
       </View>
-
-      <DramaNavigationDock active="library" locale={locale} onNavigate={(destination) => {
-        if (destination === 'library') return;
-        router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/settings');
-      }} />
 
       {error ? <ErrorState title={t('Drama shelf could not update', 'Không thể cập nhật kệ drama')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
       {!snapshot && !error ? <DramaLoadingStage label={t('Lighting your drama shelf…', 'Đang thắp sáng kệ drama…')} detail={t('Restoring covers, scene positions and decision points.', 'Đang khôi phục bìa, vị trí cảnh và điểm quyết định.')} locale={locale} /> : null}

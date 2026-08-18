@@ -18,21 +18,81 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from './theme';
 
-export function Screen({ children, contentStyle }: { children: ReactNode; contentStyle?: StyleProp<ViewStyle> }) {
+export function Screen({
+  children,
+  contentStyle,
+  footer,
+}: {
+  children: ReactNode;
+  contentStyle?: StyleProp<ViewStyle>;
+  footer?: ReactNode;
+}) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'bottom', 'left']}>
       <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           automaticallyAdjustKeyboardInsets
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={[styles.screenContent, contentStyle]}
+          contentContainerStyle={[styles.screenContent, footer ? styles.screenContentWithFooter : null, contentStyle]}
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           keyboardShouldPersistTaps="handled"
         >
           {children}
         </ScrollView>
+        {footer ? <View style={styles.footerSlot}>{footer}</View> : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+export function SectionHeader({
+  title,
+  eyebrow,
+  meta,
+  index,
+}: {
+  title: string;
+  eyebrow?: string;
+  meta?: string;
+  index?: string;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      {index ? <Text style={styles.sectionIndex}>{index}</Text> : null}
+      <View style={styles.sectionHeaderCopy}>
+        {eyebrow ? <Text style={styles.sectionEyebrow}>{eyebrow}</Text> : null}
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {meta ? <Text style={styles.sectionMeta}>{meta}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+export function SettingsRow({
+  label,
+  value,
+  onPress,
+  trailing,
+}: {
+  label: string;
+  value?: string;
+  onPress?: () => void;
+  trailing?: ReactNode;
+}) {
+  const body = (
+    <View style={styles.settingsRow}>
+      <View style={styles.settingsRowCopy}>
+        <Text style={styles.settingsRowLabel}>{label}</Text>
+        {value ? <Text style={styles.settingsRowValue}>{value}</Text> : null}
+      </View>
+      {trailing ?? (onPress ? <Text style={styles.settingsRowChevron}>›</Text> : null)}
+    </View>
+  );
+  if (!onPress) return body;
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [pressed && styles.settingsRowPressed]}>
+      {body}
+    </Pressable>
   );
 }
 
@@ -190,6 +250,101 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
+  },
+  screenContentWithFooter: {
+    paddingBottom: spacing.lg,
+  },
+  footerSlot: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+    backgroundColor: colors.background,
+  },
+  sectionHeader: {
+    width: '100%',
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  sectionIndex: {
+    width: 28,
+    flexShrink: 0,
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    lineHeight: 17,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  sectionHeaderCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: 2,
+  },
+  sectionEyebrow: {
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.7,
+    textTransform: 'uppercase',
+  },
+  sectionTitle: {
+    flexShrink: 1,
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 25,
+    lineHeight: 29,
+    fontWeight: '700',
+  },
+  sectionMeta: {
+    color: colors.quietInk,
+    fontFamily: typography.mono,
+    fontSize: 8,
+    lineHeight: 13,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.surface,
+  },
+  settingsRowCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  settingsRowLabel: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  settingsRowValue: {
+    color: colors.inkMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  settingsRowChevron: {
+    color: colors.quietInk,
+    fontSize: 22,
+    fontWeight: '300',
+  },
+  settingsRowPressed: {
+    opacity: 0.78,
   },
   brandRow: {
     alignItems: 'center',

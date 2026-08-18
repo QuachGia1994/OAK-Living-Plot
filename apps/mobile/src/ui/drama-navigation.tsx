@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { UiLocale } from '@/features/preferences/contracts';
 import { colors, radius, spacing, typography } from './theme';
 
-type DramaDestination = 'home' | 'create' | 'library' | 'settings';
+export type DramaDestination = 'home' | 'create' | 'library' | 'settings';
 
 export function DramaNavigationDock({
   active,
@@ -15,9 +15,9 @@ export function DramaNavigationDock({
 }) {
   const vi = locale === 'vi';
   const items: readonly { key: DramaDestination; glyph: string; en: string; vi: string }[] = [
-    { key: 'home', glyph: '◈', en: 'Discover', vi: 'Khám phá' },
-    { key: 'create', glyph: '+', en: 'Direct', vi: 'Tạo drama' },
-    { key: 'library', glyph: '▤', en: 'My shelf', vi: 'Kệ của tôi' },
+    { key: 'home', glyph: '◈', en: 'Home', vi: 'Trang chủ' },
+    { key: 'create', glyph: '+', en: 'Create', vi: 'Tạo' },
+    { key: 'library', glyph: '▤', en: 'Library', vi: 'Thư viện' },
     { key: 'settings', glyph: '○', en: 'Settings', vi: 'Cài đặt' },
   ];
 
@@ -35,7 +35,9 @@ export function DramaNavigationDock({
             style={({ pressed }) => [styles.item, selected && styles.itemSelected, pressed && styles.itemPressed]}
           >
             <Text style={[styles.glyph, selected && styles.glyphSelected]}>{item.glyph}</Text>
-            <Text style={[styles.label, selected && styles.labelSelected]} numberOfLines={1}>{vi ? item.vi : item.en}</Text>
+            <Text style={[styles.label, selected && styles.labelSelected]} numberOfLines={1}>
+              {vi ? item.vi : item.en}
+            </Text>
           </Pressable>
         );
       })}
@@ -47,26 +49,44 @@ const styles = StyleSheet.create({
   dock: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    gap: 4,
-    padding: 4,
-    borderRadius: radius.lg,
+    gap: 2,
+    padding: 5,
+    borderRadius: radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surfaceQuiet,
   },
   item: {
-    minHeight: 58,
+    minHeight: 52,
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
     paddingHorizontal: spacing.xs,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
   },
-  itemSelected: { backgroundColor: colors.surfaceWarmDeep },
-  itemPressed: { opacity: 0.76 },
-  glyph: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 15, fontWeight: '900' },
-  glyphSelected: { color: colors.accentStrong },
-  label: { color: colors.quietInk, fontSize: 9, fontWeight: '800' },
-  labelSelected: { color: colors.ink },
+  itemSelected: {
+    backgroundColor: colors.surfaceWarmDeep,
+  },
+  itemPressed: {
+    opacity: 0.76,
+  },
+  glyph: {
+    color: colors.quietInk,
+    fontFamily: typography.mono,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  glyphSelected: {
+    color: colors.accentStrong,
+  },
+  label: {
+    color: colors.quietInk,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  labelSelected: {
+    color: colors.ink,
+  },
 });

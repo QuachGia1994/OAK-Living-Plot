@@ -87,39 +87,39 @@ export default function HomeScreen() {
   const featuredDrama = snapshot?.recentDramas[0] ?? null;
   const dailyPrompt = snapshot?.retention.dailyPrompt ?? null;
 
+  const navFooter = (
+    <DramaNavigationDock
+      active="home"
+      locale={locale}
+      onNavigate={(destination) => {
+        if (destination === 'home') return;
+        router.push(destination === 'create' ? '/create' : destination === 'library' ? '/library' : '/settings');
+      }}
+    />
+  );
+
   return (
-    <Screen>
+    <Screen footer={navFooter}>
       <View style={styles.topBar}>
         <BrandMark />
         {auth.configured && auth.isSignedIn ? <ActionButton label={sharedUiCopy.signOut[locale]} variant="ghost" onPress={() => void auth.signOut()} /> : null}
       </View>
 
       {snapshot && dailyPrompt ? (
-        <>
-          <DramaPoster
-            title={featuredDrama?.title ?? dailyPrompt.label}
-            premise={featuredDrama?.resumeLine ?? dailyPrompt.premise}
-            characterName={featuredDrama?.characterName ?? dailyPrompt.characterName}
-            mood={featuredDrama?.mood ?? dailyPrompt.mood}
-            sceneLabel={featuredDrama
-              ? t(`SCENE ${featuredDrama.sceneNumber} · CONTINUE`, `CẢNH ${featuredDrama.sceneNumber} · TIẾP TỤC`)
-              : t('TODAY · NEW DRAMA', 'HÔM NAY · DRAMA MỚI')}
-            actionLabel={featuredDrama ? t('Resume drama', 'Tiếp tục drama') : t('Start today’s drama', 'Bắt đầu drama hôm nay')}
-            onPress={() => featuredDrama
-              ? router.push({ pathname: '/drama', params: { dramaId: featuredDrama.id } })
-              : openDailySpark(snapshot)}
-            style={styles.heroPoster}
-          />
-
-          <DramaNavigationDock
-            active="home"
-            locale={locale}
-            onNavigate={(destination) => {
-              if (destination === 'home') return;
-              router.push(destination === 'create' ? '/create' : destination === 'library' ? '/library' : '/settings');
-            }}
-          />
-        </>
+        <DramaPoster
+          title={featuredDrama?.title ?? dailyPrompt.label}
+          premise={featuredDrama?.resumeLine ?? dailyPrompt.premise}
+          characterName={featuredDrama?.characterName ?? dailyPrompt.characterName}
+          mood={featuredDrama?.mood ?? dailyPrompt.mood}
+          sceneLabel={featuredDrama
+            ? t(`SCENE ${featuredDrama.sceneNumber} · CONTINUE`, `CẢNH ${featuredDrama.sceneNumber} · TIẾP TỤC`)
+            : t('TODAY · NEW DRAMA', 'HÔM NAY · DRAMA MỚI')}
+          actionLabel={featuredDrama ? t('Resume drama', 'Tiếp tục drama') : t('Start today’s drama', 'Bắt đầu drama hôm nay')}
+          onPress={() => featuredDrama
+            ? router.push({ pathname: '/drama', params: { dramaId: featuredDrama.id } })
+            : openDailySpark(snapshot)}
+          style={styles.heroPoster}
+        />
       ) : null}
 
       {error ? (

@@ -4,6 +4,9 @@ All notable changes to Living Plot will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Professional app shell pass: pinned capsule bottom navigation via `Screen` footer slot, shared `SectionHeader`/`SettingsRow` primitives, and unified dock labels across Home/Create/Library/Settings without changing business logic.
+
 ### Added
 - Canonical drama runtime ownership map covering `Drama`, `Scene`, `Character`, `Choice`, `Branch`, `GenerationJob`, `MediaAsset`, `PlaybackState`, locale ownership, failure paths, and the verification tests that prove each transition.
 - Provider-neutral `SceneGenerator`/`SceneProposal` boundary with strict scene normalization, bounded prompt context, controlled invalid-response retry, and Gemini isolated as the current adapter.
