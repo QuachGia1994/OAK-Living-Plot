@@ -9,7 +9,6 @@ import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
-import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
@@ -77,19 +76,8 @@ export default function CreateDramaScreen() {
     );
   }
 
-  const navFooter = (
-    <DramaNavigationDock
-      active="create"
-      locale={locale}
-      onNavigate={(destination) => {
-        if (destination === 'create') return;
-        router.replace(destination === 'home' ? '/' : destination === 'library' ? '/library' : '/settings');
-      }}
-    />
-  );
-
   return (
-    <Screen footer={navFooter}>
+    <Screen>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={sharedUiCopy.cancel[locale]} variant="ghost" onPress={() => router.back()} />

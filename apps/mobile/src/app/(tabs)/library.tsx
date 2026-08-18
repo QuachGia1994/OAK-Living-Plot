@@ -4,7 +4,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaLibrarySnapshot, DramaSummary } from '@/features/drama/contracts';
-import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { DramaCoverTile, DramaEmptyStage, DramaLoadingStage } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
@@ -56,19 +55,8 @@ export default function DramaLibraryScreen() {
 
   const emptyLibrary = Boolean(snapshot && snapshot.active.length === 0 && snapshot.archived.length === 0);
 
-  const navFooter = (
-    <DramaNavigationDock
-      active="library"
-      locale={locale}
-      onNavigate={(destination) => {
-        if (destination === 'library') return;
-        router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/settings');
-      }}
-    />
-  );
-
   return (
-    <Screen footer={navFooter}>
+    <Screen>
       <View style={styles.topBar}><BrandMark /></View>
       <View style={styles.hero}>
         <Eyebrow>{t('My drama shelf', 'Kệ drama của tôi')}</Eyebrow>

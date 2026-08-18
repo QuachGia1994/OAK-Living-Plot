@@ -6,7 +6,6 @@ import { useDramaExperienceClient } from '@/features/drama/drama-client-context'
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHomeSnapshot, DramaSummary } from '@/features/drama/contracts';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
-import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { DramaCoverTile, DramaLoadingStage, DramaPoster, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
@@ -87,19 +86,8 @@ export default function HomeScreen() {
   const featuredDrama = snapshot?.recentDramas[0] ?? null;
   const dailyPrompt = snapshot?.retention.dailyPrompt ?? null;
 
-  const navFooter = (
-    <DramaNavigationDock
-      active="home"
-      locale={locale}
-      onNavigate={(destination) => {
-        if (destination === 'home') return;
-        router.push(destination === 'create' ? '/create' : destination === 'library' ? '/library' : '/settings');
-      }}
-    />
-  );
-
   return (
-    <Screen footer={navFooter}>
+    <Screen>
       <View style={styles.topBar}>
         <BrandMark />
         {auth.configured && auth.isSignedIn ? <ActionButton label={sharedUiCopy.signOut[locale]} variant="ghost" onPress={() => void auth.signOut()} /> : null}

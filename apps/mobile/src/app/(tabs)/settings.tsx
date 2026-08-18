@@ -10,7 +10,6 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
 import type { DramaLocale, NarratorVariant, UiLocale } from '@/features/preferences/contracts';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
-import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
 import { colors, cinematic, radius, spacing, typography } from '@/ui/theme';
 
@@ -130,19 +129,8 @@ export default function SettingsScreen() {
     `apiHealth=${apiHealth}`,
   ].join('\n');
 
-  const navFooter = (
-    <DramaNavigationDock
-      active="settings"
-      locale={locale}
-      onNavigate={(destination) => {
-        if (destination === 'settings') return;
-        router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/library');
-      }}
-    />
-  );
-
   return (
-    <Screen footer={navFooter}>
+    <Screen>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => router.back()} />

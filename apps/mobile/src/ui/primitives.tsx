@@ -28,7 +28,7 @@ export function Screen({
   footer?: ReactNode;
 }) {
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'bottom', 'left']}>
+    <SafeAreaView style={styles.safeArea} edges={footer ? ['top', 'right', 'bottom', 'left'] : ['top', 'right', 'left']}>
       <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           automaticallyAdjustKeyboardInsets
@@ -98,8 +98,12 @@ export function SettingsRow({
 
 export function BrandMark() {
   return (
-    <View style={styles.brandRow}>
-      <Image source={require('../../assets/living-plot-icon.png')} style={styles.brandIcon} accessibilityIgnoresInvertColors />
+    <View style={styles.brandRow} accessible accessibilityRole="image" accessibilityLabel="Living Plot">
+      <Image
+        source={require('../../assets/brand/living-plot-monogram.png')}
+        style={styles.brandIcon}
+        accessibilityIgnoresInvertColors
+      />
       <Text style={styles.brandText}>LIVING PLOT</Text>
     </View>
   );
@@ -352,16 +356,15 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   brandIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: radius.sm,
+    width: 36,
+    height: 36,
   },
   brandText: {
     color: colors.ink,
     fontFamily: typography.mono,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 2.5,
+    letterSpacing: 2.8,
   },
   eyebrow: {
     color: colors.accentStrong,

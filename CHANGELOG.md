@@ -5,7 +5,9 @@ All notable changes to Living Plot will be documented in this file.
 ## [Unreleased]
 
 ### Changed
-- Professional app shell pass: pinned capsule bottom navigation via `Screen` footer slot, shared `SectionHeader`/`SettingsRow` primitives, and unified dock labels across Home/Create/Library/Settings without changing business logic.
+- Living Plot brand system: LP serif monogram assets, app/adaptive/splash icons, stronger BrandMark lockup, and Expo app config pointed at the new brand files.
+- Native system tab bar via `expo-router/unstable-native-tabs` for Home/Create/Library/Settings (SF Symbols + Material symbols); iOS 26 adopts Liquid Glass from the system tab bar; removed the custom RN capsule dock.
+- Professional app shell pass: shared `SectionHeader`/`SettingsRow` primitives without changing business logic.
 
 ### Added
 - Canonical drama runtime ownership map covering `Drama`, `Scene`, `Character`, `Choice`, `Branch`, `GenerationJob`, `MediaAsset`, `PlaybackState`, locale ownership, failure paths, and the verification tests that prove each transition.
