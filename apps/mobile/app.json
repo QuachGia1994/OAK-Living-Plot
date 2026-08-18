@@ -3,6 +3,7 @@
     "name": "Living Plot",
     "slug": "living-plot",
     "version": "0.1.0",
+    "icon": "./assets/living-plot-icon.png",
     "orientation": "portrait",
     "scheme": "livingplot",
     "userInterfaceStyle": "automatic",

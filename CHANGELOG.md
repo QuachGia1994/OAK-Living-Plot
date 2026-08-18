@@ -57,11 +57,12 @@ All notable changes to Living Plot will be documented in this file.
 - Privacy-safe episode-depth telemetry buckets plus aggregate D1 activation/depth/D1/D7 retention queries.
 - CI release-candidate gates for local D1 migrations, Cloudflare development dry-run, iOS production export, and Android native preview APK.
 - Closed Beta RC runbook covering real development provisioning, provider blockers, abuse/cost guardrails, live bring-up order, and exact-SHA verification.
-- Provisioned non-production D1 `living-plot-dev` plus development TTS Queue/DLQ and applied migrations `0001`–`0008` remotely; R2 remains explicitly blocked until the Cloudflare account enables the service.
+- Provisioned non-production D1 `living-plot-dev` plus development TTS Queue/DLQ and applied migrations `0001`–`0009` remotely, including retryable quota reservations; R2 remains explicitly blocked until the Cloudflare account enables the service.
 - Protected JSON request-size guard and API response hardening with `no-store`, `nosniff`, and `no-referrer` headers.
 - iOS unsigned Native RC pipeline on GitHub macOS: explicit Expo iOS identity, clean prebuild/CocoaPods, Release `iphoneos` Xcode build with code signing disabled, negative signature verification, `Payload/LivingPlot.app` IPA packaging, and artifact upload.
 
 ### Changed
+- Added a real Living Plot branching-plot brand mark/app icon and replaced the Plus procedural character artwork with a bundled premium cinematic anime-style hero while preserving the existing product/runtime boundaries.
 - Replaced application-level Story/Plot/Episode vocabulary with the canonical Drama/Scene/Branch model across mobile contracts, `/v1/dramas` HTTP routes, runtime services, history/library summaries, product telemetry, sharing, and EN/VI UI terminology. Existing D1 `plots/episodes/story_locale` names remain persistence-only compatibility vocabulary.
 - Renamed saved application generation locale from `storyLocale` to `dramaLocale`; the preview store reads the legacy key only as a compatibility migration, while authenticated preferences and new-drama creation use the canonical field.
 - Account export is now schema v2 with `dramas[]`, `scenes[]`, generated/voiced scene usage, and provider-neutral media metadata instead of projecting D1 plot/episode/audio naming.
@@ -77,6 +78,7 @@ All notable changes to Living Plot will be documented in this file.
 - Narrative prompt guidance now keeps the canonical protagonist visible, requires durable scene progress, and keeps narrative/branch output in the requested locale.
 
 ### Fixed
+- Aligned Free/Plus quota metrics on one typographic baseline and constrained Vietnamese Settings privacy/delete-data headers so long copy wraps cleanly without the old danger signal protruding beyond its card.
 - Fixed an integration mismatch where the API emitted `recentDramas/sceneNumber/ready_for_next_scene/activeDramas` while the mobile HTTP parser still expected the older plot/episode field names; both sides now share one canonical contract.
 - Fixed live Vietnamese metadata localization for relative update/reset labels and localized spoiler-safe share copy while preserving each existing drama's creation locale.
 - Fixed preview localization so `storyLocale` actually controls seeded stories, Episode 1, continuations, choices, intents and consequences; Vietnamese preview stories no longer fall back to English while the UI is Vietnamese. Locale-specific preview clients now share story state, so existing plots remain visible across EN/VI preference changes and each plot keeps its original story locale for future continuation episodes. Preview summary timestamps and episode labels are localized as well.

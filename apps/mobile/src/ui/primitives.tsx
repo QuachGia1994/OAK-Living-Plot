@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -38,7 +39,7 @@ export function Screen({ children, contentStyle }: { children: ReactNode; conten
 export function BrandMark() {
   return (
     <View style={styles.brandRow}>
-      <View style={styles.brandRule} />
+      <Image source={require('../../assets/living-plot-icon.png')} style={styles.brandIcon} accessibilityIgnoresInvertColors />
       <Text style={styles.brandText}>LIVING PLOT</Text>
     </View>
   );
@@ -195,10 +196,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  brandRule: {
-    width: 20,
-    height: 1,
-    backgroundColor: colors.accent,
+  brandIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.sm,
   },
   brandText: {
     color: colors.ink,

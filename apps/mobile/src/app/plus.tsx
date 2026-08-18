@@ -88,6 +88,7 @@ export default function PlusScreen() {
         detail={t('More daily scenes and fresh narration when the cliffhanger should not end here.', 'Thêm cảnh và giọng đọc mới mỗi ngày khi cao trào chưa nên dừng lại.')}
         mood="romantic"
         characterName="Plus"
+        artworkSource={require('../../assets/living-plot-plus-hero.jpg')}
       />
 
       <View style={styles.pass}>
@@ -146,16 +147,14 @@ function PlanMetric({ locale, label, free, plus }: { locale: 'en' | 'vi'; label:
   return (
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <View style={styles.metricValues}>
-        <View>
-          <Text style={styles.metricTier}>{locale === 'vi' ? 'MIỄN PHÍ' : 'FREE'}</Text>
-          <Text style={styles.metricFree}>{free}</Text>
-        </View>
+      <View style={styles.metricTierRow}>
+        <Text style={styles.metricTier}>{locale === 'vi' ? 'MIỄN PHÍ' : 'FREE'}</Text>
+        <Text style={[styles.metricTier, styles.metricTierPlus]}>PLUS</Text>
+      </View>
+      <View style={styles.metricNumberRow}>
+        <Text style={styles.metricFree}>{free}</Text>
         <Text style={styles.metricArrow}>→</Text>
-        <View>
-          <Text style={[styles.metricTier, styles.metricTierPlus]}>PLUS</Text>
-          <Text style={styles.metricPlus}>{plus}</Text>
-        </View>
+        <Text style={styles.metricPlus}>{plus}</Text>
       </View>
     </View>
   );
@@ -188,12 +187,13 @@ const styles = StyleSheet.create({
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   metric: { minWidth: 150, flexGrow: 1, flexBasis: '46%', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceQuiet },
   metricLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 0.75, textTransform: 'uppercase' },
-  metricValues: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm },
-  metricTier: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  metricTierRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  metricNumberRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm },
+  metricTier: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 14, fontWeight: '900', letterSpacing: 0.8 },
   metricTierPlus: { color: colors.accentStrong },
-  metricFree: { color: colors.inkMuted, fontFamily: typography.display, fontSize: 29, lineHeight: 32, fontWeight: '700' },
-  metricPlus: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 38, lineHeight: 40, fontWeight: '700' },
-  metricArrow: { color: colors.accentSoft, fontSize: 21, paddingBottom: 3 },
+  metricFree: { minWidth: 40, color: colors.inkMuted, fontFamily: typography.display, fontSize: 34, lineHeight: 38, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  metricPlus: { minWidth: 54, color: colors.accentStrong, fontFamily: typography.display, fontSize: 34, lineHeight: 38, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] },
+  metricArrow: { color: colors.accentSoft, fontSize: 22, lineHeight: 38, textAlign: 'center' },
   passFooter: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
   passFootnote: { color: colors.narrativeInk, fontSize: 12, lineHeight: 18 },
   backendState: { color: colors.success, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 0.8 },

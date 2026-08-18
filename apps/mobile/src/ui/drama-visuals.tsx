@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
+  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type ImageSourcePropType,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -255,17 +257,23 @@ export function DramaUtilityHero({
   detail,
   mood = 'mysterious',
   characterName = 'Living Plot',
+  artworkSource,
 }: {
   kicker: string;
   title: string;
   detail?: string;
   mood?: DramaMood;
   characterName?: string;
+  artworkSource?: ImageSourcePropType;
 }) {
   const tone = cinematic.scene[mood];
   return (
     <View style={[styles.utilityHero, { backgroundColor: tone.base }]}>
-      <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${detail ?? ''}`} compact />
+      {artworkSource ? (
+        <Image source={artworkSource} style={styles.utilityHeroImage} resizeMode="cover" accessibilityIgnoresInvertColors />
+      ) : (
+        <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${detail ?? ''}`} compact />
+      )}
       <View style={styles.utilityHeroShade} />
       <View style={styles.utilityHeroCopy}>
         <Text style={[styles.utilityHeroKicker, { color: tone.rim }]}>{kicker}</Text>
@@ -873,6 +881,15 @@ const styles = StyleSheet.create({
     borderRadius: cinematic.radius.scene,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: cinematic.overlay.hairline,
+  },
+  utilityHeroImage: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
   },
   utilityHeroShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.3)' },
   utilityHeroCopy: {

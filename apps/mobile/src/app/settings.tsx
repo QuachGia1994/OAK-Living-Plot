@@ -187,11 +187,10 @@ export default function SettingsScreen() {
 
       <View style={styles.dangerVault}>
         <View style={styles.dangerHeader}>
-          <View>
+          <View style={styles.dangerHeaderCopy}>
             <Text style={styles.dangerKicker}>{t('IRREVERSIBLE', 'KHÔNG THỂ HOÀN TÁC')}</Text>
             <Text style={styles.dangerTitle}>{t('Erase Living Plot data', 'Xóa dữ liệu Living Plot')}</Text>
           </View>
-          <View style={styles.dangerSignal} />
         </View>
         <Text style={styles.dangerBody}>{t('Private narration is cleaned up before your drama data is erased. Type the exact phrase to unlock the action.', 'Giọng đọc riêng tư được dọn trước khi dữ liệu drama bị xóa. Nhập chính xác cụm từ để mở khóa thao tác.')}</Text>
         <View style={styles.confirmDock}>
@@ -317,11 +316,11 @@ const styles = StyleSheet.create({
   advancedCopy: { flex: 1, minWidth: 190, gap: 4 },
   advancedTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 20, lineHeight: 24, fontWeight: '700' },
   section: { gap: spacing.md, paddingVertical: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
-  sectionStatusHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
-  sectionHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  sectionIndex: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 17, fontWeight: '900', letterSpacing: 1.2 },
-  sectionHeaderCopy: { gap: 2 },
-  sectionTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 25, lineHeight: 29, fontWeight: '700' },
+  sectionStatusHeader: { gap: spacing.sm },
+  sectionHeader: { width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  sectionIndex: { width: 28, flexShrink: 0, color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 17, fontWeight: '900', letterSpacing: 1.2 },
+  sectionHeaderCopy: { minWidth: 0, flex: 1, gap: 2 },
+  sectionTitle: { flexShrink: 1, color: colors.ink, fontFamily: typography.display, fontSize: 25, lineHeight: 29, fontWeight: '700' },
   sectionMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 13, fontWeight: '900', letterSpacing: 0.8 },
   preferenceRow: { gap: spacing.sm },
   preferenceLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
@@ -340,11 +339,11 @@ const styles = StyleSheet.create({
   policyKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   policyTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 18, lineHeight: 22, fontWeight: '700' },
   policyBody: { color: colors.inkMuted, fontSize: 11, lineHeight: 17 },
-  dangerVault: { gap: spacing.md, padding: spacing.lg, borderRadius: cinematic.radius.scene, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.danger, backgroundColor: colors.surfaceDanger },
-  dangerHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  dangerVault: { gap: spacing.md, padding: spacing.lg, overflow: 'hidden', borderRadius: cinematic.radius.scene, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.danger, backgroundColor: colors.surfaceDanger },
+  dangerHeader: { width: '100%', alignItems: 'stretch' },
+  dangerHeaderCopy: { width: '100%', minWidth: 0 },
   dangerKicker: { color: colors.danger, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
-  dangerTitle: { marginTop: spacing.xs, color: colors.ink, fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700' },
-  dangerSignal: { width: 34, height: 3, borderRadius: radius.pill, backgroundColor: colors.danger },
+  dangerTitle: { flexShrink: 1, marginTop: spacing.xs, color: colors.ink, fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700' },
   dangerBody: { color: colors.narrativeInk, fontSize: 12, lineHeight: 19 },
   confirmDock: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.background },
   confirmLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
