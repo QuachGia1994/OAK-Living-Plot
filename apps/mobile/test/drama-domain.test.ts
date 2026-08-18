@@ -47,4 +47,43 @@ describe('drama playback domain', () => {
       code: 'not_found',
     });
   });
+
+  it('treats selected choice as transient until branch is committed', () => {
+    expect(openDrama.currentScene.branch.state).toBe('open');
+    const selectedId = openDrama.currentScene.choices[2].id;
+    expect(selectedId).toBe('choice-c');
+    // Selected UI state must not mutate the open branch.
+    expect(openDrama.currentScene.branch).toEqual({ state: 'open' });
+    const committed: Drama = {
+      ...openDrama,
+      currentScene: {
+        ...openDrama.currentScene,
+        branch: { state: 'committed', choiceId: selectedId, consequence: openDrama.currentScene.choices[2].consequence },
+      },
+    };
+    expect(committed.currentScene.branch.state).toBe('committed');
+    if (committed.currentScene.branch.state === 'committed') {
+      expect(committed.currentScene.branch.choiceId).toBe(selectedId);
+    }
+  });
+
+  it('keeps committing_choice phase while action is in flight so UI cannot double-lock', () => {
+    expect(
+      derivePlaybackState({ drama: openDrama, sceneComplete: true, action: 'commit_choice' }),
+    ).toEqual({ phase: 'committing_choice' });
+    // Even with an open branch, an in-flight commit action owns the transition.
+    expect(
+      derivePlaybackState({
+        drama: {
+          ...openDrama,
+          currentScene: {
+            ...openDrama.currentScene,
+            branch: { state: 'committed', choiceId: 'choice-a', consequence: 'x' },
+          },
+        },
+        sceneComplete: true,
+        action: 'commit_choice',
+      }),
+    ).toEqual({ phase: 'committing_choice' });
+  });
 });

@@ -1,0 +1,36 @@
+# Living Plot RC freeze — state ownership
+
+> updated 2026-08-18 · beta RC
+
+## Feature freeze
+UI/visual systems are frozen for beta RC unless a functional/accessibility/platform bug requires a minimal fix.
+
+Frozen surfaces: Home, Create, Playback A/B/C, Library, Settings, Plus, LP brand, iOS Liquid Glass tabs + minimize-on-scroll, Android native dark tabs.
+
+## State owners (SSOT)
+
+| Concern | Owner |
+| --- | --- |
+| Drama / Scene / Branch / Choice lock | API D1 (`plots`, `episodes`, `choice_commits`) via `D1ChoiceCommitter` / drama runtime |
+| Generation job + provider normalize | API AI boundary (`gemini-scene-generator` + scene schema) |
+| Quota | API `D1QuotaLedger` (reserve → consume / release); Free 3/1, Plus 20/10 UTC day |
+| Voice / MediaAsset | API `D1AudioService` + queue; ready asset replay does not re-reserve |
+| Entitlement | API entitlement repository + RevenueCat webhook/subscriber |
+| Session / auth | Clerk session verifier → mobile auth context |
+| Preferences | API preferences + mobile preferences context |
+| Playback phase (UI) | `derivePlaybackState` from canonical drama + local action only |
+| Selected choice (transient) | Mobile `useDramaPlayback.selectedChoiceId` only; never written as branch until commit succeeds |
+
+## Invariants
+- `selected != locked`: UI selection does not mutate `branch` until `commitChoice` succeeds server-side.
+- One choice lock per episode: `choice_commits` + episode `ready → completed` guarded batch; replay is idempotent.
+- Quota cannot double-charge: reservation key + ledger transitions; release on provider failure.
+- Voice replay: existing non-failed `audio_assets` returns without new reservation.
+- Navigation params carry identity only (`dramaId`), not business DB.
+
+## Client concurrency
+`useDramaPlayback` gates `commitChoice` / `continueDrama` on `action !== null` so double-tap cannot start parallel mutations.
+
+## Platform
+- Android: `DynamicColorIOS` only under `Platform.OS === 'ios'`.
+- iOS: NativeTabs + `minimizeBehavior="onScrollDown"` retained.
