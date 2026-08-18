@@ -1,5 +1,5 @@
-import type { ChoiceStateDelta, EpisodeProposal } from '../ai/contracts';
-import { parseStructuredPlotState } from '../domain/story';
+import type { ChoiceStateDelta, SceneProposal } from '../ai/contracts';
+import { parseDramaState } from '../domain/drama-state';
 import type { ChoiceCommitInput, ChoiceCommitResult, ChoiceCommitSuccess } from './contracts';
 import { applyCommittedChoiceState } from './state-application';
 
@@ -27,10 +27,10 @@ interface CommitContextRow {
   state_delta_json: string;
 }
 
-interface StoredEpisodeContent {
+interface StoredSceneContent {
   script: string;
   establishedFacts: string[];
-  threadChanges: EpisodeProposal['threadChanges'];
+  threadChanges: SceneProposal['threadChanges'];
 }
 
 export class D1ChoiceCommitter {
@@ -169,7 +169,7 @@ export class D1ChoiceCommitter {
     }
 
     try {
-      const state = parseStructuredPlotState(existing.state_json_after);
+      const state = parseDramaState(existing.state_json_after);
       const value: ChoiceCommitSuccess = {
         commitId: existing.id,
         plotId: input.plotId,
@@ -200,26 +200,26 @@ function computeNextState(
   context: CommitContextRow,
   episodeId: string,
   choiceId: string,
-): { ok: true; value: ReturnType<typeof parseStructuredPlotState> } | { ok: false; error: string } {
+): { ok: true; value: ReturnType<typeof parseDramaState> } | { ok: false; error: string } {
   try {
-    const state = parseStructuredPlotState(context.state_json);
-    const episode = parseEpisodeContent(context.script_json);
+    const state = parseDramaState(context.state_json);
+    const scene = parseSceneContent(context.script_json);
     const delta = JSON.parse(context.state_delta_json) as ChoiceStateDelta;
-    return applyCommittedChoiceState(state, episodeId, choiceId, episode, delta);
+    return applyCommittedChoiceState(state, episodeId, choiceId, scene, delta);
   } catch {
-    return { ok: false, error: 'Stored episode, choice, or plot state is invalid.' };
+    return { ok: false, error: 'Stored scene, choice, or drama state is invalid.' };
   }
 }
 
-function parseEpisodeContent(raw: string): StoredEpisodeContent {
-  const value = JSON.parse(raw) as Partial<StoredEpisodeContent>;
+function parseSceneContent(raw: string): StoredSceneContent {
+  const value = JSON.parse(raw) as Partial<StoredSceneContent>;
   if (!Array.isArray(value.establishedFacts) || !value.establishedFacts.every((item) => typeof item === 'string')) {
     throw new Error('Invalid established facts.');
   }
   if (!value.threadChanges || !Array.isArray(value.threadChanges.open) || !Array.isArray(value.threadChanges.resolve)) {
     throw new Error('Invalid thread changes.');
   }
-  return value as StoredEpisodeContent;
+  return value as StoredSceneContent;
 }
 
 function parseChoiceKey(value: string): 'A' | 'B' | 'C' {

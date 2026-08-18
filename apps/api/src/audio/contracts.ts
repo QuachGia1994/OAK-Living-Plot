@@ -1,28 +1,30 @@
 export type AudioAssetStatus = 'reserving' | 'queued' | 'processing' | 'staged' | 'ready' | 'failed';
+export type MediaAssetStatus = 'queued' | 'processing' | 'ready' | 'failed';
 
 export interface AudioJob {
   assetId: string;
 }
 
-export interface AudioAssetSnapshot {
+export interface MediaAsset {
   id: string;
-  episodeId: string;
-  voiceVariant: string;
-  provider: 'google';
-  providerVoiceId: string;
-  languageCode: string;
-  reservationKey: string;
-  objectKey: string | null;
-  status: AudioAssetStatus;
-  inputCharacters: number;
+  sceneId: string;
+  kind: 'voice';
+  variant: string;
+  status: MediaAssetStatus;
   attempts: number;
   failureCode: string | null;
   cached: boolean;
 }
 
+export interface AudioDeliveryAsset {
+  media: MediaAsset;
+  objectKey: string | null;
+  persistenceStatus: AudioAssetStatus;
+}
+
 export interface AudioRequestInput {
   userId: string;
-  episodeId: string;
+  sceneId: string;
   voiceVariant: string;
   reservationKey: string;
   tier: 'free' | 'plus';
@@ -36,7 +38,7 @@ export type AudioRequestError =
   | { code: 'persistence_error'; message: string };
 
 export type AudioRequestResult =
-  | { ok: true; value: AudioAssetSnapshot }
+  | { ok: true; value: MediaAsset }
   | { ok: false; error: AudioRequestError };
 
 export interface AudioQueue {

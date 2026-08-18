@@ -150,16 +150,6 @@ export function MotionReveal({ children, delay = 0 }: { children: ReactNode; del
   );
 }
 
-export function LoadingState({ label = 'Loading your story…', detail }: { label?: string; detail?: string }) {
-  return (
-    <View style={styles.stateWrap} accessibilityRole="progressbar" accessibilityLabel={label} accessibilityLiveRegion="polite">
-      <ActivityIndicator size="large" color={colors.accent} />
-      <Text style={styles.stateTitle}>{label}</Text>
-      {detail ? <Text style={styles.stateBody}>{detail}</Text> : null}
-    </View>
-  );
-}
-
 export function ErrorState({
   title,
   message,
@@ -296,14 +286,6 @@ const styles = StyleSheet.create({
   },
   buttonTextGhost: {
     color: colors.inkMuted,
-  },
-  stateWrap: {
-    flex: 1,
-    minHeight: 360,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
   },
   stateTitle: {
     color: colors.ink,

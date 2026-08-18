@@ -4,12 +4,12 @@ import migrationOne from '../migrations/0001_initial.sql?raw';
 import migrationTwo from '../migrations/0002_episode_publication.sql?raw';
 import migrationThree from '../migrations/0003_choice_commit.sql?raw';
 import { D1ChoiceCommitter } from '../src/choice/d1-choice-committer';
-import type { StructuredPlotState } from '../src/domain/story';
+import type { DramaState } from '../src/domain/drama-state';
 import type { AppEnv } from '../src/env';
 import { D1EpisodePublisher } from '../src/publication/d1-episode-publisher';
 import type { PublishedEpisode } from '../src/publication/contracts';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
-import { makeValidProposal } from './story-fixtures';
+import { makeValidProposal } from './drama-fixtures';
 
 const db = (env as unknown as AppEnv).DB;
 
@@ -210,7 +210,7 @@ async function seedReadyEpisode(userId: string, plotId: string, generationKey: s
   return published.value;
 }
 
-function initialState(): StructuredPlotState {
+function initialState(): DramaState {
   return {
     schemaVersion: 2,
     relationships: [

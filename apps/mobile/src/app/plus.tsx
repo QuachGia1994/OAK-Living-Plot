@@ -85,7 +85,7 @@ export default function PlusScreen() {
       <DramaUtilityHero
         kicker="LIVING PLOT PLUS"
         title={t('Stay for the next scene.', 'Ở lại cho cảnh tiếp theo.')}
-        detail={t('More daily episodes and fresh narration when the cliffhanger should not end here.', 'Thêm tập và giọng đọc mới mỗi ngày khi cao trào chưa nên dừng lại.')}
+        detail={t('More daily scenes and fresh narration when the cliffhanger should not end here.', 'Thêm cảnh và giọng đọc mới mỗi ngày khi cao trào chưa nên dừng lại.')}
         mood="romantic"
         characterName="Plus"
       />
@@ -93,7 +93,7 @@ export default function PlusScreen() {
       <View style={styles.pass}>
         <View style={styles.passTopRow}>
           <View>
-            <Eyebrow>{t('Daily story pass', 'Thẻ drama mỗi ngày')}</Eyebrow>
+            <Eyebrow>{t('Daily drama pass', 'Thẻ drama mỗi ngày')}</Eyebrow>
             <Text style={styles.passTitle}>{entitlementActive ? t('Plus is active', 'Plus đang hoạt động') : t('Free → Plus', 'Miễn phí → Plus')}</Text>
           </View>
           <View style={styles.passPills}>
@@ -102,7 +102,7 @@ export default function PlusScreen() {
         </View>
 
         <View style={styles.metricGrid}>
-          <PlanMetric locale={locale} label={t('Story episodes', 'Tập truyện')} free="3" plus="20" />
+          <PlanMetric locale={locale} label={t('Drama scenes', 'Cảnh drama')} free="3" plus="20" />
           <PlanMetric locale={locale} label={t('Fresh narration', 'Giọng đọc mới')} free="1" plus="10" />
         </View>
 
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   metricPlus: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 38, lineHeight: 40, fontWeight: '700' },
   metricArrow: { color: colors.accentSoft, fontSize: 21, paddingBottom: 3 },
   passFooter: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
-  passFootnote: { color: colors.storyInk, fontSize: 12, lineHeight: 18 },
+  passFootnote: { color: colors.narrativeInk, fontSize: 12, lineHeight: 18 },
   backendState: { color: colors.success, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 0.8 },
   primaryAction: { gap: spacing.sm },
   utilityBar: { gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },

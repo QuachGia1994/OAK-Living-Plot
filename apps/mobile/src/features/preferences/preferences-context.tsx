@@ -38,7 +38,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     try {
       setPreferences(await client.load());
     } catch {
-      setError('Preferences could not be loaded. Existing stories are unchanged.');
+      setError('Preferences could not be loaded. Existing dramas are unchanged.');
     } finally {
       setLoading(false);
     }
@@ -53,7 +53,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
         setError(null);
       })
       .catch(() => {
-        if (active) setError('Preferences could not be loaded. Existing stories are unchanged.');
+        if (active) setError('Preferences could not be loaded. Existing dramas are unchanged.');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -67,7 +67,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     try {
       setPreferences(await client.save(next));
     } catch {
-      setError('Preferences could not be saved. Existing stories are unchanged.');
+      setError('Preferences could not be saved. Existing dramas are unchanged.');
       throw new Error('preferences_save_failed');
     } finally {
       setLoading(false);

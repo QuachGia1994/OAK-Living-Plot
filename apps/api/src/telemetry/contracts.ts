@@ -1,19 +1,19 @@
-import type { StoryGenerationUsage } from '../ai/contracts';
+import type { SceneGenerationUsage } from '../ai/contracts';
 
-export type StoryGenerationAttemptOutcome = 'accepted' | 'rejected';
+export type GenerationAttemptOutcome = 'accepted' | 'rejected';
 
-export interface StoryGenerationAttemptTelemetry {
-  provider: 'gemini';
+export interface GenerationAttemptTelemetry {
+  provider: string;
   model: string;
   attempt: 1 | 2;
-  outcome: StoryGenerationAttemptOutcome;
-  usage: StoryGenerationUsage;
+  outcome: GenerationAttemptOutcome;
+  usage: SceneGenerationUsage;
 }
 
-export interface StoryTelemetrySink {
-  recordGenerationAttempt(event: StoryGenerationAttemptTelemetry): void;
+export interface GenerationTelemetrySink {
+  recordGenerationAttempt(event: GenerationAttemptTelemetry): void;
 }
 
-export const NOOP_STORY_TELEMETRY: StoryTelemetrySink = {
+export const NOOP_GENERATION_TELEMETRY: GenerationTelemetrySink = {
   recordGenerationAttempt() {},
 };

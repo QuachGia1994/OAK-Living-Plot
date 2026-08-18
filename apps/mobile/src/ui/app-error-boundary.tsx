@@ -1,9 +1,11 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { UiLocale } from '@/features/preferences/contracts';
 import { colors, radius, spacing } from './theme';
 
 interface Props {
   children: ReactNode;
+  locale: UiLocale;
 }
 
 interface State {
@@ -17,30 +19,29 @@ export class AppErrorBoundary extends Component<Props, State> {
     return { failed: true };
   }
 
-  componentDidCatch(_error: Error, _info: ErrorInfo): void {
-    // Deliberately do not persist error payloads or story data from a render crash.
-  }
-
   private reset = () => {
     this.setState({ failed: false });
   };
 
   render() {
     if (!this.state.failed) return this.props.children;
+    const vi = this.props.locale === 'vi';
     return (
       <View style={styles.screen} accessibilityLiveRegion="assertive">
-        <Text style={styles.eyebrow}>UI recovery</Text>
-        <Text style={styles.title}>Living Plot hit a display error.</Text>
+        <Text style={styles.eyebrow}>{vi ? 'KHÔI PHỤC GIAO DIỆN' : 'UI RECOVERY'}</Text>
+        <Text style={styles.title}>{vi ? 'Living Plot gặp lỗi hiển thị.' : 'Living Plot hit a display error.'}</Text>
         <Text style={styles.body}>
-          Your canonical story, choices, quota, and purchases remain server-owned. Retrying here only rebuilds the interface.
+          {vi
+            ? 'Drama chuẩn, lựa chọn, hạn mức và giao dịch vẫn do máy chủ sở hữu. Thử lại ở đây chỉ dựng lại giao diện.'
+            : 'Your canonical drama, choices, quota, and purchases remain server-owned. Retrying here only rebuilds the interface.'}
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Retry Living Plot interface"
+          accessibilityLabel={vi ? 'Thử lại giao diện Living Plot' : 'Retry Living Plot interface'}
           onPress={this.reset}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
         >
-          <Text style={styles.buttonText}>Retry interface</Text>
+          <Text style={styles.buttonText}>{vi ? 'Thử lại giao diện' : 'Retry interface'}</Text>
         </Pressable>
       </View>
     );

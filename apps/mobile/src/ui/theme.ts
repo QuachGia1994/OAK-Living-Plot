@@ -24,7 +24,7 @@ export const colors = {
   danger: '#E58A82',
   success: '#8DCAA2',
   overlay: '#0F0E0C',
-  storyInk: '#D8CFC1',
+  narrativeInk: '#D8CFC1',
   placeholder: '#70675E',
   quietInk: '#80776D',
 } as const;

@@ -12,7 +12,6 @@ export const sharedUiCopy = {
   tryAgain: { en: 'Try again', vi: 'Thử lại' },
   signIn: { en: 'Continue with email', vi: 'Tiếp tục bằng email' },
   signOut: { en: 'Sign out', vi: 'Đăng xuất' },
-  loadingStory: { en: 'Loading your story…', vi: 'Đang tải câu chuyện…' },
 } as const satisfies Record<string, LocalizedCopy>;
 
 export function localize(locale: UiLocale, copy: LocalizedCopy): string {

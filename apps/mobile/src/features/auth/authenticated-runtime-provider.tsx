@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BillingSessionProvider } from '@/features/billing/billing-session-context';
 import type { BillingSession } from '@/features/billing/contracts';
-import { StoryExperienceClientProvider } from '@/features/story/story-client-context';
+import { DramaExperienceClientProvider } from '@/features/drama/drama-client-context';
 import { loadBackendUserId } from './backend-identity';
 import { useMobileAuth } from './mobile-auth-context';
 
@@ -30,7 +30,7 @@ export function AuthenticatedRuntimeProvider({ children }: { children: ReactNode
 
   return (
     <BillingSessionProvider session={billingSession}>
-      <StoryExperienceClientProvider>{children}</StoryExperienceClientProvider>
+      <DramaExperienceClientProvider>{children}</DramaExperienceClientProvider>
     </BillingSessionProvider>
   );
 }

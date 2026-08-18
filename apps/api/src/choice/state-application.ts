@@ -1,24 +1,24 @@
-import type { ChoiceStateDelta, EpisodeProposal, RelationshipDelta, ThreadProposal } from '../ai/contracts';
-import type { FactState, RelationshipState, StructuredPlotState, ThreadState } from '../domain/story';
+import type { ChoiceStateDelta, RelationshipDelta, SceneProposal, ThreadProposal } from '../ai/contracts';
+import type { DramaState, FactState, RelationshipState, ThreadState } from '../domain/drama-state';
 
 export type StateApplicationResult =
-  | { ok: true; value: StructuredPlotState }
+  | { ok: true; value: DramaState }
   | { ok: false; error: string };
 
 export function applyCommittedChoiceState(
-  current: StructuredPlotState,
-  episodeId: string,
+  current: DramaState,
+  sceneId: string,
   choiceId: string,
-  episode: Pick<EpisodeProposal, 'establishedFacts' | 'threadChanges'>,
+  scene: Pick<SceneProposal, 'establishedFacts' | 'threadChanges'>,
   delta: ChoiceStateDelta,
 ): StateApplicationResult {
   const state = cloneState(current);
 
-  const episodeThreadResolution = resolveThreads(state.openThreads, episode.threadChanges.resolve);
-  if (!episodeThreadResolution.ok) return episodeThreadResolution;
-  state.openThreads = episodeThreadResolution.value;
-  state.openThreads.push(...createThreads(`episode:${episodeId}:thread`, episode.threadChanges.open));
-  state.facts.push(...createFacts(`episode:${episodeId}:fact`, episode.establishedFacts));
+  const sceneThreadResolution = resolveThreads(state.openThreads, scene.threadChanges.resolve);
+  if (!sceneThreadResolution.ok) return sceneThreadResolution;
+  state.openThreads = sceneThreadResolution.value;
+  state.openThreads.push(...createThreads(`scene:${sceneId}:thread`, scene.threadChanges.open));
+  state.facts.push(...createFacts(`scene:${sceneId}:fact`, scene.establishedFacts));
 
   for (const relationshipDelta of delta.relationships) {
     const result = applyRelationshipDelta(state.relationships, relationshipDelta);
@@ -41,7 +41,7 @@ export function applyCommittedChoiceState(
   return { ok: true, value: state };
 }
 
-function cloneState(state: StructuredPlotState): StructuredPlotState {
+function cloneState(state: DramaState): DramaState {
   return {
     schemaVersion: 2,
     relationships: state.relationships.map((item) => ({ ...item })),
@@ -121,7 +121,7 @@ function createThreads(prefix: string, threads: ThreadProposal[]): ThreadState[]
   }));
 }
 
-function findDuplicateStateKey(state: StructuredPlotState): string | null {
+function findDuplicateStateKey(state: DramaState): string | null {
   const relationshipKeys = state.relationships.map((item) => `${item.fromKey}\u0000${item.toKey}`);
   if (new Set(relationshipKeys).size !== relationshipKeys.length) return 'Duplicate canonical relationship key.';
   const factKeys = state.facts.map((item) => item.key);

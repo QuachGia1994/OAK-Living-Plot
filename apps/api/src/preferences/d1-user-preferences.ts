@@ -1,10 +1,10 @@
-import type { NarratorVariant, StoryLocale, UiLocale, UserPreferences } from './contracts';
-import { defaultUserPreferences } from './contracts';
+import type { DramaLocale, NarratorVariant, UiLocale, UserPreferences } from './contracts';
+import { defaultUserPreferences, isDramaLocale, isNarratorVariant, isUiLocale } from './contracts';
 
 interface PreferenceRow {
-  ui_locale: UiLocale;
-  story_locale: StoryLocale;
-  narrator_variant: NarratorVariant;
+  ui_locale: string;
+  story_locale: string;
+  narrator_variant: string;
   updated_at: number;
 }
 
@@ -20,9 +20,12 @@ export class D1UserPreferencesRepository {
       .bind(userId)
       .first<PreferenceRow>();
     if (!row) return { ...defaultUserPreferences };
+    if (!isUiLocale(row.ui_locale) || !isDramaLocale(row.story_locale) || !isNarratorVariant(row.narrator_variant)) {
+      throw new Error('Stored user preferences are invalid.');
+    }
     return {
       uiLocale: row.ui_locale,
-      storyLocale: row.story_locale,
+      dramaLocale: row.story_locale,
       narratorVariant: row.narrator_variant,
       updatedAt: row.updated_at,
     };
@@ -30,7 +33,7 @@ export class D1UserPreferencesRepository {
 
   async set(
     userId: string,
-    input: { uiLocale: UiLocale; storyLocale: StoryLocale; narratorVariant: NarratorVariant },
+    input: { uiLocale: UiLocale; dramaLocale: DramaLocale; narratorVariant: NarratorVariant },
     nowMs = Date.now(),
   ): Promise<UserPreferences> {
     await this.db
@@ -43,7 +46,7 @@ export class D1UserPreferencesRepository {
            narrator_variant = excluded.narrator_variant,
            updated_at = excluded.updated_at`,
       )
-      .bind(userId, input.uiLocale, input.storyLocale, input.narratorVariant, nowMs)
+      .bind(userId, input.uiLocale, input.dramaLocale, input.narratorVariant, nowMs)
       .run();
     return { ...input, updatedAt: nowMs };
   }

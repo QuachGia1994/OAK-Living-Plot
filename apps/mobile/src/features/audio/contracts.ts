@@ -1,29 +1,18 @@
-export type EpisodeAudioStatus = 'reserving' | 'queued' | 'processing' | 'staged' | 'ready' | 'failed';
+import type { MediaAsset } from '@/features/drama/domain';
 
-export interface EpisodeAudioAsset {
-  id: string;
-  episodeId: string;
-  voiceVariant: string;
-  status: EpisodeAudioStatus;
-  inputCharacters: number;
-  attempts: number;
-  cached: boolean;
-  failureCode: string | null;
-}
-
-export interface EpisodeAudioPlaybackSource {
+export interface SceneVoicePlaybackSource {
   uri: string;
   headers: Record<string, string>;
 }
 
-export interface EpisodeAudioClient {
+export interface SceneVoiceClient {
   readonly configured: boolean;
-  request(episodeId: string, voiceVariant: string, reservationKey: string): Promise<EpisodeAudioAsset>;
-  loadStatus(assetId: string): Promise<EpisodeAudioAsset>;
-  playbackSource(assetId: string): Promise<EpisodeAudioPlaybackSource>;
+  request(sceneId: string, voiceVariant: string, reservationKey: string): Promise<MediaAsset>;
+  loadStatus(assetId: string): Promise<MediaAsset>;
+  playbackSource(assetId: string): Promise<SceneVoicePlaybackSource>;
 }
 
-export type EpisodeAudioErrorCode =
+export type SceneVoiceErrorCode =
   | 'auth_required'
   | 'not_found'
   | 'quota_exceeded'
@@ -32,12 +21,12 @@ export type EpisodeAudioErrorCode =
   | 'backend_unavailable'
   | 'not_configured';
 
-export class EpisodeAudioClientError extends Error {
+export class SceneVoiceClientError extends Error {
   constructor(
-    public readonly code: EpisodeAudioErrorCode,
+    public readonly code: SceneVoiceErrorCode,
     message: string,
   ) {
     super(message);
-    this.name = 'EpisodeAudioClientError';
+    this.name = 'SceneVoiceClientError';
   }
 }

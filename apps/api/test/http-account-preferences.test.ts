@@ -40,23 +40,23 @@ describe('preferences and account data boundary', () => {
   it('loads defaults, saves only the authenticated owner preferences, and rejects unsupported values', async () => {
     const defaults = await call('/v1/preferences', 'GET', undefined, 'owner');
     expect(defaults.status).toBe(200);
-    expect(await defaults.json()).toEqual({ preferences: { uiLocale: 'en', storyLocale: 'en-US', narratorVariant: 'en-narrator-female', updatedAt: null } });
+    expect(await defaults.json()).toEqual({ preferences: { uiLocale: 'en', dramaLocale: 'en-US', narratorVariant: 'en-narrator-female', updatedAt: null } });
 
     const saved = await call('/v1/preferences', 'POST', {
-      uiLocale: 'vi', storyLocale: 'vi-VN', narratorVariant: 'vi-narrator-female', userId: 'forged-user',
+      uiLocale: 'vi', dramaLocale: 'vi-VN', narratorVariant: 'vi-narrator-female', userId: 'forged-user',
     }, 'owner');
     expect(saved.status).toBe(200);
-    expect(await saved.json()).toEqual({ preferences: expect.objectContaining({ uiLocale: 'vi', storyLocale: 'vi-VN', narratorVariant: 'vi-narrator-female' }) });
+    expect(await saved.json()).toEqual({ preferences: expect.objectContaining({ uiLocale: 'vi', dramaLocale: 'vi-VN', narratorVariant: 'vi-narrator-female' }) });
 
     const other = await call('/v1/preferences', 'GET', undefined, 'other');
-    expect(await other.json()).toEqual({ preferences: { uiLocale: 'en', storyLocale: 'en-US', narratorVariant: 'en-narrator-female', updatedAt: null } });
+    expect(await other.json()).toEqual({ preferences: { uiLocale: 'en', dramaLocale: 'en-US', narratorVariant: 'en-narrator-female', updatedAt: null } });
 
-    const invalid = await call('/v1/preferences', 'POST', { uiLocale: 'fr', storyLocale: 'fr-FR', narratorVariant: 'arbitrary-provider-voice' }, 'owner');
+    const invalid = await call('/v1/preferences', 'POST', { uiLocale: 'fr', dramaLocale: 'fr-FR', narratorVariant: 'arbitrary-provider-voice' }, 'owner');
     expect(invalid.status).toBe(400);
   });
 
   it('exports portable owner data without auth/provider/private-object secrets', async () => {
-    const owner = await seedOwnedStory('owner-auth-subject');
+    const owner = await seedOwnedDrama('owner-auth-subject');
     await db.prepare(`INSERT INTO user_preferences (user_id, ui_locale, story_locale, narrator_variant) VALUES (?, 'vi', 'vi-VN', 'vi-narrator-female')`).bind(owner.id).run();
     await db.prepare(`INSERT INTO user_entitlements (user_id, tier, plus_expires_at, provider_request_date_ms) VALUES (?, 'plus', ?, ?)`).bind(owner.id, Date.now() + 60_000, Date.now()).run();
 
@@ -64,8 +64,10 @@ describe('preferences and account data boundary', () => {
     expect(response.status).toBe(200);
     const body = await response.json() as { export: Record<string, unknown> };
     const serialized = JSON.stringify(body);
-    expect(body.export).toMatchObject({ schemaVersion: 1, preferences: { uiLocale: 'vi', storyLocale: 'vi-VN' } });
-    expect(serialized).toContain('A portable episode script.');
+    expect(body.export).toMatchObject({ schemaVersion: 2, preferences: { uiLocale: 'vi', dramaLocale: 'vi-VN' } });
+    expect(serialized).toContain('A portable scene script.');
+    expect(serialized).toContain('"dramas"');
+    expect(serialized).toContain('"scenes"');
     expect(serialized).not.toContain('private/audio/object.mp3');
     expect(serialized).not.toContain('provider-secret-voice-id');
     expect(serialized).not.toContain('owner-auth-subject');
@@ -73,7 +75,7 @@ describe('preferences and account data boundary', () => {
   });
 
   it('requires the exact deletion phrase and removes private audio before D1 cascade', async () => {
-    const owner = await seedOwnedStory('owner-auth-subject');
+    const owner = await seedOwnedDrama('owner-auth-subject');
     await seedCascadingAccountRows(owner.id);
     await runtimeEnv.AUDIO_BUCKET.put('private/audio/object.mp3', new TextEncoder().encode('audio'));
 
@@ -96,7 +98,7 @@ describe('preferences and account data boundary', () => {
   });
 
   it('fails closed and keeps canonical D1 data when private audio cleanup fails', async () => {
-    const owner = await seedOwnedStory('owner-fail');
+    const owner = await seedOwnedDrama('owner-fail');
     const failingBucket = { ...runtimeEnv.AUDIO_BUCKET, async delete() { throw new Error('r2 down'); } } as unknown as R2Bucket;
     const response = await handleRequest(request('/v1/account/delete', 'POST', { confirmation: 'DELETE MY LIVING PLOT DATA' }), { ...testEnv, AUDIO_BUCKET: failingBucket }, {
       sessionVerifier: verifier('owner-fail'),
@@ -109,11 +111,11 @@ describe('preferences and account data boundary', () => {
   });
 });
 
-async function seedOwnedStory(subject: string) {
+async function seedOwnedDrama(subject: string) {
   const user = await new D1UserRepository(db).resolveOrCreate(subject);
   await db.prepare(`INSERT INTO plots (id, user_id, title, premise, locale, mood) VALUES ('plot-export', ?, 'Portable plot', 'A premise safe for export.', 'en-US', 'mysterious')`).bind(user.id).run();
   await db.prepare(`INSERT INTO characters (id, plot_id, name, role, traits_json) VALUES ('character-export', 'plot-export', 'Mina', 'protagonist', '{"goal":"truth"}')`).run();
-  await db.prepare(`INSERT INTO episodes (id, plot_id, episode_number, title, script_json, summary, status) VALUES ('episode-export', 'plot-export', 1, 'Export episode', '{"script":"A portable episode script."}', 'Portable summary.', 'ready')`).run();
+  await db.prepare(`INSERT INTO episodes (id, plot_id, episode_number, title, script_json, summary, status) VALUES ('episode-export', 'plot-export', 1, 'Export scene', '{"script":"A portable scene script."}', 'Portable summary.', 'ready')`).run();
   await db.prepare(`INSERT INTO episode_choices (id, episode_id, position, label, choice_key, intent, consequence) VALUES ('choice-export-a', 'episode-export', 1, 'Open the door', 'A', 'confront', 'The visitor is revealed.')`).run();
   await db.prepare(`INSERT INTO audio_assets (id, episode_id, voice_variant, provider, provider_voice_id, language_code, reservation_key, object_key, status, input_characters, ready_at) VALUES ('audio-export', 'episode-export', 'en-narrator-female', 'google', 'provider-secret-voice-id', 'en-US', 'reservation-export-001', 'private/audio/object.mp3', 'ready', 25, ?)`).bind(Date.now()).run();
   return user;

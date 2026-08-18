@@ -3,15 +3,15 @@ import type { UserPreferences } from '../preferences/contracts';
 export const ACCOUNT_DELETE_CONFIRMATION = 'DELETE MY LIVING PLOT DATA';
 
 export interface AccountExportSnapshot {
-  schemaVersion: 1;
+  schemaVersion: 2;
   exportedAt: string;
   preferences: UserPreferences;
   entitlement: { tier: 'free' | 'plus'; expiresAt: string | null; syncedAt: string | null };
-  usage: Array<{ utcDay: string; textEpisodes: number; voicedEpisodes: number }>;
-  plots: AccountExportPlot[];
+  usage: Array<{ utcDay: string; generatedScenes: number; voicedScenes: number }>;
+  dramas: AccountExportDrama[];
 }
 
-export interface AccountExportPlot {
+export interface AccountExportDrama {
   title: string;
   premise: string;
   status: 'active' | 'completed' | 'archived';
@@ -19,10 +19,10 @@ export interface AccountExportPlot {
   mood: string;
   summary: string;
   characters: Array<{ name: string; role: string; traits: Record<string, unknown> }>;
-  episodes: AccountExportEpisode[];
+  scenes: AccountExportScene[];
 }
 
-export interface AccountExportEpisode {
+export interface AccountExportScene {
   number: number;
   title: string;
   script: string;
@@ -35,10 +35,10 @@ export interface AccountExportEpisode {
     consequence: string;
     committed: boolean;
   }>;
-  audio: Array<{
-    voiceVariant: string;
+  media: Array<{
+    kind: 'voice';
+    variant: string;
     status: string;
-    inputCharacters: number;
     attempts: number;
     readyAt: string | null;
   }>;

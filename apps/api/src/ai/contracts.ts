@@ -1,10 +1,10 @@
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
-export interface EpisodeGenerationInput {
+export interface SceneGenerationInput {
   locale: string;
   targetSpokenSeconds: number;
   contentRating: 'teen';
-  plot: {
+  drama: {
     premise: string;
     mood: string;
     summary: string;
@@ -29,7 +29,7 @@ export interface EpisodeGenerationInput {
   activeFacts: Array<{ key: string; text: string }>;
   openThreads: Array<{ key: string; title: string; urgency: number }>;
   previous: null | {
-    episodeSummary: string;
+    sceneSummary: string;
     chosenAction: string;
     choiceIntent: string;
     consequence: string;
@@ -59,7 +59,7 @@ export interface ChoiceStateDelta {
   nextTone: string;
 }
 
-export interface EpisodeChoiceProposal {
+export interface SceneChoiceProposal {
   key: 'A' | 'B' | 'C';
   label: string;
   intent: string;
@@ -67,7 +67,7 @@ export interface EpisodeChoiceProposal {
   stateDelta: ChoiceStateDelta;
 }
 
-export interface EpisodeProposal {
+export interface SceneProposal {
   title: string;
   script: string;
   summary: string;
@@ -76,27 +76,27 @@ export interface EpisodeProposal {
     open: ThreadProposal[];
     resolve: string[];
   };
-  choices: [EpisodeChoiceProposal, EpisodeChoiceProposal, EpisodeChoiceProposal];
+  choices: [SceneChoiceProposal, SceneChoiceProposal, SceneChoiceProposal];
 }
 
-export interface StoryGenerationUsage {
+export interface SceneGenerationUsage {
   inputTokens: number;
   outputTokens: number;
 }
 
-export type StoryGenerationError =
+export type SceneGenerationError =
   | { code: 'invalid_input'; message: string }
   | { code: 'provider_unavailable'; message: string; retryable: boolean }
   | { code: 'invalid_response'; message: string; attempts: number };
 
-export interface StoryGenerationSuccess {
-  proposal: EpisodeProposal;
-  usage: StoryGenerationUsage;
+export interface SceneGenerationSuccess {
+  proposal: SceneProposal;
+  usage: SceneGenerationUsage;
   attempts: number;
-  provider: 'gemini';
+  provider: string;
   model: string;
 }
 
-export interface StoryGenerator {
-  generate(input: EpisodeGenerationInput): Promise<Result<StoryGenerationSuccess, StoryGenerationError>>;
+export interface SceneGenerator {
+  generate(input: SceneGenerationInput): Promise<Result<SceneGenerationSuccess, SceneGenerationError>>;
 }

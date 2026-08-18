@@ -6,7 +6,7 @@ import type { AppEnv } from '../../src/env';
 import { D1EpisodePublisher } from '../../src/publication/d1-episode-publisher';
 import type { EpisodePublicationInput } from '../../src/publication/contracts';
 import { applySqlMigration, resetStoryData } from '../d1-test-utils';
-import { makeValidProposal } from '../story-fixtures';
+import { makeValidProposal } from '../drama-fixtures';
 
 const db = (env as unknown as AppEnv).DB;
 

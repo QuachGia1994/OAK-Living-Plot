@@ -127,7 +127,7 @@ export class AudioProcessor {
           .run();
         return { action: 'ack', assetId: work.id };
       }
-      if (work.object_key) await this.safeDelete(work.object_key);
+      if (work.object_key && !(await this.deletePrivateObject(work.id, work.object_key))) return retry(work.id);
       if (quotaStatus === 'reserved') {
         await this.quota.release({ userId: work.user_id, reservationKey: work.reservation_key });
       }
@@ -163,7 +163,7 @@ export class AudioProcessor {
     });
     if (!consumed.ok) {
       if (consumed.error.code === 'persistence_error') return retry(work.id);
-      if (work.object_key) await this.safeDelete(work.object_key);
+      if (work.object_key && !(await this.deletePrivateObject(work.id, work.object_key))) return retry(work.id);
       await this.db
         .prepare(
           `UPDATE audio_assets
@@ -234,11 +234,16 @@ export class AudioProcessor {
     return row?.status ?? null;
   }
 
-  private async safeDelete(objectKey: string): Promise<void> {
+  private async deletePrivateObject(assetId: string, objectKey: string): Promise<boolean> {
     try {
       await this.bucket.delete(objectKey);
+      return true;
     } catch {
-      // The object remains private; a later reconciliation/cleanup pass may remove it.
+      await this.db
+        .prepare("UPDATE audio_assets SET failure_code = 'r2_cleanup_failed', updated_at = ? WHERE id = ? AND status = 'staged'")
+        .bind(this.clock(), assetId)
+        .run();
+      return false;
     }
   }
 }

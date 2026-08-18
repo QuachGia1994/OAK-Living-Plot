@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { StructuredPlotState } from '../src/domain/story';
+import type { DramaState } from '../src/domain/drama-state';
 import { applyCommittedChoiceState } from '../src/choice/state-application';
-import { makeValidProposal } from './story-fixtures';
+import { makeValidProposal } from './drama-fixtures';
 
 describe('applyCommittedChoiceState', () => {
   it('applies episode facts plus the selected choice delta into canonical v2 state', () => {
@@ -58,7 +58,7 @@ describe('applyCommittedChoiceState', () => {
   });
 });
 
-function initialState(): StructuredPlotState {
+function initialState(): DramaState {
   return {
     schemaVersion: 2,
     relationships: [

@@ -1,19 +1,19 @@
-import type { StoryGenerator } from '../ai/contracts';
+import type { SceneGenerator } from '../ai/contracts';
 import { D1AccountService } from '../account/d1-account-service';
-import { createStoryGenerator } from '../ai/story-generator-factory';
+import { createSceneGenerator } from '../ai/scene-generator-factory';
 import { D1AudioService } from '../audio/d1-audio-service';
-import type { AudioAssetSnapshot, AudioQueue } from '../audio/contracts';
+import type { AudioQueue, MediaAsset } from '../audio/contracts';
 import { ClerkSessionVerifier } from '../auth/clerk-session-verifier';
 import { D1EntitlementRepository } from '../billing/d1-entitlement-repository';
 import type { EntitlementSnapshot, RevenueCatSubscriberProvider } from '../billing/contracts';
 import { handleRevenueCatWebhookRequest } from '../billing/revenuecat-webhook-handler';
 import type { SessionVerifier } from '../auth/session-verifier';
 import type { AppEnv } from '../env';
-import type { LiveStoryError, LiveStoryMood } from '../live-story/contracts';
-import { LiveStoryService } from '../live-story/live-story-service';
-import { D1StoryRepository } from '../persistence/d1-story-repository';
+import type { DramaMood } from '../domain/drama';
+import type { DramaError } from '../drama-runtime/contracts';
+import { DramaService } from '../drama-runtime/drama-service';
 import { D1UserRepository } from '../persistence/d1-user-repository';
-import { isNarratorVariant, isStoryLocale, isUiLocale } from '../preferences/contracts';
+import { isDramaLocale, isNarratorVariant, isUiLocale } from '../preferences/contracts';
 import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences';
 import { CloudflareProductTelemetrySink } from '../telemetry/cloudflare-product-telemetry';
 import type { ProductTelemetrySink } from '../telemetry/product-events';
@@ -25,8 +25,8 @@ export interface RequestDependencies {
   audioQueue?: AudioQueue;
   revenueCatSubscriberProvider?: RevenueCatSubscriberProvider;
   revenueCatWebhookClock?: () => number;
-  storyGenerator?: StoryGenerator;
-  storyClock?: () => number;
+  sceneGenerator?: SceneGenerator;
+  dramaClock?: () => number;
   productTelemetry?: ProductTelemetrySink;
 }
 
@@ -71,12 +71,11 @@ export async function handleRequest(
   if (route.kind === 'me') return json({ user: { id: user.id } });
   if (route.kind === 'preferences') return handlePreferences(request, env.DB, user.id);
   if (route.kind === 'account_export') {
-    const account = new D1AccountService(env.DB, env.AUDIO_BUCKET, dependencies.storyClock);
+    const account = new D1AccountService(env.DB, env.AUDIO_BUCKET, dependencies.dramaClock);
     return json({ export: await account.export(user.id) });
   }
-  if (route.kind === 'account_delete') return handleAccountDelete(request, env, user.id, dependencies.storyClock);
-  if (route.kind === 'plot') return handlePlotRead(env, user.id, route.plotId);
-  if (isStoryRoute(route)) return handleStoryRoute(request, env, user.id, route, dependencies);
+  if (route.kind === 'account_delete') return handleAccountDelete(request, env, user.id, dependencies.dramaClock);
+  if (isDramaRoute(route)) return handleDramaRoute(request, env, user.id, route, dependencies);
 
   const entitlements = new D1EntitlementRepository(env.DB);
   if (route.kind === 'entitlement') {
@@ -85,36 +84,35 @@ export async function handleRequest(
 
   const productTelemetry = dependencies.productTelemetry ?? new CloudflareProductTelemetrySink(env.ANALYTICS);
   const audio = new D1AudioService(env.DB, dependencies.audioQueue ?? env.TTS_QUEUE, undefined, productTelemetry);
-  if (route.kind === 'episode_audio') {
+  if (route.kind === 'scene_voice') {
     const entitlement = await entitlements.getEntitlement(user.id);
-    return handleAudioRequest(request, audio, user.id, route.episodeId, entitlement.tier);
+    return handleVoiceRequest(request, audio, user.id, route.sceneId, entitlement.tier);
   }
-  if (route.kind === 'audio_status') return handleAudioStatus(audio, user.id, route.assetId);
-  return handleAudioRead(env, audio, user.id, route.assetId);
+  if (route.kind === 'media_status') return handleMediaStatus(audio, user.id, route.assetId);
+  return handleMediaRead(env, audio, user.id, route.assetId);
 }
 
-type StoryRoute =
-  | { kind: 'story_home' }
-  | { kind: 'story_library' }
-  | { kind: 'story_collection' }
-  | { kind: 'story_plot'; plotId: string }
-  | { kind: 'story_history'; plotId: string }
-  | { kind: 'story_archive'; plotId: string }
-  | { kind: 'story_restore'; plotId: string }
-  | { kind: 'story_generate'; plotId: string }
-  | { kind: 'story_choice'; plotId: string; episodeId: string; choiceId: string };
+type DramaRoute =
+  | { kind: 'drama_home' }
+  | { kind: 'drama_library' }
+  | { kind: 'drama_collection' }
+  | { kind: 'drama'; dramaId: string }
+  | { kind: 'drama_history'; dramaId: string }
+  | { kind: 'drama_archive'; dramaId: string }
+  | { kind: 'drama_restore'; dramaId: string }
+  | { kind: 'drama_generate'; dramaId: string }
+  | { kind: 'drama_choice'; dramaId: string; sceneId: string; choiceId: string };
 
 type ProtectedRoute =
   | { kind: 'me' }
-  | { kind: 'plot'; plotId: string }
   | { kind: 'entitlement' }
   | { kind: 'preferences' }
   | { kind: 'account_export' }
   | { kind: 'account_delete' }
-  | { kind: 'episode_audio'; episodeId: string }
-  | { kind: 'audio_status'; assetId: string }
-  | { kind: 'audio'; assetId: string }
-  | StoryRoute;
+  | { kind: 'scene_voice'; sceneId: string }
+  | { kind: 'media_status'; assetId: string }
+  | { kind: 'media'; assetId: string }
+  | DramaRoute;
 
 function matchProtectedRoute(pathname: string): ProtectedRoute | null {
   if (pathname === '/v1/me') return { kind: 'me' };
@@ -122,30 +120,28 @@ function matchProtectedRoute(pathname: string): ProtectedRoute | null {
   if (pathname === '/v1/preferences') return { kind: 'preferences' };
   if (pathname === '/v1/account/export') return { kind: 'account_export' };
   if (pathname === '/v1/account/delete') return { kind: 'account_delete' };
-  if (pathname === '/v1/story/home') return { kind: 'story_home' };
-  if (pathname === '/v1/story/library') return { kind: 'story_library' };
-  if (pathname === '/v1/story/plots') return { kind: 'story_collection' };
+  if (pathname === '/v1/dramas/home') return { kind: 'drama_home' };
+  if (pathname === '/v1/dramas/library') return { kind: 'drama_library' };
+  if (pathname === '/v1/dramas') return { kind: 'drama_collection' };
 
-  const storyChoice = matchIds(pathname, /^\/v1\/story\/plots\/([^/]+)\/episodes\/([^/]+)\/choices\/([^/]+)$/);
-  if (storyChoice) return { kind: 'story_choice', plotId: storyChoice[0], episodeId: storyChoice[1], choiceId: storyChoice[2] };
-  const storyGenerate = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)\/episodes$/);
-  if (storyGenerate) return { kind: 'story_generate', plotId: storyGenerate };
-  const storyHistory = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)\/history$/);
-  if (storyHistory) return { kind: 'story_history', plotId: storyHistory };
-  const storyArchive = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)\/archive$/);
-  if (storyArchive) return { kind: 'story_archive', plotId: storyArchive };
-  const storyRestore = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)\/restore$/);
-  if (storyRestore) return { kind: 'story_restore', plotId: storyRestore };
-  const storyPlot = matchId(pathname, /^\/v1\/story\/plots\/([^/]+)$/);
-  if (storyPlot) return { kind: 'story_plot', plotId: storyPlot };
-  const plot = matchId(pathname, /^\/v1\/plots\/([^/]+)$/);
-  if (plot) return { kind: 'plot', plotId: plot };
-  const episodeAudio = matchId(pathname, /^\/v1\/episodes\/([^/]+)\/audio$/);
-  if (episodeAudio) return { kind: 'episode_audio', episodeId: episodeAudio };
-  const audioStatus = matchId(pathname, /^\/v1\/audio\/([^/]+)\/status$/);
-  if (audioStatus) return { kind: 'audio_status', assetId: audioStatus };
-  const audio = matchId(pathname, /^\/v1\/audio\/([^/]+)$/);
-  if (audio) return { kind: 'audio', assetId: audio };
+  const dramaChoice = matchIds(pathname, /^\/v1\/dramas\/([^/]+)\/scenes\/([^/]+)\/choices\/([^/]+)$/);
+  if (dramaChoice) return { kind: 'drama_choice', dramaId: dramaChoice[0], sceneId: dramaChoice[1], choiceId: dramaChoice[2] };
+  const dramaGenerate = matchId(pathname, /^\/v1\/dramas\/([^/]+)\/scenes$/);
+  if (dramaGenerate) return { kind: 'drama_generate', dramaId: dramaGenerate };
+  const dramaHistory = matchId(pathname, /^\/v1\/dramas\/([^/]+)\/history$/);
+  if (dramaHistory) return { kind: 'drama_history', dramaId: dramaHistory };
+  const dramaArchive = matchId(pathname, /^\/v1\/dramas\/([^/]+)\/archive$/);
+  if (dramaArchive) return { kind: 'drama_archive', dramaId: dramaArchive };
+  const dramaRestore = matchId(pathname, /^\/v1\/dramas\/([^/]+)\/restore$/);
+  if (dramaRestore) return { kind: 'drama_restore', dramaId: dramaRestore };
+  const drama = matchId(pathname, /^\/v1\/dramas\/([^/]+)$/);
+  if (drama) return { kind: 'drama', dramaId: drama };
+  const sceneVoice = matchId(pathname, /^\/v1\/scenes\/([^/]+)\/voice$/);
+  if (sceneVoice) return { kind: 'scene_voice', sceneId: sceneVoice };
+  const mediaStatus = matchId(pathname, /^\/v1\/media\/([^/]+)\/status$/);
+  if (mediaStatus) return { kind: 'media_status', assetId: mediaStatus };
+  const media = matchId(pathname, /^\/v1\/media\/([^/]+)$/);
+  if (media) return { kind: 'media', assetId: media };
   return null;
 }
 
@@ -174,8 +170,8 @@ function matchIds(pathname: string, pattern: RegExp): [string, string, string] |
 function methodAllowed(route: ProtectedRoute, method: string): boolean {
   if (route.kind === 'preferences') return method === 'GET' || method === 'POST';
   if (
-    route.kind === 'episode_audio' || route.kind === 'story_collection' || route.kind === 'story_generate' ||
-    route.kind === 'story_choice' || route.kind === 'story_archive' || route.kind === 'story_restore' ||
+    route.kind === 'scene_voice' || route.kind === 'drama_collection' || route.kind === 'drama_generate' ||
+    route.kind === 'drama_choice' || route.kind === 'drama_archive' || route.kind === 'drama_restore' ||
     route.kind === 'account_delete'
   ) {
     return method === 'POST';
@@ -183,38 +179,38 @@ function methodAllowed(route: ProtectedRoute, method: string): boolean {
   return method === 'GET';
 }
 
-function isStoryRoute(route: ProtectedRoute): route is StoryRoute {
-  return route.kind.startsWith('story_');
+function isDramaRoute(route: ProtectedRoute): route is DramaRoute {
+  return route.kind === 'drama' || route.kind.startsWith('drama_');
 }
 
-async function handleStoryRoute(
+async function handleDramaRoute(
   request: Request,
   env: AppEnv,
   userId: string,
-  route: StoryRoute,
+  route: DramaRoute,
   dependencies: RequestDependencies,
 ): Promise<Response> {
-  const service = new LiveStoryService(
+  const service = new DramaService(
     env.DB,
-    dependencies.storyGenerator ?? createStoryGenerator(env),
-    dependencies.storyClock,
+    dependencies.sceneGenerator ?? createSceneGenerator(env),
+    dependencies.dramaClock,
     dependencies.productTelemetry ?? new CloudflareProductTelemetrySink(env.ANALYTICS),
   );
-  if (route.kind === 'story_home') return liveStoryResponse(await service.loadHome(userId), 'home');
-  if (route.kind === 'story_library') return liveStoryResponse(await service.loadLibrary(userId), 'library');
-  if (route.kind === 'story_plot') return liveStoryResponse(await service.loadPlot(userId, route.plotId), 'story');
-  if (route.kind === 'story_history') return liveStoryResponse(await service.loadHistory(userId, route.plotId), 'history');
-  if (route.kind === 'story_archive') return liveStoryResponse(await service.archivePlot(userId, route.plotId), 'plot');
-  if (route.kind === 'story_restore') return liveStoryResponse(await service.restorePlot(userId, route.plotId), 'plot');
-  if (route.kind === 'story_choice') {
-    return liveStoryResponse(await service.commitChoice({ userId, plotId: route.plotId, episodeId: route.episodeId, choiceId: route.choiceId }), 'story');
+  if (route.kind === 'drama_home') return dramaResponse(await service.loadHome(userId), 'home');
+  if (route.kind === 'drama_library') return dramaResponse(await service.loadLibrary(userId), 'library');
+  if (route.kind === 'drama') return dramaResponse(await service.loadDrama(userId, route.dramaId), 'drama');
+  if (route.kind === 'drama_history') return dramaResponse(await service.loadHistory(userId, route.dramaId), 'history');
+  if (route.kind === 'drama_archive') return dramaResponse(await service.archiveDrama(userId, route.dramaId), 'dramaSummary');
+  if (route.kind === 'drama_restore') return dramaResponse(await service.restoreDrama(userId, route.dramaId), 'dramaSummary');
+  if (route.kind === 'drama_choice') {
+    return dramaResponse(await service.commitChoice({ userId, dramaId: route.dramaId, sceneId: route.sceneId, choiceId: route.choiceId }), 'drama');
   }
 
   const body = await parseJsonObject(request);
   if (!body) return json({ error: 'invalid_request' }, 400);
-  if (route.kind === 'story_generate') {
+  if (route.kind === 'drama_generate') {
     if (typeof body.generationKey !== 'string') return json({ error: 'invalid_request' }, 400);
-    return liveStoryResponse(await service.generateNext({ userId, plotId: route.plotId, generationKey: body.generationKey }), 'story');
+    return dramaResponse(await service.generateNext({ userId, dramaId: route.dramaId, generationKey: body.generationKey }), 'drama');
   }
 
   if (
@@ -222,12 +218,12 @@ async function handleStoryRoute(
     typeof body.generationKey !== 'string' ||
     typeof body.premise !== 'string' ||
     typeof body.characterName !== 'string' ||
-    typeof body.locale !== 'string' ||
-    !isLiveStoryMood(body.mood)
+    !isDramaLocale(body.locale) ||
+    !isDramaMood(body.mood)
   ) {
     return json({ error: 'invalid_request' }, 400);
   }
-  const result = await service.createPlot({
+  const result = await service.createDrama({
     userId,
     creationKey: body.creationKey,
     generationKey: body.generationKey,
@@ -236,8 +232,8 @@ async function handleStoryRoute(
     characterName: body.characterName,
     locale: body.locale,
   });
-  if (!result.ok) return liveStoryErrorResponse(result.error);
-  return json({ story: result.value.story }, result.value.created ? 201 : 200);
+  if (!result.ok) return dramaErrorResponse(result.error);
+  return json({ drama: result.value.drama }, result.value.created ? 201 : 200);
 }
 
 async function parseJsonObject(request: Request): Promise<Record<string, unknown> | null> {
@@ -258,19 +254,19 @@ function requestBodyTooLarge(request: Request): boolean {
   return Number.isFinite(parsed) && parsed > MAX_JSON_BODY_CHARACTERS;
 }
 
-function isLiveStoryMood(value: unknown): value is LiveStoryMood {
+function isDramaMood(value: unknown): value is DramaMood {
   return value === 'tense' || value === 'romantic' || value === 'mysterious' || value === 'hopeful';
 }
 
-function liveStoryResponse<T>(
-  result: { ok: true; value: T } | { ok: false; error: LiveStoryError },
-  key: 'home' | 'story' | 'library' | 'history' | 'plot',
+function dramaResponse<T>(
+  result: { ok: true; value: T } | { ok: false; error: DramaError },
+  key: 'home' | 'drama' | 'library' | 'history' | 'dramaSummary',
 ): Response {
-  if (!result.ok) return liveStoryErrorResponse(result.error);
+  if (!result.ok) return dramaErrorResponse(result.error);
   return json({ [key]: result.value });
 }
 
-function liveStoryErrorResponse(error: LiveStoryError): Response {
+function dramaErrorResponse(error: DramaError): Response {
   if (error.code === 'invalid_input') return json({ error: error.code }, 400);
   if (error.code === 'not_found') return json({ error: error.code }, 404);
   if (error.code === 'quota_exceeded') {
@@ -290,13 +286,13 @@ async function handlePreferences(request: Request, db: D1Database, userId: strin
   const preferences = new D1UserPreferencesRepository(db);
   if (request.method === 'GET') return json({ preferences: await preferences.get(userId) });
   const body = await parseJsonObject(request);
-  if (!body || !isUiLocale(body.uiLocale) || !isStoryLocale(body.storyLocale) || !isNarratorVariant(body.narratorVariant)) {
+  if (!body || !isUiLocale(body.uiLocale) || !isDramaLocale(body.dramaLocale) || !isNarratorVariant(body.narratorVariant)) {
     return json({ error: 'invalid_request' }, 400);
   }
   return json({
     preferences: await preferences.set(userId, {
       uiLocale: body.uiLocale,
-      storyLocale: body.storyLocale,
+      dramaLocale: body.dramaLocale,
       narratorVariant: body.narratorVariant,
     }),
   });
@@ -318,29 +314,11 @@ async function handleAccountDelete(
   return json({ error: 'internal_error' }, 500);
 }
 
-async function handlePlotRead(env: AppEnv, userId: string, plotId: string): Promise<Response> {
-  const stories = new D1StoryRepository(env.DB);
-  const memory = await stories.loadOwnedPlotMemory(userId, plotId);
-  if (!memory) return json({ error: 'not_found' }, 404);
-
-  return json({
-    plot: {
-      id: memory.id,
-      status: memory.status,
-      summary: memory.summary,
-      version: memory.version,
-      nextEpisodeNumber: memory.nextEpisodeNumber,
-      state: memory.state,
-      characters: memory.characters,
-    },
-  });
-}
-
-async function handleAudioRequest(
+async function handleVoiceRequest(
   request: Request,
   audio: D1AudioService,
   userId: string,
-  episodeId: string,
+  sceneId: string,
   tier: 'free' | 'plus',
 ): Promise<Response> {
   const body = await parseJsonObject(request);
@@ -350,7 +328,7 @@ async function handleAudioRequest(
 
   const result = await audio.request({
     userId,
-    episodeId,
+    sceneId,
     voiceVariant: body.voiceVariant,
     reservationKey: body.reservationKey,
     tier,
@@ -374,33 +352,33 @@ async function handleAudioRequest(
   }
 
   return json(
-    { audio: clientAudio(result.value) },
+    { media: clientMedia(result.value) },
     result.value.status === 'ready' ? 200 : 202,
   );
 }
 
-async function handleAudioStatus(
+async function handleMediaStatus(
   audio: D1AudioService,
   userId: string,
   assetId: string,
 ): Promise<Response> {
-  const asset = await audio.getOwnedAsset(userId, assetId);
-  return asset ? json({ audio: clientAudio(asset) }) : json({ error: 'not_found' }, 404);
+  const asset = await audio.getOwnedMediaAsset(userId, assetId);
+  return asset ? json({ media: clientMedia(asset) }) : json({ error: 'not_found' }, 404);
 }
 
-async function handleAudioRead(
+async function handleMediaRead(
   env: AppEnv,
   audio: D1AudioService,
   userId: string,
   assetId: string,
 ): Promise<Response> {
-  const asset = await audio.getOwnedAsset(userId, assetId);
-  if (!asset) return json({ error: 'not_found' }, 404);
-  if (asset.status !== 'ready' || !asset.objectKey) {
-    return json({ audio: clientAudio(asset) }, 202);
+  const delivery = await audio.getOwnedDeliveryAsset(userId, assetId);
+  if (!delivery) return json({ error: 'not_found' }, 404);
+  if (delivery.persistenceStatus !== 'ready' || !delivery.objectKey) {
+    return json({ media: clientMedia(delivery.media) }, 202);
   }
 
-  const object = await env.AUDIO_BUCKET.get(asset.objectKey);
+  const object = await env.AUDIO_BUCKET.get(delivery.objectKey);
   if (!object) return json({ error: 'audio_unavailable' }, 503);
 
   const headers = new Headers({
@@ -420,13 +398,13 @@ function clientEntitlement(entitlement: EntitlementSnapshot) {
   };
 }
 
-function clientAudio(asset: AudioAssetSnapshot) {
+function clientMedia(asset: MediaAsset) {
   return {
     id: asset.id,
-    episodeId: asset.episodeId,
-    voiceVariant: asset.voiceVariant,
+    sceneId: asset.sceneId,
+    kind: asset.kind,
+    variant: asset.variant,
     status: asset.status,
-    inputCharacters: asset.inputCharacters,
     attempts: asset.attempts,
     cached: asset.cached,
     failureCode: asset.failureCode,

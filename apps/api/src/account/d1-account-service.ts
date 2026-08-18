@@ -1,4 +1,4 @@
-import type { AccountDeleteResult, AccountExportEpisode, AccountExportPlot, AccountExportSnapshot } from './contracts';
+import type { AccountDeleteResult, AccountExportDrama, AccountExportScene, AccountExportSnapshot } from './contracts';
 import { ACCOUNT_DELETE_CONFIRMATION } from './contracts';
 import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences';
 
@@ -27,12 +27,12 @@ export class D1AccountService {
       this.loadAudio(userId),
     ]);
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: new Date(this.clock()).toISOString(),
       preferences,
       entitlement,
       usage,
-      plots: assemblePlots(plots, characters, episodes, choices, audio),
+      dramas: assembleDramas(plots, characters, episodes, choices, audio),
     };
   }
 
@@ -76,7 +76,7 @@ export class D1AccountService {
       .prepare('SELECT usage_date, text_episodes, voiced_episodes FROM daily_usage WHERE user_id = ? ORDER BY usage_date')
       .bind(userId)
       .all<{ usage_date: string; text_episodes: number; voiced_episodes: number }>();
-    return rows.results.map((row) => ({ utcDay: row.usage_date, textEpisodes: row.text_episodes, voicedEpisodes: row.voiced_episodes }));
+    return rows.results.map((row) => ({ utcDay: row.usage_date, generatedScenes: row.text_episodes, voicedScenes: row.voiced_episodes }));
   }
 
   private async loadPlots(userId: string) {
@@ -125,13 +125,13 @@ export class D1AccountService {
   }
 }
 
-function assemblePlots(
+function assembleDramas(
   plots: PlotRow[],
   characters: CharacterRow[],
   episodes: EpisodeRow[],
   choices: ChoiceRow[],
   audio: AudioRow[],
-): AccountExportPlot[] {
+): AccountExportDrama[] {
   return plots.map((plot) => ({
     title: plot.title,
     premise: plot.premise,
@@ -140,11 +140,11 @@ function assemblePlots(
     mood: plot.mood,
     summary: plot.summary,
     characters: characters.filter((row) => row.plot_id === plot.id).map((row) => ({ name: row.name, role: row.role, traits: parseObject(row.traits_json) })),
-    episodes: episodes.filter((row) => row.plot_id === plot.id).map((row) => assembleEpisode(row, choices, audio)),
+    scenes: episodes.filter((row) => row.plot_id === plot.id).map((row) => assembleScene(row, choices, audio)),
   }));
 }
 
-function assembleEpisode(row: EpisodeRow, choices: ChoiceRow[], audio: AudioRow[]): AccountExportEpisode {
+function assembleScene(row: EpisodeRow, choices: ChoiceRow[], audio: AudioRow[]): AccountExportScene {
   return {
     number: row.episode_number,
     title: row.title,
@@ -158,10 +158,10 @@ function assembleEpisode(row: EpisodeRow, choices: ChoiceRow[], audio: AudioRow[
       consequence: choice.consequence ?? '',
       committed: choice.committed_choice_id === choice.id,
     })),
-    audio: audio.filter((asset) => asset.episode_id === row.id).map((asset) => ({
-      voiceVariant: asset.voice_variant,
+    media: audio.filter((asset) => asset.episode_id === row.id).map((asset) => ({
+      kind: 'voice' as const,
+      variant: asset.voice_variant,
       status: asset.status,
-      inputCharacters: asset.input_characters,
       attempts: asset.attempts,
       readyAt: asset.ready_at ? new Date(asset.ready_at).toISOString() : null,
     })),

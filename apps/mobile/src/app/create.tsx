@@ -1,62 +1,62 @@
 import { useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import type { PlotDraft, StoryMood } from '@/features/story/contracts';
-import { StoryClientError } from '@/features/story/contracts';
-import { hasDraftErrors, normalizePlotDraft, storyMoodOptionsFor, validatePlotDraft } from '@/features/story/draft';
+import type { GenerationJob } from '@/features/drama/domain';
+import type { DramaDraft, DramaMood } from '@/features/drama/contracts';
+import { DramaClientError } from '@/features/drama/contracts';
+import { dramaMoodOptionsFor, hasDraftErrors, normalizeDramaDraft, validateDramaDraft } from '@/features/drama/setup';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
-import { createStoryRequestKey } from '@/features/story/request-key';
-import { useStoryExperienceClient } from '@/features/story/story-client-context';
+import { createIdempotencyKey } from '@/lib/idempotency-key';
+import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
 
-const initialDraft: PlotDraft = {
+const initialDraft: DramaDraft = {
   premise: '',
   mood: 'tense',
   characterName: '',
 };
 
-export default function CreatePlotScreen() {
+export default function CreateDramaScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ premise?: string | string[]; mood?: string | string[]; characterName?: string | string[] }>();
   const auth = useMobileAuth();
   const { locale, t } = useUiCopy();
-  const storyExperienceClient = useStoryExperienceClient();
+  const dramaExperienceClient = useDramaExperienceClient();
   const creationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
-  const [draft, setDraft] = useState<PlotDraft>(() => ({
+  const [draft, setDraft] = useState<DramaDraft>(() => ({
     premise: readParam(params.premise) ?? initialDraft.premise,
     mood: readMood(params.mood) ?? initialDraft.mood,
     characterName: readParam(params.characterName) ?? initialDraft.characterName,
   }));
   const [showValidation, setShowValidation] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [generationJob, setGenerationJob] = useState<GenerationJob>({ state: 'idle' });
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const errors = validatePlotDraft(draft, locale);
-  const moodOptions = storyMoodOptionsFor(locale);
+  const errors = validateDramaDraft(draft, locale);
+  const moodOptions = dramaMoodOptionsFor(locale);
 
   async function submit() {
     setShowValidation(true);
     setSubmitError(null);
     if (hasDraftErrors(errors)) return;
 
-    setBusy(true);
-    const normalizedDraft = normalizePlotDraft(draft);
+    const normalizedDraft = normalizeDramaDraft(draft);
     const fingerprint = JSON.stringify(normalizedDraft);
     const previousAttempt = creationAttempt.current;
     const attempt = previousAttempt?.fingerprint === fingerprint
       ? previousAttempt
-      : { fingerprint, key: createStoryRequestKey('creation') };
+      : { fingerprint, key: createIdempotencyKey('creation') };
     creationAttempt.current = attempt;
+    setGenerationJob({ state: 'running', operation: 'first_scene', requestKey: attempt.key });
     try {
-      const plot = await storyExperienceClient.createPlot(normalizedDraft, attempt.key);
-      router.replace({ pathname: '/story', params: { plotId: plot.id } });
+      const drama = await dramaExperienceClient.createDrama(normalizedDraft, attempt.key);
+      router.replace({ pathname: '/drama', params: { dramaId: drama.id } });
     } catch (caught) {
       setSubmitError(createErrorMessage(caught, locale));
-    } finally {
-      setBusy(false);
+      setGenerationJob({ state: 'failed', operation: 'first_scene', code: generationFailureCode(caught) });
     }
   }
 
@@ -65,7 +65,7 @@ export default function CreatePlotScreen() {
       <Screen>
         <BrandMark />
         <DramaUtilityHero
-          kicker={t('SAVE YOUR PLOT', 'LƯU CỐT TRUYỆN')}
+          kicker={t('SAVE YOUR DRAMA', 'LƯU DRAMA')}
           title={auth.isLoaded ? t('Sign in before directing a new drama.', 'Đăng nhập trước khi dựng drama mới.') : t('Opening your account…', 'Đang mở tài khoản…')}
           detail={t('Your choices stay linked when you return on another device.', 'Lựa chọn vẫn được liên kết khi bạn quay lại trên thiết bị khác.')}
           mood="mysterious"
@@ -108,10 +108,10 @@ export default function CreatePlotScreen() {
       />
 
       <View style={styles.composerSection}>
-        <FieldHeader step="01" label={t('Story spark', 'Tia lửa câu chuyện')} hint={t('The moment everything changes', 'Khoảnh khắc mọi thứ thay đổi')} />
+        <FieldHeader step="01" label={t('Drama spark', 'Mầm drama')} hint={t('The moment everything changes', 'Khoảnh khắc mọi thứ thay đổi')} />
         <View style={[styles.sparkComposer, showValidation && errors.premise && styles.composerError]}>
           <TextInput
-            accessibilityLabel={t('Story premise', 'Tình huống câu chuyện')}
+            accessibilityLabel={t('Drama premise', 'Tình huống drama')}
             multiline
             maxLength={600}
             placeholder={t('A junior chef realizes tonight’s critic is the person who vanished from her family ten years ago…', 'Một đầu bếp trẻ nhận ra vị khách phê bình tối nay chính là người đã biến mất khỏi gia đình cô mười năm trước…')}
@@ -173,35 +173,39 @@ export default function CreatePlotScreen() {
 
       {submitError ? (
         <View style={styles.submitError}>
-          <Text style={styles.submitErrorTitle}>{t('Episode 1 could not start', 'Không thể bắt đầu tập 1')}</Text>
+          <Text style={styles.submitErrorTitle}>{t('Scene 1 could not start', 'Không thể bắt đầu cảnh 1')}</Text>
           <Text style={styles.submitErrorBody}>{submitError}</Text>
         </View>
       ) : null}
 
-      {busy ? (
+      {generationJob.state === 'running' ? (
         <DramaGenerationState
           characterName={draft.characterName || t('Your lead', 'Nhân vật chính')}
           mood={draft.mood}
-          label={t('Directing episode 1…', 'Đang dựng tập 1…')}
-          detail={t('Turning your spark into a short scene, framing the lead and preparing the first decision point.', 'Đang biến tia lửa thành một cảnh ngắn, dựng nhân vật chính và chuẩn bị điểm quyết định đầu tiên.')}
+          label={t('Generating scene 1…', 'Đang tạo cảnh 1…')}
+          detail={t('Creating the canonical script and first branch. Voice remains a separate media step.', 'Đang tạo kịch bản chuẩn và nhánh đầu tiên. Giọng đọc là một bước media riêng.')}
           locale={locale}
         />
       ) : (
         <View style={styles.submitBlock}>
-          <ActionButton label={t('Play episode 1', 'Xem tập 1')} onPress={() => void submit()} />
+          <ActionButton label={generationJob.state === 'failed' ? t('Retry scene 1', 'Thử lại cảnh 1') : t('Play scene 1', 'Xem cảnh 1')} onPress={() => void submit()} />
         </View>
       )}
     </Screen>
   );
 }
 
+function generationFailureCode(error: unknown): string {
+  return error instanceof DramaClientError ? error.code : 'unknown';
+}
+
 function createErrorMessage(error: unknown, locale: 'en' | 'vi'): string {
   const vi = locale === 'vi';
-  if (!(error instanceof StoryClientError)) return vi ? 'Không thể chuẩn bị tập đầu. Thiết lập vẫn còn để bạn thử lại.' : 'The first episode could not be prepared. Your setup is still here, so you can try again.';
-  if (error.code === 'quota_exceeded') return vi ? 'Bạn đã dùng hết lượt tập chữ hôm nay. Thiết lập vẫn được giữ đến khi hạn mức UTC đặt lại.' : 'Today’s text episode allowance is exhausted. Your setup is saved here until the UTC reset.';
-  if (error.code === 'auth_required') return vi ? 'Phiên đăng nhập đã hết hạn. Đăng nhập lại trước khi tạo câu chuyện.' : 'Your session expired. Sign in again before generating this plot.';
-  if (error.code === 'provider_unavailable') return vi ? 'Bộ máy tạo truyện tạm thời không khả dụng. Thiết lập không thay đổi; hãy thử lại sau.' : 'The story engine is temporarily unavailable. Your setup is unchanged; try again later.';
-  if (error.code === 'choice_required') return vi ? 'Lần tạo này không còn khớp với bản trên máy chủ. Chỉnh thiết lập hoặc về trang chủ để tiếp tục câu chuyện hiện có.' : 'This creation attempt no longer matches the server copy. Edit the setup or return home to resume the existing plot.';
+  if (!(error instanceof DramaClientError)) return vi ? 'Không thể chuẩn bị cảnh đầu. Thiết lập vẫn còn để bạn thử lại.' : 'The first scene could not be prepared. Your setup is still here, so you can try again.';
+  if (error.code === 'quota_exceeded') return vi ? 'Bạn đã dùng hết lượt tạo cảnh hôm nay. Thiết lập vẫn được giữ đến khi hạn mức UTC đặt lại.' : 'Today’s scene-generation allowance is exhausted. Your setup is saved here until the UTC reset.';
+  if (error.code === 'auth_required') return vi ? 'Phiên đăng nhập đã hết hạn. Đăng nhập lại trước khi tạo drama.' : 'Your session expired. Sign in again before generating this drama.';
+  if (error.code === 'provider_unavailable') return vi ? 'Bộ máy tạo drama tạm thời không khả dụng. Thiết lập không thay đổi; hãy thử lại sau.' : 'The drama engine is temporarily unavailable. Your setup is unchanged; try again later.';
+  if (error.code === 'choice_required') return vi ? 'Lần tạo này không còn khớp với bản trên máy chủ. Chỉnh thiết lập hoặc về trang chủ để tiếp tục drama hiện có.' : 'This creation attempt no longer matches the server copy. Edit the setup or return home to resume the existing drama.';
   return error.message;
 }
 
@@ -210,7 +214,7 @@ function readParam(value: string | string[] | undefined): string | null {
   return value?.trim() || null;
 }
 
-function readMood(value: string | string[] | undefined): StoryMood | null {
+function readMood(value: string | string[] | undefined): DramaMood | null {
   const candidate = readParam(value);
   return candidate === 'tense' || candidate === 'romantic' || candidate === 'mysterious' || candidate === 'hopeful' ? candidate : null;
 }

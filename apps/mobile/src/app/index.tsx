@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
+import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
-import type { StoryHomeSnapshot, StoryPlotSummary } from '@/features/story/contracts';
-import { useStoryExperienceClient } from '@/features/story/story-client-context';
+import type { DramaHomeSnapshot, DramaSummary } from '@/features/drama/contracts';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { DramaCoverTile, DramaLoadingStage, DramaPoster, DramaUtilityHero } from '@/ui/drama-visuals';
@@ -15,23 +15,23 @@ export default function HomeScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
   const { locale, t } = useUiCopy();
-  const storyExperienceClient = useStoryExperienceClient();
-  const [snapshot, setSnapshot] = useState<StoryHomeSnapshot | null>(null);
+  const dramaClient = useDramaExperienceClient();
+  const [snapshot, setSnapshot] = useState<DramaHomeSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (auth.configured && (!auth.isLoaded || !auth.isSignedIn)) return;
     setError(null);
     try {
-      setSnapshot(await storyExperienceClient.loadHome());
+      setSnapshot(await dramaClient.loadHome());
     } catch {
-      setError(t('Recent stories could not be loaded. Your canonical story data is never replaced by this screen state.', 'Không thể tải các câu chuyện gần đây. Dữ liệu câu chuyện chuẩn trên máy chủ không bị thay thế bởi trạng thái màn hình này.'));
+      setError(t('Recent dramas could not be loaded. Canonical drama state is unchanged.', 'Không thể tải các drama gần đây. Trạng thái drama chuẩn không thay đổi.'));
     }
-  }, [auth.configured, auth.isLoaded, auth.isSignedIn, storyExperienceClient, t]);
+  }, [auth.configured, auth.isLoaded, auth.isSignedIn, dramaClient, t]);
 
   useRefreshOnForeground(load);
 
-  function openDailySpark(source: StoryHomeSnapshot) {
+  function openDailySpark(source: DramaHomeSnapshot) {
     const prompt = source.retention.dailyPrompt;
     router.push({ pathname: '/create', params: { premise: prompt.premise, mood: prompt.mood, characterName: prompt.characterName } });
   }
@@ -39,18 +39,17 @@ export default function HomeScreen() {
   useEffect(() => {
     if (auth.configured && (!auth.isLoaded || !auth.isSignedIn)) return;
     let active = true;
-    void storyExperienceClient.loadHome()
+    void dramaClient.loadHome()
       .then((next) => {
         if (!active) return;
         setSnapshot(next);
         setError(null);
       })
       .catch(() => {
-        if (!active) return;
-        setError(t('Recent stories could not be loaded. Your canonical story data is never replaced by this screen state.', 'Không thể tải các câu chuyện gần đây. Dữ liệu câu chuyện chuẩn trên máy chủ không bị thay thế bởi trạng thái màn hình này.'));
+        if (active) setError(t('Recent dramas could not be loaded. Canonical drama state is unchanged.', 'Không thể tải các drama gần đây. Trạng thái drama chuẩn không thay đổi.'));
       });
     return () => { active = false; };
-  }, [auth.configured, auth.isLoaded, auth.isSignedIn, storyExperienceClient, t]);
+  }, [auth.configured, auth.isLoaded, auth.isSignedIn, dramaClient, t]);
 
   if (auth.configured && !auth.isLoaded) {
     return <Screen><BrandMark /><DramaLoadingStage label={t('Opening your Living Plot session…', 'Đang mở phiên Living Plot…')} locale={locale} /></Screen>;
@@ -61,9 +60,9 @@ export default function HomeScreen() {
       <Screen>
         <BrandMark />
         <DramaUtilityHero
-          kicker={t('YOUR STORIES, REMEMBERED', 'CÂU CHUYỆN ĐƯỢC GHI NHỚ')}
+          kicker={t('YOUR DRAMAS, REMEMBERED', 'DRAMA CỦA BẠN ĐƯỢC GHI NHỚ')}
           title={t('Pick what happens. Return for the consequence.', 'Chọn điều xảy ra. Quay lại để xem hậu quả.')}
-          detail={t('One email code keeps plots and choices linked across devices.', 'Một mã email giữ cốt truyện và lựa chọn liên kết giữa các thiết bị.')}
+          detail={t('One email code keeps dramas and choices linked across devices.', 'Một mã email giữ drama và lựa chọn liên kết giữa các thiết bị.')}
           mood="mysterious"
           characterName="Identity"
         />
@@ -78,14 +77,14 @@ export default function HomeScreen() {
         <BrandMark />
         <DramaLoadingStage
           label={t('Opening tonight’s drama…', 'Đang mở drama tối nay…')}
-          detail={t('Framing your latest story and restoring the next decision point.', 'Đang dựng lại câu chuyện gần nhất và điểm quyết định tiếp theo.')}
+          detail={t('Restoring your latest scene and decision point.', 'Đang khôi phục cảnh gần nhất và điểm quyết định tiếp theo.')}
           locale={locale}
         />
       </Screen>
     );
   }
 
-  const featuredPlot = snapshot?.recentPlots[0] ?? null;
+  const featuredDrama = snapshot?.recentDramas[0] ?? null;
   const dailyPrompt = snapshot?.retention.dailyPrompt ?? null;
 
   return (
@@ -98,16 +97,16 @@ export default function HomeScreen() {
       {snapshot && dailyPrompt ? (
         <>
           <DramaPoster
-            title={featuredPlot?.title ?? dailyPrompt.label}
-            premise={featuredPlot?.resumeLine ?? dailyPrompt.premise}
-            characterName={featuredPlot?.characterName ?? dailyPrompt.characterName}
-            mood={featuredPlot?.mood ?? dailyPrompt.mood}
-            episodeLabel={featuredPlot
-              ? t(`EP ${featuredPlot.episodeNumber} · CONTINUE`, `TẬP ${featuredPlot.episodeNumber} · TIẾP TỤC`)
+            title={featuredDrama?.title ?? dailyPrompt.label}
+            premise={featuredDrama?.resumeLine ?? dailyPrompt.premise}
+            characterName={featuredDrama?.characterName ?? dailyPrompt.characterName}
+            mood={featuredDrama?.mood ?? dailyPrompt.mood}
+            sceneLabel={featuredDrama
+              ? t(`SCENE ${featuredDrama.sceneNumber} · CONTINUE`, `CẢNH ${featuredDrama.sceneNumber} · TIẾP TỤC`)
               : t('TODAY · NEW DRAMA', 'HÔM NAY · DRAMA MỚI')}
-            actionLabel={featuredPlot ? t('Resume drama', 'Tiếp tục drama') : t('Play today’s story', 'Xem câu chuyện hôm nay')}
-            onPress={() => featuredPlot
-              ? router.push({ pathname: '/story', params: { plotId: featuredPlot.id } })
+            actionLabel={featuredDrama ? t('Resume drama', 'Tiếp tục drama') : t('Start today’s drama', 'Bắt đầu drama hôm nay')}
+            onPress={() => featuredDrama
+              ? router.push({ pathname: '/drama', params: { dramaId: featuredDrama.id } })
               : openDailySpark(snapshot)}
             style={styles.heroPoster}
           />
@@ -124,40 +123,31 @@ export default function HomeScreen() {
       ) : null}
 
       {error ? (
-        <ErrorState
-          title={t('Couldn’t load your stories', 'Không thể tải câu chuyện')}
-          message={error}
-          retryLabel={sharedUiCopy.tryAgain[locale]}
-          onRetry={() => void load()}
-        />
+        <ErrorState title={t('Couldn’t load your dramas', 'Không thể tải drama')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} />
       ) : null}
 
       {snapshot ? (
         <>
-          {featuredPlot ? (
+          {featuredDrama ? (
             <UpNextShelf
               snapshot={snapshot}
-              featuredPlotId={featuredPlot.id}
+              featuredDramaId={featuredDrama.id}
               t={t}
-              onOpenPlot={(plot) => router.push({ pathname: '/story', params: { plotId: plot.id } })}
+              onOpenDrama={(drama) => router.push({ pathname: '/drama', params: { dramaId: drama.id } })}
               onOpenSpark={() => openDailySpark(snapshot)}
             />
           ) : (
             <View style={styles.firstRunCue}>
-              <Text style={styles.firstRunTitle}>{t('ONE SPARK', 'MỘT TIA LỬA')}</Text>
-              <Text style={styles.firstRunDivider}>·</Text>
-              <Text style={styles.firstRunTitle}>{t('ONE MINUTE', 'MỘT PHÚT')}</Text>
-              <Text style={styles.firstRunDivider}>·</Text>
-              <Text style={styles.firstRunTitle}>{t('THREE PATHS', 'BA HƯỚNG ĐI')}</Text>
+              <Text style={styles.firstRunTitle}>{t('ONE SPARK', 'MỘT TIA LỬA')}</Text><Text style={styles.firstRunDivider}>·</Text>
+              <Text style={styles.firstRunTitle}>{t('ONE MINUTE', 'MỘT PHÚT')}</Text><Text style={styles.firstRunDivider}>·</Text>
+              <Text style={styles.firstRunTitle}>{t('THREE CHOICES', 'BA LỰA CHỌN')}</Text>
             </View>
           )}
 
-          <StoryHud snapshot={snapshot} t={t} />
+          <DramaHud snapshot={snapshot} t={t} />
 
           <View style={styles.plusRow}>
-            <View style={styles.plusCopy}>
-              <Text style={styles.plusKicker}>{t('PLUS · 20 EP / 10 VOICE', 'PLUS · 20 TẬP / 10 GIỌNG')}</Text>
-            </View>
+            <View style={styles.plusCopy}><Text style={styles.plusKicker}>{t('PLUS · 20 SCENES / 10 VOICES', 'PLUS · 20 CẢNH / 10 GIỌNG')}</Text></View>
             <ActionButton label={t('View Plus', 'Xem Plus')} variant="ghost" onPress={() => router.push('/plus')} />
           </View>
         </>
@@ -170,78 +160,51 @@ export default function HomeScreen() {
 
 type Translate = (en: string, vi: string) => string;
 
-function StoryHud({ snapshot, t }: { snapshot: StoryHomeSnapshot; t: Translate }) {
+function DramaHud({ snapshot, t }: { snapshot: DramaHomeSnapshot; t: Translate }) {
   const { retention, quota } = snapshot;
   return (
     <View style={styles.hud}>
       <HudMetric label={t('Streak', 'Chuỗi')} value={retention.currentStreakDays > 0 ? `${retention.currentStreakDays}D` : '—'} />
       <HudMetric label={t('Choices', 'Lựa chọn')} value={String(retention.choicesMade)} />
-      <HudMetric label={t('Episodes left', 'Tập còn lại')} value={`${quota.textRemaining}/${quota.textLimit}`} accent />
+      <HudMetric label={t('Scenes left', 'Cảnh còn lại')} value={`${quota.textRemaining}/${quota.textLimit}`} accent />
       <HudMetric label={t('Voice left', 'Giọng còn lại')} value={`${quota.voiceRemaining}/${quota.voiceLimit}`} />
     </View>
   );
 }
 
 function HudMetric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <View style={styles.hudMetric}>
-      <Text style={[styles.hudValue, accent && styles.hudValueAccent]}>{value}</Text>
-      <Text style={styles.hudLabel}>{label}</Text>
-    </View>
-  );
+  return <View style={styles.hudMetric}><Text style={[styles.hudValue, accent && styles.hudValueAccent]}>{value}</Text><Text style={styles.hudLabel}>{label}</Text></View>;
 }
 
-function UpNextShelf({
-  snapshot,
-  featuredPlotId,
-  t,
-  onOpenPlot,
-  onOpenSpark,
-}: {
-  snapshot: StoryHomeSnapshot;
-  featuredPlotId: string;
+function UpNextShelf({ snapshot, featuredDramaId, t, onOpenDrama, onOpenSpark }: {
+  snapshot: DramaHomeSnapshot;
+  featuredDramaId: string;
   t: Translate;
-  onOpenPlot: (plot: StoryPlotSummary) => void;
+  onOpenDrama: (drama: DramaSummary) => void;
   onOpenSpark: () => void;
 }) {
   const prompt = snapshot.retention.dailyPrompt;
-  const secondaryPlots = snapshot.recentPlots.filter((plot) => plot.id !== featuredPlotId).slice(0, 3);
-
+  const secondaryDramas = snapshot.recentDramas.filter((drama) => drama.id !== featuredDramaId).slice(0, 3);
   return (
     <View style={styles.shelfSection}>
       <View style={styles.shelfHeader}>
-        <View>
-          <Eyebrow>{t('Up next', 'Tiếp theo')}</Eyebrow>
-          <Text style={styles.shelfTitle}>{t('Choose another cover', 'Chọn một bìa khác')}</Text>
-        </View>
-        <Text style={styles.shelfCount}>{String(secondaryPlots.length + 1).padStart(2, '0')}</Text>
+        <View><Eyebrow>{t('Up next', 'Tiếp theo')}</Eyebrow><Text style={styles.shelfTitle}>{t('Choose another drama', 'Chọn drama khác')}</Text></View>
+        <Text style={styles.shelfCount}>{String(secondaryDramas.length + 1).padStart(2, '0')}</Text>
       </View>
-
       <View style={styles.coverGrid}>
         <View style={styles.coverItem}>
-          <DramaCoverTile
-            title={prompt.label}
-            premise={prompt.premise}
-            characterName={prompt.characterName}
-            mood={prompt.mood}
-            episodeLabel={t('NEW · TODAY', 'MỚI · HÔM NAY')}
-            statusLabel={t('Start a new drama', 'Bắt đầu drama mới')}
-            onPress={onOpenSpark}
-          />
+          <DramaCoverTile title={prompt.label} premise={prompt.premise} characterName={prompt.characterName} mood={prompt.mood} sceneLabel={t('NEW · TODAY', 'MỚI · HÔM NAY')} statusLabel={t('Start a new drama', 'Bắt đầu drama mới')} onPress={onOpenSpark} />
         </View>
-
-        {secondaryPlots.map((plot) => (
-          <View key={plot.id} style={styles.coverItem}>
+        {secondaryDramas.map((drama) => (
+          <View key={drama.id} style={styles.coverItem}>
             <DramaCoverTile
-              title={plot.title}
-              premise={plot.resumeLine || plot.premise}
-              characterName={plot.characterName}
-              mood={plot.mood}
-              episodeLabel={`${t('EP', 'TẬP')} ${String(plot.episodeNumber).padStart(2, '0')}`}
-              statusLabel={plot.status === 'awaiting_choice'
-                ? t('Your choice is waiting', 'Đang chờ lựa chọn')
-                : t('Next scene ready', 'Cảnh tiếp theo sẵn sàng')}
-              onPress={() => onOpenPlot(plot)}
+              title={drama.title}
+              premise={drama.resumeLine || drama.premise}
+              characterName={drama.characterName}
+              mood={drama.mood}
+              sceneLabel={`${t('SCENE', 'CẢNH')} ${String(drama.sceneNumber).padStart(2, '0')}`}
+              statusLabel={drama.status === 'awaiting_choice' ? t('Your choice is waiting', 'Đang chờ lựa chọn') : t('Continue from consequence', 'Tiếp tục từ hậu quả')}
+              onPress={() => onOpenDrama(drama)}
             />
           </View>
         ))}
@@ -253,16 +216,7 @@ function UpNextShelf({
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroPoster: { marginHorizontal: -spacing.lg, borderRadius: 0 },
-  heroQuickActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, marginTop: -spacing.sm },
-  heroQuickAction: { flexGrow: 1, minWidth: 170 },
-  hud: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 0,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
+  hud: { flexDirection: 'row', flexWrap: 'wrap', gap: 0, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
   hudMetric: { minWidth: 128, flexGrow: 1, flexBasis: '46%', gap: 2, paddingVertical: spacing.md, paddingHorizontal: spacing.sm },
   hudValue: { color: colors.ink, fontFamily: typography.mono, fontSize: 17, fontWeight: '900', letterSpacing: -0.3 },
   hudValueAccent: { color: colors.accentStrong },
@@ -276,16 +230,7 @@ const styles = StyleSheet.create({
   shelfCount: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
   coverGrid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.sm },
   coverItem: { minWidth: 148, flexGrow: 1, flexBasis: '46%' },
-  plusRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingVertical: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle,
-  },
+  plusRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
   plusCopy: { flex: 1, minWidth: 190 },
   plusKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 0.9 },
   previewNote: { color: colors.quietInk, fontSize: 10, lineHeight: 16, textAlign: 'center', paddingHorizontal: spacing.md },

@@ -1,4 +1,4 @@
-import type { LiveStoryDailyPrompt, LiveStoryRetention } from '../live-story/contracts';
+import type { DramaDailyPrompt, DramaRetention } from '../drama-runtime/contracts';
 import type { UiLocale } from '../preferences/contracts';
 
 export interface RetentionActivityDay {
@@ -9,7 +9,7 @@ export interface RetentionActivityDay {
 interface LocalizedDailyPrompt {
   label: Record<UiLocale, string>;
   premise: Record<UiLocale, string>;
-  mood: LiveStoryDailyPrompt['mood'];
+  mood: DramaDailyPrompt['mood'];
   characterName: string;
 }
 
@@ -63,10 +63,10 @@ const DAILY_PROMPTS: readonly LocalizedDailyPrompt[] = [
 
 export function buildRetentionSnapshot(
   days: readonly RetentionActivityDay[],
-  activePlots: number,
+  activeDramas: number,
   nowMs: number,
   uiLocale: UiLocale = 'en',
-): LiveStoryRetention {
+): DramaRetention {
   const normalized = [...days]
     .filter((day) => /^\d{4}-\d{2}-\d{2}$/u.test(day.utcDay) && Number.isInteger(day.choicesMade) && day.choicesMade > 0)
     .sort((left, right) => right.utcDay.localeCompare(left.utcDay));
@@ -74,12 +74,12 @@ export function buildRetentionSnapshot(
   return {
     currentStreakDays: currentStreak(normalized.map((day) => day.utcDay), utcDay),
     choicesMade: normalized.reduce((total, day) => total + day.choicesMade, 0),
-    activePlots,
+    activeDramas,
     dailyPrompt: promptForUtcDay(utcDay, uiLocale),
   };
 }
 
-export function promptForUtcDay(utcDay: string, uiLocale: UiLocale = 'en'): LiveStoryDailyPrompt {
+export function promptForUtcDay(utcDay: string, uiLocale: UiLocale = 'en'): DramaDailyPrompt {
   const index = hash(utcDay) % DAILY_PROMPTS.length;
   const prompt = DAILY_PROMPTS[index];
   return {

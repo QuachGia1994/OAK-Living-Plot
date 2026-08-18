@@ -1,4 +1,4 @@
-import type { StructuredPlotState } from '../domain/story';
+import type { DramaState } from '../domain/drama-state';
 
 export interface ChoiceCommitInput {
   userId: string;
@@ -17,7 +17,7 @@ export interface ChoiceCommitSuccess {
   sequence: number;
   stateVersionBefore: number;
   stateVersionAfter: number;
-  state: StructuredPlotState;
+  state: DramaState;
   replayed: boolean;
 }
 

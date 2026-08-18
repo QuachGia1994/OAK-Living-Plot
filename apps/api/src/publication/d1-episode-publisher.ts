@@ -1,4 +1,4 @@
-import type { EpisodeChoiceProposal } from '../ai/contracts';
+import type { SceneChoiceProposal } from '../ai/contracts';
 import type {
   EpisodePublicationInput,
   EpisodePublicationResult,
@@ -168,7 +168,7 @@ export class D1EpisodePublisher {
     episodeId: string,
     choiceId: string,
     position: number,
-    choice: EpisodeChoiceProposal,
+    choice: SceneChoiceProposal,
   ): D1PreparedStatement {
     return this.db
       .prepare(

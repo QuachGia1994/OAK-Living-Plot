@@ -1,16 +1,16 @@
-import type { EpisodeProposal, StoryGenerationUsage } from '../ai/contracts';
+import type { SceneGenerationUsage, SceneProposal } from '../ai/contracts';
 
 export interface EpisodePublicationInput {
   userId: string;
   plotId: string;
   generationKey: string;
   expectedStateVersion: number;
-  proposal: EpisodeProposal;
+  proposal: SceneProposal;
   generation: {
-    provider: 'gemini';
+    provider: string;
     model: string;
     attempts: number;
-    usage: StoryGenerationUsage;
+    usage: SceneGenerationUsage;
   };
 }
 

@@ -20,7 +20,7 @@ export default function AuthScreen() {
         <DramaUtilityHero
           kicker={t('PREVIEW IDENTITY', 'DANH TÍNH BẢN XEM TRƯỚC')}
           title={t('The drama works. Account sync waits for live services.', 'Drama vẫn chạy. Đồng bộ tài khoản chờ dịch vụ live.')}
-          detail={t('Explore the complete story flow now; sign-in appears when Clerk is connected.', 'Khám phá toàn bộ luồng câu chuyện ngay; đăng nhập sẽ xuất hiện khi Clerk được kết nối.')}
+          detail={t('Explore the complete drama flow now; sign-in appears when Clerk is connected.', 'Khám phá toàn bộ luồng drama ngay; đăng nhập sẽ xuất hiện khi Clerk được kết nối.')}
           mood="mysterious"
           characterName="Preview"
         />
@@ -33,7 +33,7 @@ export default function AuthScreen() {
     return (
       <Screen>
         <BrandMark />
-        <DramaLoadingStage label={t('Opening secure session…', 'Đang mở phiên đăng nhập…')} detail={t('Restoring your identity without touching story state.', 'Đang khôi phục danh tính mà không thay đổi trạng thái câu chuyện.')} locale={locale} />
+        <DramaLoadingStage label={t('Opening secure session…', 'Đang mở phiên đăng nhập…')} detail={t('Restoring your identity without touching drama state.', 'Đang khôi phục danh tính mà không thay đổi trạng thái drama.')} locale={locale} />
       </Screen>
     );
   }

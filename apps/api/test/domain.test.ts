@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   DomainInvariantError,
-  createInitialPlotState,
-  parseStructuredPlotState,
+  createInitialDramaState,
+  parseDramaState,
   requireThreeChoices,
-} from '../src/domain/story';
+} from '../src/domain/drama-state';
 
-describe('story domain contracts', () => {
+describe('drama state contracts', () => {
   it('creates canonical v2 structured memory', () => {
-    expect(createInitialPlotState()).toEqual({
+    expect(createInitialDramaState()).toEqual({
       schemaVersion: 2,
       relationships: [],
       facts: [],
@@ -18,7 +18,7 @@ describe('story domain contracts', () => {
   });
 
   it('upgrades legacy v1 memory deterministically without dropping text', () => {
-    const state = parseStructuredPlotState(
+    const state = parseDramaState(
       '{"relationships":{"linh":72},"facts":["The message was hidden."],"openThreads":["Linh suspects betrayal."],"tone":"tense"}',
     );
 
@@ -52,7 +52,7 @@ describe('story domain contracts', () => {
 
   it('rejects malformed v2 structured memory', () => {
     expect(() =>
-      parseStructuredPlotState(
+      parseDramaState(
         '{"schemaVersion":2,"relationships":[{"fromKey":"hero","toKey":"linh","affinity":101,"trust":0,"tension":0,"status":"bad"}],"facts":[],"openThreads":[],"tone":"tense"}',
       ),
     ).toThrow(DomainInvariantError);

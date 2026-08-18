@@ -1,10 +1,10 @@
 export type UiLocale = 'en' | 'vi';
-export type StoryLocale = 'en-US' | 'vi-VN';
+export type DramaLocale = 'en-US' | 'vi-VN';
 export type NarratorVariant = 'en-narrator-female' | 'vi-narrator-female';
 
 export interface UserPreferences {
   uiLocale: UiLocale;
-  storyLocale: StoryLocale;
+  dramaLocale: DramaLocale;
   narratorVariant: NarratorVariant;
   updatedAt: number | null;
 }
@@ -17,7 +17,7 @@ export interface PreferencesClient {
 
 export const defaultUserPreferences: UserPreferences = {
   uiLocale: 'en',
-  storyLocale: 'en-US',
+  dramaLocale: 'en-US',
   narratorVariant: 'en-narrator-female',
   updatedAt: null,
 };

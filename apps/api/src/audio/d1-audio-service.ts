@@ -2,11 +2,13 @@ import { D1QuotaLedger } from '../quota/d1-quota-ledger';
 import { NOOP_PRODUCT_TELEMETRY, type ProductTelemetrySink } from '../telemetry/product-events';
 import { approvedVoice } from '../tts/voice-registry';
 import type {
-  AudioAssetSnapshot,
   AudioAssetStatus,
+  AudioDeliveryAsset,
   AudioQueue,
   AudioRequestInput,
   AudioRequestResult,
+  MediaAsset,
+  MediaAssetStatus,
 } from './contracts';
 
 interface AudioAssetRow {
@@ -38,12 +40,12 @@ export class D1AudioService {
 
     const voice = approvedVoice(input.voiceVariant);
     if (!voice) return { ok: false, error: { code: 'invalid_input', message: 'Voice variant is not approved.' } };
-    if (!(await this.ownsEpisode(input.userId, input.episodeId))) {
-      return { ok: false, error: { code: 'not_found', message: 'Episode not found.' } };
+    if (!(await this.ownsEpisode(input.userId, input.sceneId))) {
+      return { ok: false, error: { code: 'not_found', message: 'Scene not found.' } };
     }
 
-    const existing = await this.loadByEpisode(input.userId, input.episodeId, input.voiceVariant);
-    if (existing && existing.status !== 'failed') return { ok: true, value: toSnapshot(existing) };
+    const existing = await this.loadByEpisode(input.userId, input.sceneId, input.voiceVariant);
+    if (existing && existing.status !== 'failed') return { ok: true, value: toMediaAsset(existing) };
 
     const assetId = existing?.id ?? crypto.randomUUID();
     try {
@@ -77,22 +79,22 @@ export class D1AudioService {
             voice.providerVoiceId,
             voice.languageCode,
             input.reservationKey,
-            input.episodeId,
+            input.sceneId,
             input.userId,
             input.voiceVariant,
           )
           .run();
       }
     } catch {
-      const raced = await this.loadByEpisode(input.userId, input.episodeId, input.voiceVariant);
-      if (raced) return { ok: true, value: toSnapshot(raced) };
+      const raced = await this.loadByEpisode(input.userId, input.sceneId, input.voiceVariant);
+      if (raced) return { ok: true, value: toMediaAsset(raced) };
       return { ok: false, error: { code: 'persistence_error', message: 'Audio asset claim failed.' } };
     }
 
-    const canonical = await this.loadByEpisode(input.userId, input.episodeId, input.voiceVariant);
+    const canonical = await this.loadByEpisode(input.userId, input.sceneId, input.voiceVariant);
     if (!canonical) return { ok: false, error: { code: 'persistence_error', message: 'Audio asset claim failed.' } };
     if (canonical.id !== assetId || canonical.reservation_key !== input.reservationKey || canonical.status !== 'reserving') {
-      return { ok: true, value: toSnapshot(canonical) };
+      return { ok: true, value: toMediaAsset(canonical) };
     }
 
     const reserved = await this.quota.reserve({
@@ -133,11 +135,11 @@ export class D1AudioService {
       .bind(canonical.id, input.reservationKey)
       .run();
 
-    const queued = await this.loadByEpisode(input.userId, input.episodeId, input.voiceVariant);
+    const queued = await this.loadByEpisode(input.userId, input.sceneId, input.voiceVariant);
     if (!queued || queued.status !== 'queued' || queued.reservation_key !== input.reservationKey) {
       await this.safeRelease(input.userId, input.reservationKey);
       return queued
-        ? { ok: true, value: toSnapshot(queued) }
+        ? { ok: true, value: toMediaAsset(queued) }
         : { ok: false, error: { code: 'persistence_error', message: 'Audio asset queue transition failed.' } };
     }
 
@@ -154,12 +156,24 @@ export class D1AudioService {
     } catch {
       // Product analytics is observational and cannot fail a queued voice request.
     }
-    return { ok: true, value: toSnapshot(queued) };
+    return { ok: true, value: toMediaAsset(queued) };
   }
 
-  async getOwnedAsset(userId: string, assetId: string): Promise<AudioAssetSnapshot | null> {
+  async getOwnedMediaAsset(userId: string, assetId: string): Promise<MediaAsset | null> {
+    const row = await this.loadOwnedAsset(userId, assetId);
+    return row ? toMediaAsset(row) : null;
+  }
+
+  async getOwnedDeliveryAsset(userId: string, assetId: string): Promise<AudioDeliveryAsset | null> {
+    const row = await this.loadOwnedAsset(userId, assetId);
+    return row
+      ? { media: toMediaAsset(row), objectKey: row.object_key, persistenceStatus: row.status }
+      : null;
+  }
+
+  private async loadOwnedAsset(userId: string, assetId: string): Promise<AudioAssetRow | null> {
     if (!userId.trim() || !assetId.trim()) return null;
-    const row = await this.db
+    return this.db
       .prepare(
         `SELECT a.id, a.episode_id, a.voice_variant, a.provider, a.provider_voice_id, a.language_code,
                 a.reservation_key, a.object_key, a.status, a.input_characters, a.attempts, a.failure_code
@@ -170,7 +184,6 @@ export class D1AudioService {
       )
       .bind(assetId, userId)
       .first<AudioAssetRow>();
-    return row ? toSnapshot(row) : null;
   }
 
   private async loadByEpisode(userId: string, episodeId: string, voiceVariant: string): Promise<AudioAssetRow | null> {
@@ -230,27 +243,27 @@ export class D1AudioService {
   }
 }
 
-function toSnapshot(row: AudioAssetRow): AudioAssetSnapshot {
-  if (row.provider !== 'google') throw new Error('Unsupported audio provider in canonical state.');
+function toMediaAsset(row: AudioAssetRow): MediaAsset {
   return {
     id: row.id,
-    episodeId: row.episode_id,
-    voiceVariant: row.voice_variant,
-    provider: 'google',
-    providerVoiceId: row.provider_voice_id,
-    languageCode: row.language_code,
-    reservationKey: row.reservation_key,
-    objectKey: row.object_key,
-    status: row.status,
-    inputCharacters: row.input_characters,
+    sceneId: row.episode_id,
+    kind: 'voice',
+    variant: row.voice_variant,
+    status: toMediaStatus(row.status),
     attempts: row.attempts,
     failureCode: row.failure_code,
     cached: row.status === 'ready',
   };
 }
 
+function toMediaStatus(status: AudioAssetStatus): MediaAssetStatus {
+  if (status === 'reserving' || status === 'queued') return 'queued';
+  if (status === 'processing' || status === 'staged') return 'processing';
+  return status;
+}
+
 function validateInput(input: AudioRequestInput): string | null {
-  if (!input.userId.trim() || !input.episodeId.trim()) return 'User and episode identifiers are required.';
+  if (!input.userId.trim() || !input.sceneId.trim()) return 'User and scene identifiers are required.';
   if (input.reservationKey !== input.reservationKey.trim() || input.reservationKey.length < 8 || input.reservationKey.length > 128) {
     return 'Reservation key must be 8–128 non-padded characters.';
   }

@@ -1,5 +1,5 @@
-import type { EpisodeGenerationInput, EpisodeProposal } from '../ai/contracts';
-import { parseAndValidateEpisodeProposal } from '../ai/episode-schema';
+import type { SceneGenerationInput, SceneProposal } from '../ai/contracts';
+import { parseAndValidateSceneProposal } from '../ai/scene-schema';
 
 export type NarrativeEvalDimension =
   | 'continuity'
@@ -36,10 +36,10 @@ const DIMENSIONS: NarrativeEvalDimension[] = [
 ];
 
 export function evaluateNarrative(
-  input: EpisodeGenerationInput,
-  proposal: EpisodeProposal,
+  input: SceneGenerationInput,
+  proposal: SceneProposal,
 ): NarrativeEvalReport {
-  const structural = parseAndValidateEpisodeProposal(JSON.stringify(proposal), input);
+  const structural = parseAndValidateSceneProposal(JSON.stringify(proposal), input);
   if (!structural.ok) {
     return {
       passed: false,
@@ -70,8 +70,8 @@ export function evaluateNarrative(
 }
 
 function scoreContinuity(
-  input: EpisodeGenerationInput,
-  proposal: EpisodeProposal,
+  input: SceneGenerationInput,
+  proposal: SceneProposal,
   findings: NarrativeEvalFinding[],
 ): number {
   if (!input.previous) return 100;
@@ -84,7 +84,7 @@ function scoreContinuity(
     findings.push({
       dimension: 'continuity',
       code: 'PREVIOUS_CONSEQUENCE_NOT_VISIBLE_EARLY',
-      message: 'The previous committed consequence is not materially visible in the first third of the episode.',
+      message: 'The previous committed consequence is not materially visible in the first third of the scene.',
     });
   }
   if (chosenActionOverlap < 0.2) {
@@ -92,15 +92,15 @@ function scoreContinuity(
     findings.push({
       dimension: 'continuity',
       code: 'COMMITTED_ACTION_WEAKLY_REFLECTED',
-      message: 'The committed action is weakly reflected in the episode opening or summary.',
+      message: 'The committed action is weakly reflected in the scene opening or summary.',
     });
   }
   return clampScore(score);
 }
 
 function scoreThreadMomentum(
-  input: EpisodeGenerationInput,
-  proposal: EpisodeProposal,
+  input: SceneGenerationInput,
+  proposal: SceneProposal,
   findings: NarrativeEvalFinding[],
 ): number {
   if (input.openThreads.length === 0) return 100;
@@ -123,13 +123,13 @@ function scoreThreadMomentum(
   findings.push({
     dimension: 'threadMomentum',
     code: 'NO_OPEN_THREAD_ADVANCED',
-    message: 'No existing open thread is resolved or materially reflected in the episode.',
+    message: 'No existing open thread is resolved or materially reflected in the scene.',
   });
   return 40;
 }
 
 function scoreBranchDistinctness(
-  proposal: EpisodeProposal,
+  proposal: SceneProposal,
   findings: NarrativeEvalFinding[],
 ): number {
   const labelSimilarity = maxPairwiseSimilarity(proposal.choices.map((choice) => choice.label));
@@ -158,7 +158,7 @@ function scoreBranchDistinctness(
   return clampScore(score);
 }
 
-function scoreConsequences(proposal: EpisodeProposal, findings: NarrativeEvalFinding[]): number {
+function scoreConsequences(proposal: SceneProposal, findings: NarrativeEvalFinding[]): number {
   const consequences = proposal.choices.map((choice) => choice.consequence);
   const similarity = maxPairwiseSimilarity(consequences);
   const shortCount = consequences.filter((text) => meaningfulTokens(text).length < 5).length;
@@ -185,7 +185,7 @@ function scoreConsequences(proposal: EpisodeProposal, findings: NarrativeEvalFin
   return clampScore(score);
 }
 
-function scoreRepetition(proposal: EpisodeProposal, findings: NarrativeEvalFinding[]): number {
+function scoreRepetition(proposal: SceneProposal, findings: NarrativeEvalFinding[]): number {
   const tokens = meaningfulTokens(proposal.script);
   if (tokens.length < 3) return 0;
   const trigrams: string[] = [];
@@ -199,14 +199,14 @@ function scoreRepetition(proposal: EpisodeProposal, findings: NarrativeEvalFindi
   findings.push({
     dimension: 'repetitionControl',
     code: 'SCRIPT_EXCESSIVELY_REPETITIVE',
-    message: 'The episode contains excessive repeated three-word sequences.',
+    message: 'The scene contains excessive repeated three-word sequences.',
   });
   return 40;
 }
 
 function scoreCharacterConsistency(
-  input: EpisodeGenerationInput,
-  proposal: EpisodeProposal,
+  input: SceneGenerationInput,
+  proposal: SceneProposal,
   findings: NarrativeEvalFinding[],
 ): number {
   const protagonist = input.characters[0];
@@ -216,14 +216,14 @@ function scoreCharacterConsistency(
   findings.push({
     dimension: 'characterConsistency',
     code: 'PROTAGONIST_NOT_ANCHORED',
-    message: 'The episode does not name the canonical protagonist in the scene, summary, or branch labels.',
+    message: 'The scene does not name the canonical protagonist in the scene, summary, or branch labels.',
   });
   return 40;
 }
 
 function scoreLocaleAlignment(
-  input: EpisodeGenerationInput,
-  proposal: EpisodeProposal,
+  input: SceneGenerationInput,
+  proposal: SceneProposal,
   findings: NarrativeEvalFinding[],
 ): number {
   const storyText = [proposal.script, proposal.summary, ...proposal.choices.flatMap((choice) => [choice.label, choice.consequence])].join(' ');
@@ -234,7 +234,7 @@ function scoreLocaleAlignment(
     findings.push({
       dimension: 'localeAlignment',
       code: 'VIETNAMESE_OUTPUT_NOT_VISIBLE',
-      message: 'A Vietnamese episode contains too little Vietnamese-language signal to match the requested locale.',
+      message: 'A Vietnamese scene contains too little Vietnamese-language signal to match the requested locale.',
     });
     return 30;
   }
@@ -249,22 +249,22 @@ function scoreLocaleAlignment(
     findings.push({
       dimension: 'localeAlignment',
       code: 'ENGLISH_OUTPUT_NOT_VISIBLE',
-      message: 'An English episode contains too little English-language signal to match the requested locale.',
+      message: 'An English scene contains too little English-language signal to match the requested locale.',
     });
     return 40;
   }
   return 100;
 }
 
-function scoreSceneProgression(proposal: EpisodeProposal, findings: NarrativeEvalFinding[]): number {
+function scoreSceneProgression(proposal: SceneProposal, findings: NarrativeEvalFinding[]): number {
   const progresses = proposal.establishedFacts.length > 0 ||
     proposal.threadChanges.open.length > 0 ||
     proposal.threadChanges.resolve.length > 0;
   if (progresses) return 100;
   findings.push({
     dimension: 'sceneProgression',
-    code: 'EPISODE_ADDS_NO_CANONICAL_PROGRESS',
-    message: 'The episode establishes no fact and opens or resolves no canonical thread before branching.',
+    code: 'SCENE_ADDS_NO_CANONICAL_PROGRESS',
+    message: 'The scene establishes no fact and opens or resolves no canonical thread before branching.',
   });
   return 40;
 }
@@ -319,7 +319,7 @@ function containsPhrase(text: string, phrase: string): boolean {
   return text.normalize('NFKC').toLocaleLowerCase().includes(phrase.normalize('NFKC').toLocaleLowerCase());
 }
 
-function stateDeltaSignature(delta: EpisodeProposal['choices'][number]['stateDelta']): string {
+function stateDeltaSignature(delta: SceneProposal['choices'][number]['stateDelta']): string {
   return JSON.stringify({
     relationships: delta.relationships.map((relationship) => ({
       fromKey: relationship.fromKey,

@@ -72,7 +72,7 @@ describe('narrative quality eval suite', () => {
     expect(report.findings.some((finding) => finding.code === 'SCRIPT_EXCESSIVELY_REPETITIVE')).toBe(true);
   });
 
-  it('rejects an episode that drops the canonical protagonist from the visible scene', () => {
+  it('rejects a scene that drops the canonical protagonist from the visible scene', () => {
     const fixture = structuredClone(NARRATIVE_FIXTURES[1]);
     const protagonist = fixture.input.characters[0]?.name ?? '';
     const removeName = (value: string) => value.replaceAll(protagonist, 'Someone');
@@ -90,7 +90,7 @@ describe('narrative quality eval suite', () => {
     expect(report.findings.some((finding) => finding.code === 'PROTAGONIST_NOT_ANCHORED')).toBe(true);
   });
 
-  it('rejects English output for a Vietnamese story locale', () => {
+  it('rejects English output for a Vietnamese drama locale', () => {
     const fixture = structuredClone(NARRATIVE_FIXTURES.find((item) => item.input.locale.startsWith('vi')) ?? NARRATIVE_FIXTURES[0]);
     fixture.proposal.script = unrelatedScript();
     fixture.proposal.summary = 'The protagonist receives new information and must decide who to trust before the situation escalates.';
@@ -106,7 +106,7 @@ describe('narrative quality eval suite', () => {
     expect(report.findings.some((finding) => finding.code === 'VIETNAMESE_OUTPUT_NOT_VISIBLE')).toBe(true);
   });
 
-  it('rejects an episode that creates no durable canonical progression before branching', () => {
+  it('rejects a scene that creates no durable canonical progression before branching', () => {
     const fixture = structuredClone(NARRATIVE_FIXTURES[2]);
     fixture.proposal.establishedFacts = [];
     fixture.proposal.threadChanges = { open: [], resolve: [] };
@@ -115,7 +115,7 @@ describe('narrative quality eval suite', () => {
 
     expect(report.passed).toBe(false);
     expect(report.dimensions.sceneProgression).toBeLessThan(60);
-    expect(report.findings.some((finding) => finding.code === 'EPISODE_ADDS_NO_CANONICAL_PROGRESS')).toBe(true);
+    expect(report.findings.some((finding) => finding.code === 'SCENE_ADDS_NO_CANONICAL_PROGRESS')).toBe(true);
   });
 });
 

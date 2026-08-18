@@ -5,16 +5,16 @@ describe('HttpAccountDataClient', () => {
   it('validates portable export shape', async () => {
     const client = new HttpAccountDataClient('https://api.test', async () => 'token', async () => Response.json({
       export: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         exportedAt: '2026-08-17T04:30:00.000Z',
-        preferences: {}, entitlement: {}, usage: [], plots: [],
+        preferences: {}, entitlement: {}, usage: [], dramas: [],
       },
     }));
-    await expect(client.loadExport()).resolves.toMatchObject({ schemaVersion: 1, plots: [] });
+    await expect(client.loadExport()).resolves.toMatchObject({ schemaVersion: 2, dramas: [] });
   });
 
   it('rejects malformed export and never retries account deletion automatically', async () => {
-    const malformed = new HttpAccountDataClient('https://api.test', async () => 'token', async () => Response.json({ export: { schemaVersion: 2 } }));
+    const malformed = new HttpAccountDataClient('https://api.test', async () => 'token', async () => Response.json({ export: { schemaVersion: 1 } }));
     await expect(malformed.loadExport()).rejects.toThrow('Account export response is invalid.');
 
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ error: 'audio_cleanup_failed' }), {

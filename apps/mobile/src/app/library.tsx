@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
+import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
-import type { StoryLibrarySnapshot, StoryPlotSummary } from '@/features/story/contracts';
-import { useStoryExperienceClient } from '@/features/story/story-client-context';
+import type { DramaLibrarySnapshot, DramaSummary } from '@/features/drama/contracts';
 import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { DramaCoverTile, DramaEmptyStage, DramaLoadingStage } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
-export default function StoryLibraryScreen() {
+export default function DramaLibraryScreen() {
   const router = useRouter();
   const { locale, t } = useUiCopy();
-  const client = useStoryExperienceClient();
-  const [snapshot, setSnapshot] = useState<StoryLibrarySnapshot | null>(null);
+  const client = useDramaExperienceClient();
+  const [snapshot, setSnapshot] = useState<DramaLibrarySnapshot | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +22,7 @@ export default function StoryLibraryScreen() {
     try {
       setSnapshot(await client.loadLibrary());
     } catch {
-      setError(t('Your story library could not be loaded. Canonical plot state is unchanged.', 'Không thể tải thư viện câu chuyện. Trạng thái cốt truyện chuẩn không thay đổi.'));
+      setError(t('Your drama library could not be loaded. Canonical state is unchanged.', 'Không thể tải thư viện drama. Trạng thái chuẩn không thay đổi.'));
     }
   }, [client, t]);
 
@@ -35,22 +35,20 @@ export default function StoryLibraryScreen() {
         setError(null);
       })
       .catch(() => {
-        if (active) setError(t('Your story library could not be loaded. Canonical plot state is unchanged.', 'Không thể tải thư viện câu chuyện. Trạng thái cốt truyện chuẩn không thay đổi.'));
+        if (active) setError(t('Your drama library could not be loaded. Canonical state is unchanged.', 'Không thể tải thư viện drama. Trạng thái chuẩn không thay đổi.'));
       });
     return () => { active = false; };
   }, [client, t]);
 
-  async function change(plot: StoryPlotSummary, action: 'archive' | 'restore') {
-    setBusyId(plot.id);
+  async function change(drama: DramaSummary, action: 'archive' | 'restore') {
+    setBusyId(drama.id);
     setError(null);
     try {
-      if (action === 'archive') await client.archivePlot(plot.id);
-      else await client.restorePlot(plot.id);
+      if (action === 'archive') await client.archiveDrama(drama.id);
+      else await client.restoreDrama(drama.id);
       await load();
     } catch {
-      setError(action === 'archive'
-        ? t('This plot could not be paused.', 'Không thể tạm dừng cốt truyện này.')
-        : t('This plot could not be restored.', 'Không thể khôi phục cốt truyện này.'));
+      setError(action === 'archive' ? t('This drama could not be paused.', 'Không thể tạm dừng drama này.') : t('This drama could not be restored.', 'Không thể khôi phục drama này.'));
     } finally {
       setBusyId(null);
     }
@@ -60,49 +58,24 @@ export default function StoryLibraryScreen() {
 
   return (
     <Screen>
-      <View style={styles.topBar}>
-        <BrandMark />
-      </View>
-
+      <View style={styles.topBar}><BrandMark /></View>
       <View style={styles.hero}>
         <Eyebrow>{t('My drama shelf', 'Kệ drama của tôi')}</Eyebrow>
-        <Text style={styles.title}>{t('Every story has a face.', 'Mỗi câu chuyện đều có một gương mặt.')}</Text>
+        <Text style={styles.title}>{t('Every drama has a face.', 'Mỗi drama đều có một gương mặt.')}</Text>
         <Text style={styles.body}>{t('Continue the scene that is calling you back.', 'Tiếp tục cảnh đang gọi bạn quay lại.')}</Text>
       </View>
 
-      <DramaNavigationDock
-        active="library"
-        locale={locale}
-        onNavigate={(destination) => {
-          if (destination === 'library') return;
-          router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/settings');
-        }}
-      />
+      <DramaNavigationDock active="library" locale={locale} onNavigate={(destination) => {
+        if (destination === 'library') return;
+        router.replace(destination === 'home' ? '/' : destination === 'create' ? '/create' : '/settings');
+      }} />
 
-      {error ? (
-        <ErrorState
-          title={t('My Stories could not update', 'Không thể cập nhật Câu chuyện của tôi')}
-          message={error}
-          retryLabel={sharedUiCopy.tryAgain[locale]}
-          onRetry={() => void load()}
-        />
-      ) : null}
-
-      {!snapshot && !error ? (
-        <DramaLoadingStage
-          label={t('Lighting your story shelf…', 'Đang thắp sáng kệ câu chuyện…')}
-          detail={t('Restoring covers, episode positions and your next decision points.', 'Đang dựng lại bìa, vị trí tập và điểm quyết định tiếp theo.')}
-          locale={locale}
-        />
-      ) : null}
+      {error ? <ErrorState title={t('Drama shelf could not update', 'Không thể cập nhật kệ drama')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
+      {!snapshot && !error ? <DramaLoadingStage label={t('Lighting your drama shelf…', 'Đang thắp sáng kệ drama…')} detail={t('Restoring covers, scene positions and decision points.', 'Đang khôi phục bìa, vị trí cảnh và điểm quyết định.')} locale={locale} /> : null}
 
       {emptyLibrary ? (
         <View style={styles.emptyWrap}>
-          <DramaEmptyStage
-            title={t('No drama is playing yet.', 'Chưa có drama nào đang phát.')}
-            detail={t('Give Living Plot one spark and your first cover will appear here.', 'Cho Living Plot một tia lửa và bìa câu chuyện đầu tiên sẽ xuất hiện ở đây.')}
-            locale={locale}
-          />
+          <DramaEmptyStage title={t('No drama is playing yet.', 'Chưa có drama nào đang phát.')} detail={t('Give Living Plot one spark and your first drama will appear here.', 'Cho Living Plot một tia lửa và drama đầu tiên sẽ xuất hiện ở đây.')} locale={locale} />
           <ActionButton label={t('Create my first drama', 'Tạo drama đầu tiên')} onPress={() => router.push('/create')} />
         </View>
       ) : null}
@@ -111,23 +84,23 @@ export default function StoryLibraryScreen() {
         <>
           <LibrarySection
             title={t('Now playing', 'Đang phát')}
-            subtitle={t('Tap a cover to step back into the scene.', 'Chạm bìa để quay lại cảnh đang diễn ra.')}
-            plots={snapshot.active}
+            subtitle={t('Tap a cover to return to the current scene.', 'Chạm bìa để quay lại cảnh hiện tại.')}
+            dramas={snapshot.active}
             action="archive"
             busyId={busyId}
             t={t}
-            onOpen={(plot) => router.push({ pathname: '/story', params: { plotId: plot.id } })}
+            onOpen={(drama) => router.push({ pathname: '/drama', params: { dramaId: drama.id } })}
             onChange={change}
           />
           {snapshot.archived.length > 0 ? (
             <LibrarySection
               title={t('Paused', 'Đã tạm dừng')}
-              subtitle={t('Older stories stay on the shelf until you restore them.', 'Câu chuyện cũ vẫn nằm trên kệ cho đến khi bạn khôi phục.')}
-              plots={snapshot.archived}
+              subtitle={t('Paused dramas stay here until you restore them.', 'Drama đã tạm dừng vẫn ở đây cho đến khi bạn khôi phục.')}
+              dramas={snapshot.archived}
               action="restore"
               busyId={busyId}
               t={t}
-              onOpen={(plot) => router.push({ pathname: '/story', params: { plotId: plot.id, readOnly: '1' } })}
+              onOpen={(drama) => router.push({ pathname: '/drama', params: { dramaId: drama.id, readOnly: '1' } })}
               onChange={change}
             />
           ) : null}
@@ -139,69 +112,49 @@ export default function StoryLibraryScreen() {
 
 type Translate = (en: string, vi: string) => string;
 
-function LibrarySection({
-  title,
-  subtitle,
-  plots,
-  action,
-  busyId,
-  t,
-  onOpen,
-  onChange,
-}: {
+function LibrarySection({ title, subtitle, dramas, action, busyId, t, onOpen, onChange }: {
   title: string;
   subtitle: string;
-  plots: StoryPlotSummary[];
+  dramas: DramaSummary[];
   action: 'archive' | 'restore';
   busyId: string | null;
   t: Translate;
-  onOpen: (plot: StoryPlotSummary) => void;
-  onChange: (plot: StoryPlotSummary, action: 'archive' | 'restore') => void;
+  onOpen: (drama: DramaSummary) => void;
+  onChange: (drama: DramaSummary, action: 'archive' | 'restore') => void;
 }) {
-  if (plots.length === 0) return null;
-
+  if (dramas.length === 0) return null;
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <View style={styles.sectionCopy}>
-          <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={styles.sectionSubtitle}>{subtitle}</Text>
-        </View>
-        <Text style={styles.sectionCount}>{String(plots.length).padStart(2, '0')}</Text>
+        <View style={styles.sectionCopy}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.sectionSubtitle}>{subtitle}</Text></View>
+        <Text style={styles.sectionCount}>{String(dramas.length).padStart(2, '0')}</Text>
       </View>
-
       <View style={styles.coverGrid}>
-        {plots.map((plot) => {
-          const awaitingChoice = plot.status === 'awaiting_choice';
-          const status = awaitingChoice
-            ? t('Your choice is waiting', 'Đang chờ lựa chọn của bạn')
-            : t('Next scene ready', 'Cảnh tiếp theo đã sẵn sàng');
-          return (
-            <View key={plot.id} style={styles.coverItem}>
-              <DramaCoverTile
-                title={plot.title}
-                premise={plot.resumeLine || plot.premise}
-                characterName={plot.characterName}
-                mood={plot.mood}
-                episodeLabel={`${t('EP', 'TẬP')} ${String(plot.episodeNumber).padStart(2, '0')}`}
-                statusLabel={status}
-                subdued={action === 'restore'}
-                onPress={() => onOpen(plot)}
+        {dramas.map((drama) => (
+          <View key={drama.id} style={styles.coverItem}>
+            <DramaCoverTile
+              title={drama.title}
+              premise={drama.resumeLine || drama.premise}
+              characterName={drama.characterName}
+              mood={drama.mood}
+              sceneLabel={`${t('SCENE', 'CẢNH')} ${String(drama.sceneNumber).padStart(2, '0')}`}
+              statusLabel={drama.status === 'awaiting_choice' ? t('Your choice is waiting', 'Đang chờ lựa chọn của bạn') : t('Continue from consequence', 'Tiếp tục từ hậu quả')}
+              subdued={action === 'restore'}
+              onPress={() => onOpen(drama)}
+            />
+            <View style={styles.coverFooter}>
+              <Text style={styles.updated}>{drama.updatedLabel}</Text>
+              <ActionButton
+                label={action === 'archive' ? t('Pause', 'Tạm dừng') : t('Restore', 'Khôi phục')}
+                variant="ghost"
+                busy={busyId === drama.id}
+                disabled={busyId !== null && busyId !== drama.id}
+                onPress={() => onChange(drama, action)}
+                style={styles.coverAction}
               />
-              <View style={styles.coverFooter}>
-                <Text style={styles.updated}>{plot.updatedLabel}</Text>
-                <ActionButton
-                  label={action === 'archive' ? t('Pause', 'Tạm dừng') : t('Restore', 'Khôi phục')}
-                  variant="ghost"
-                  busy={busyId === plot.id}
-                  disabled={busyId !== null && busyId !== plot.id}
-                  onPress={() => onChange(plot, action)}
-                  style={styles.coverAction}
-                />
-              </View>
             </View>
-          );
-        })}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -214,15 +167,7 @@ const styles = StyleSheet.create({
   body: { color: colors.inkMuted, fontSize: 14, lineHeight: 20 },
   emptyWrap: { gap: spacing.md },
   section: { gap: spacing.md, paddingTop: spacing.xl },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
-  },
+  sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderStrong },
   sectionCopy: { flex: 1, gap: 3 },
   sectionTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 27, lineHeight: 31, fontWeight: '700' },
   sectionSubtitle: { color: colors.inkMuted, fontSize: 11, lineHeight: 16 },

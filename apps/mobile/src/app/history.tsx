@@ -1,90 +1,74 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
+import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
-import type { StoryHistoryItem, StoryHistorySnapshot } from '@/features/story/contracts';
-import { useStoryExperienceClient } from '@/features/story/story-client-context';
+import type { DramaHistory, DramaHistoryItem } from '@/features/drama/contracts';
 import { DramaEmptyStage, DramaLoadingStage, DramaRecapFrame, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
-export default function StoryHistoryScreen() {
+export default function DramaHistoryScreen() {
   const router = useRouter();
   const { locale, t } = useUiCopy();
-  const params = useLocalSearchParams<{ plotId?: string | string[] }>();
-  const plotId = useMemo(() => readParam(params.plotId), [params.plotId]);
-  const client = useStoryExperienceClient();
-  const [history, setHistory] = useState<StoryHistorySnapshot | null>(null);
-  const [error, setError] = useState<string | null>(plotId ? null : t('This history link is missing its plot identifier.', 'Liên kết lịch sử thiếu mã cốt truyện.'));
+  const params = useLocalSearchParams<{ dramaId?: string | string[] }>();
+  const dramaId = useMemo(() => readParam(params.dramaId), [params.dramaId]);
+  const client = useDramaExperienceClient();
+  const [history, setHistory] = useState<DramaHistory | null>(null);
+  const [error, setError] = useState<string | null>(dramaId ? null : t('This history link is missing its drama identifier.', 'Liên kết lịch sử thiếu mã drama.'));
 
   const load = useCallback(async () => {
-    if (!plotId) {
-      setError(t('This history link is missing its plot identifier.', 'Liên kết lịch sử thiếu mã cốt truyện.'));
+    if (!dramaId) {
+      setError(t('This history link is missing its drama identifier.', 'Liên kết lịch sử thiếu mã drama.'));
       return;
     }
     setError(null);
     try {
-      setHistory(await client.loadHistory(plotId));
+      setHistory(await client.loadHistory(dramaId));
     } catch {
-      setError(t('Canonical story history could not be loaded.', 'Không thể tải lịch sử câu chuyện chuẩn.'));
+      setError(t('Canonical drama history could not be loaded.', 'Không thể tải lịch sử drama chuẩn.'));
     }
-  }, [client, plotId, t]);
+  }, [client, dramaId, t]);
 
   useEffect(() => {
-    if (!plotId) return;
+    if (!dramaId) return;
     let active = true;
-    void client.loadHistory(plotId)
+    void client.loadHistory(dramaId)
       .then((next) => {
         if (!active) return;
         setHistory(next);
         setError(null);
       })
       .catch(() => {
-        if (active) setError(t('Canonical story history could not be loaded.', 'Không thể tải lịch sử câu chuyện chuẩn.'));
+        if (active) setError(t('Canonical drama history could not be loaded.', 'Không thể tải lịch sử drama chuẩn.'));
       });
     return () => { active = false; };
-  }, [client, plotId, t]);
+  }, [client, dramaId, t]);
+
+  const backToDrama = () => dramaId ? router.replace({ pathname: '/drama', params: { dramaId } }) : router.replace('/');
 
   return (
     <Screen>
       <View style={styles.topBar}>
         <BrandMark />
-        <ActionButton
-          label={t('Back to story', 'Quay lại câu chuyện')}
-          variant="ghost"
-          onPress={() => plotId ? router.replace({ pathname: '/story', params: { plotId } }) : router.replace('/')}
-        />
+        <ActionButton label={t('Back to drama', 'Quay lại drama')} variant="ghost" onPress={backToDrama} />
       </View>
 
       <DramaUtilityHero
         kicker={t('PREVIOUSLY ON LIVING PLOT', 'TRƯỚC ĐÓ TRÊN LIVING PLOT')}
-        title={history?.title ?? t('Story so far', 'Câu chuyện đến đây')}
-        detail={history ? t(`${history.items.length} scenes preserved in canonical order.`, `${history.items.length} cảnh được giữ theo thứ tự chuẩn.`) : t('Rebuilding the chain of choices that brought you here.', 'Đang dựng lại chuỗi lựa chọn đã đưa câu chuyện tới đây.')}
+        title={history?.title ?? t('Drama so far', 'Drama đến đây')}
+        detail={history ? t(`${history.items.length} scenes preserved in canonical order.`, `${history.items.length} cảnh được giữ theo thứ tự chuẩn.`) : t('Restoring the choices that brought this drama here.', 'Đang khôi phục các lựa chọn đã đưa drama tới đây.')}
         mood="mysterious"
         characterName="Recap"
       />
 
       {error ? <ErrorState title={t('Recap unavailable', 'Tóm tắt không khả dụng')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
-      {!history && !error ? (
-        <DramaLoadingStage
-          label={t('Building your story recap…', 'Đang dựng lại tóm tắt câu chuyện…')}
-          detail={t('Restoring each episode, locked choice and consequence.', 'Đang khôi phục từng tập, lựa chọn đã chốt và hậu quả.')}
-          locale={locale}
-        />
-      ) : null}
+      {!history && !error ? <DramaLoadingStage label={t('Building your drama recap…', 'Đang dựng lại tóm tắt drama…')} detail={t('Restoring each scene, committed branch and consequence.', 'Đang khôi phục từng cảnh, nhánh đã chốt và hậu quả.')} locale={locale} /> : null}
 
       {history && history.items.length === 0 ? (
         <View style={styles.emptyState}>
-          <DramaEmptyStage
-            title={t('No recap scenes yet.', 'Chưa có cảnh tóm tắt.')}
-            detail={t('Play the first episode and your locked decisions will appear here.', 'Xem tập đầu và các quyết định đã chốt sẽ xuất hiện ở đây.')}
-            locale={locale}
-          />
-          <ActionButton
-            label={t('Back to story', 'Quay lại câu chuyện')}
-            variant="secondary"
-            onPress={() => plotId ? router.replace({ pathname: '/story', params: { plotId } }) : router.replace('/')}
-          />
+          <DramaEmptyStage title={t('No recap scenes yet.', 'Chưa có cảnh tóm tắt.')} detail={t('Play the first scene and committed choices will appear here.', 'Xem cảnh đầu và các lựa chọn đã chốt sẽ xuất hiện ở đây.')} locale={locale} />
+          <ActionButton label={t('Back to drama', 'Quay lại drama')} variant="secondary" onPress={backToDrama} />
         </View>
       ) : null}
 
@@ -92,34 +76,34 @@ export default function StoryHistoryScreen() {
         <>
           <BranchJourney items={history.items} locale={locale} />
           <View style={styles.timeline}>
-          <View style={styles.timelineRail} />
-          {history.items.map((item, index) => {
-            const locked = item.status === 'choice_committed';
-            return (
-              <View key={item.episodeId} style={styles.timelineItem}>
-                <View style={styles.timelineMarkerColumn}>
-                  <View style={[styles.timelineNode, locked && styles.timelineNodeLocked]}>
-                    <Text style={[styles.timelineNodeText, locked && styles.timelineNodeTextLocked]}>{String(index + 1).padStart(2, '0')}</Text>
+            <View style={styles.timelineRail} />
+            {history.items.map((item, index) => {
+              const committed = item.branchState === 'committed';
+              return (
+                <View key={item.sceneId} style={styles.timelineItem}>
+                  <View style={styles.timelineMarkerColumn}>
+                    <View style={[styles.timelineNode, committed && styles.timelineNodeLocked]}>
+                      <Text style={[styles.timelineNodeText, committed && styles.timelineNodeTextLocked]}>{String(index + 1).padStart(2, '0')}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.timelineContent}>
+                    <View style={styles.itemHeader}>
+                      <Pill tone={committed ? 'success' : 'accent'}>{committed ? t('COMMITTED', 'ĐÃ CHỐT') : t('CURRENT', 'HIỆN TẠI')}</Pill>
+                      <Text style={styles.itemMeta}>{t('SCENE', 'CẢNH')} {String(item.sceneNumber).padStart(2, '0')}</Text>
+                    </View>
+                    <DramaRecapFrame
+                      sceneNumber={item.sceneNumber}
+                      title={item.title}
+                      summary={item.summary}
+                      choiceLabel={item.choiceLabel ? t(`Choice ${item.choiceKey}: ${item.choiceLabel}`, `Lựa chọn ${item.choiceKey}: ${item.choiceLabel}`) : undefined}
+                      consequence={item.consequence}
+                      pendingLabel={t('The next choice is still waiting inside this scene.', 'Lựa chọn tiếp theo vẫn đang chờ trong cảnh này.')}
+                      locale={locale}
+                    />
                   </View>
                 </View>
-                <View style={styles.timelineContent}>
-                  <View style={styles.itemHeader}>
-                    <Pill tone={locked ? 'success' : 'accent'}>{locked ? t('LOCKED', 'ĐÃ CHỐT') : t('NOW', 'HIỆN TẠI')}</Pill>
-                    <Text style={styles.itemMeta}>{locale === 'vi' ? 'TẬP' : 'EP'} {String(item.episodeNumber).padStart(2, '0')}</Text>
-                  </View>
-                  <DramaRecapFrame
-                    episodeNumber={item.episodeNumber}
-                    title={item.title}
-                    summary={item.summary}
-                    choiceLabel={item.choiceLabel ? t(`Choice ${item.choiceKey}: ${item.choiceLabel}`, `Lựa chọn ${item.choiceKey}: ${item.choiceLabel}`) : undefined}
-                    consequence={item.consequence}
-                    pendingLabel={t('Your next choice is still waiting inside this scene.', 'Lựa chọn tiếp theo vẫn đang chờ trong cảnh này.')}
-                    locale={locale}
-                  />
-                </View>
-              </View>
-            );
-          })}
+              );
+            })}
           </View>
         </>
       ) : null}
@@ -127,7 +111,7 @@ export default function StoryHistoryScreen() {
   );
 }
 
-function BranchJourney({ items, locale }: { items: StoryHistoryItem[]; locale: 'en' | 'vi' }) {
+function BranchJourney({ items, locale }: { items: DramaHistoryItem[]; locale: 'en' | 'vi' }) {
   const current = items[items.length - 1];
   return (
     <View style={styles.branchMap}>
@@ -137,21 +121,19 @@ function BranchJourney({ items, locale }: { items: StoryHistoryItem[]; locale: '
       </View>
       <View style={styles.branchPath}>
         {items.map((item, index) => (
-          <View key={item.episodeId} style={styles.branchStep}>
-            <View style={[styles.branchNode, item.status === 'choice_committed' && styles.branchNodeLocked]}>
-              <Text style={styles.branchNodeText}>{String(item.episodeNumber).padStart(2, '0')}</Text>
+          <View key={item.sceneId} style={styles.branchStep}>
+            <View style={[styles.branchNode, item.branchState === 'committed' && styles.branchNodeLocked]}>
+              <Text style={styles.branchNodeText}>{String(item.sceneNumber).padStart(2, '0')}</Text>
             </View>
             {item.choiceKey ? <Text style={styles.branchChoice}>{item.choiceKey}</Text> : null}
             {index < items.length - 1 ? <View style={styles.branchConnector} /> : null}
           </View>
         ))}
       </View>
-      {current?.status === 'awaiting_choice' ? (
+      {current?.branchState === 'open' ? (
         <View style={styles.branchFuture}>
-          <Text style={styles.branchFutureLabel}>{locale === 'vi' ? 'LỰA CHỌN TIẾP THEO' : 'NEXT TURN'}</Text>
-          <View style={styles.branchFutureChoices}>
-            {['A', 'B', 'C'].map((key) => <View key={key} style={styles.branchGhost}><Text style={styles.branchGhostText}>{key}</Text></View>)}
-          </View>
+          <Text style={styles.branchFutureLabel}>{locale === 'vi' ? 'LỰA CHỌN TIẾP THEO' : 'NEXT CHOICE'}</Text>
+          <View style={styles.branchFutureChoices}>{['A', 'B', 'C'].map((key) => <View key={key} style={styles.branchGhost}><Text style={styles.branchGhostText}>{key}</Text></View>)}</View>
         </View>
       ) : null}
     </View>

@@ -47,10 +47,10 @@ describe('AudioProcessor', () => {
     expect(first.action).toBe('ack');
     expect(second.action).toBe('ack');
     expect(synthesizer.calls).toBe(1);
-    const asset = await service.getOwnedAsset('user-1', requested.value.id);
-    expect(asset).toMatchObject({ status: 'ready', inputCharacters: 56, attempts: 1, cached: true });
-    expect(asset?.objectKey).toBe(`audio/episode-1/vi-narrator-female.mp3`);
-    const object = await bucket.get(asset?.objectKey ?? 'missing');
+    const delivery = await service.getOwnedDeliveryAsset('user-1', requested.value.id);
+    expect(delivery?.media).toMatchObject({ status: 'ready', attempts: 1, cached: true, sceneId: 'episode-1' });
+    expect(delivery?.objectKey).toBe(`audio/episode-1/vi-narrator-female.mp3`);
+    const object = await bucket.get(delivery?.objectKey ?? 'missing');
     expect(object).not.toBeNull();
     expect(object?.httpMetadata?.contentType).toBe('audio/mpeg');
     expect(new TextDecoder().decode(await object?.arrayBuffer())).toBe('synthetic-mp3');
@@ -113,6 +113,34 @@ describe('AudioProcessor', () => {
     expect(usage).toMatchObject({ voiceConsumed: 1, voiceReserved: 0 });
   });
 
+  it('keeps staged metadata and retries when private R2 cleanup fails', async () => {
+    const requested = await createRequested('processor-cleanup-fail');
+    const objectKey = 'audio/episode-1/vi-narrator-female.mp3';
+    await bucket.put(objectKey, new TextEncoder().encode('private-object'), {
+      httpMetadata: { contentType: 'audio/mpeg' },
+    });
+    await db
+      .prepare("UPDATE audio_assets SET status = 'staged', object_key = ?, input_characters = 42 WHERE id = ?")
+      .bind(objectKey, requested.id)
+      .run();
+    const failingBucket = {
+      async delete() { throw new Error('r2 unavailable'); },
+    } as unknown as R2Bucket;
+    const missingQuota = {
+      async consume() { return { ok: false as const, error: { code: 'not_found' as const, message: 'reservation missing' } }; },
+    } as unknown as D1QuotaLedger;
+    const processor = new AudioProcessor(db, failingBucket, recordingSynthesizer(successSpeech()), missingQuota);
+
+    const result = await processor.process({ assetId: requested.id });
+
+    expect(result).toEqual({ action: 'retry', assetId: requested.id, delaySeconds: 30 });
+    const asset = await db
+      .prepare('SELECT status, object_key, failure_code FROM audio_assets WHERE id = ?')
+      .bind(requested.id)
+      .first<{ status: string; object_key: string | null; failure_code: string | null }>();
+    expect(asset).toEqual({ status: 'staged', object_key: objectKey, failure_code: 'r2_cleanup_failed' });
+  });
+
   it('DLQ cleanup releases held quota and marks unfinished work failed', async () => {
     const requested = await createRequested('processor-dlq');
     const processor = new AudioProcessor(db, bucket, recordingSynthesizer(successSpeech()));
@@ -163,7 +191,7 @@ function fakeQueue(): AudioQueue & { messages: AudioJob[] } {
 function requestInput(reservationKey: string) {
   return {
     userId: 'user-1',
-    episodeId: 'episode-1',
+    sceneId: 'episode-1',
     voiceVariant: 'vi-narrator-female',
     reservationKey,
     tier: 'free' as const,

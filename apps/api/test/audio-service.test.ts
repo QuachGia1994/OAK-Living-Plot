@@ -68,7 +68,7 @@ describe('D1AudioService', () => {
     expect(reservations?.count).toBe(1);
   });
 
-  it('enforces the Free fresh-voice limit before a second episode is queued', async () => {
+  it('enforces the Free fresh-voice limit before a second scene is queued', async () => {
     await db
       .prepare('INSERT INTO episodes (id, plot_id, episode_number, title, script_json) VALUES (?, ?, ?, ?, ?)')
       .bind('episode-2', 'plot-1', 2, 'Second', JSON.stringify({ script: 'Second episode.' }))
@@ -77,7 +77,7 @@ describe('D1AudioService', () => {
     const service = new D1AudioService(db, queue);
 
     const first = await service.request(requestInput('voice-limit-001'));
-    const second = await service.request({ ...requestInput('voice-limit-002'), episodeId: 'episode-2' });
+    const second = await service.request({ ...requestInput('voice-limit-002'), sceneId: 'episode-2' });
 
     expect(first.ok).toBe(true);
     expect(second).toMatchObject({ ok: false, error: { code: 'quota_exceeded', limit: 1 } });
@@ -112,7 +112,7 @@ describe('D1AudioService', () => {
 
     expect(retried.ok).toBe(true);
     if (!retried.ok) return;
-    expect(retried.value).toMatchObject({ status: 'queued', reservationKey: 'voice-retry-new' });
+    expect(retried.value).toMatchObject({ status: 'queued', sceneId: 'episode-1', kind: 'voice' });
     expect(queue.messages).toEqual([{ assetId: retried.value.id }]);
   });
 
@@ -123,9 +123,9 @@ describe('D1AudioService', () => {
     if (!created.ok) throw new Error('Failed to seed asset.');
 
     const wrongRequest = await service.request({ ...requestInput('voice-attacker'), userId: 'attacker' });
-    const wrongRead = await service.getOwnedAsset('attacker', created.value.id);
+    const wrongRead = await service.getOwnedMediaAsset('attacker', created.value.id);
 
-    expect(wrongRequest).toEqual({ ok: false, error: { code: 'not_found', message: 'Episode not found.' } });
+    expect(wrongRequest).toEqual({ ok: false, error: { code: 'not_found', message: 'Scene not found.' } });
     expect(wrongRead).toBeNull();
   });
 });
@@ -143,7 +143,7 @@ function fakeQueue(): AudioQueue & { messages: AudioJob[] } {
 function requestInput(reservationKey: string) {
   return {
     userId: 'user-1',
-    episodeId: 'episode-1',
+    sceneId: 'episode-1',
     voiceVariant: 'vi-narrator-female',
     reservationKey,
     tier: 'free' as const,

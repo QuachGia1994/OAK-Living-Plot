@@ -1,4 +1,4 @@
-import type { StoryGenerationUsage } from '../ai/contracts';
+import type { SceneGenerationUsage } from '../ai/contracts';
 
 export const GEMINI_3_5_FLASH_LITE_STANDARD_PRICING = {
   model: 'gemini-3.5-flash-lite',
@@ -16,7 +16,7 @@ export interface AiCostBreakdown {
   totalNanoUsd: number;
 }
 
-export function calculateAiCost(model: string, usage: StoryGenerationUsage): AiCostBreakdown | null {
+export function calculateAiCost(model: string, usage: SceneGenerationUsage): AiCostBreakdown | null {
   if (model !== GEMINI_3_5_FLASH_LITE_STANDARD_PRICING.model) return null;
   if (!isSafeTokenCount(usage.inputTokens) || !isSafeTokenCount(usage.outputTokens)) return null;
 

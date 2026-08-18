@@ -1,5 +1,5 @@
 import { AuthenticatedJsonTransport, type FetchLike, type TokenProvider } from '../../lib/http-transport';
-import type { NarratorVariant, PreferencesClient, StoryLocale, UiLocale, UserPreferences } from './contracts';
+import type { DramaLocale, NarratorVariant, PreferencesClient, UiLocale, UserPreferences } from './contracts';
 import { defaultUserPreferences } from './contracts';
 
 export class HttpPreferencesClient implements PreferencesClient {
@@ -51,13 +51,13 @@ function parseEnvelope(response: { ok: boolean; status: number; payload: unknown
     throw new Error('Preferences response is unavailable.');
   }
   const value = response.payload.preferences;
-  if (!isUiLocale(value.uiLocale) || !isStoryLocale(value.storyLocale) || !isNarratorVariant(value.narratorVariant)) {
+  if (!isUiLocale(value.uiLocale) || !isDramaLocale(value.dramaLocale) || !isNarratorVariant(value.narratorVariant)) {
     throw new Error('Preferences response is invalid.');
   }
   if (value.updatedAt !== null && !Number.isInteger(value.updatedAt)) throw new Error('Preferences timestamp is invalid.');
   return {
     uiLocale: value.uiLocale,
-    storyLocale: value.storyLocale,
+    dramaLocale: value.dramaLocale,
     narratorVariant: value.narratorVariant,
     updatedAt: value.updatedAt === null ? null : Number(value.updatedAt),
   };
@@ -69,10 +69,14 @@ async function loadPreviewPreferencesFromDevice(): Promise<UserPreferences | nul
     const raw = await secureStore.getItemAsync(PREVIEW_PREFERENCES_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed) || !isUiLocale(parsed.uiLocale) || !isStoryLocale(parsed.storyLocale) || !isNarratorVariant(parsed.narratorVariant)) return null;
+    if (!isRecord(parsed) || !isUiLocale(parsed.uiLocale) || !isNarratorVariant(parsed.narratorVariant)) return null;
+    const dramaLocale = isDramaLocale(parsed.dramaLocale)
+      ? parsed.dramaLocale
+      : isDramaLocale(parsed.storyLocale) ? parsed.storyLocale : null;
+    if (!dramaLocale) return null;
     return {
       uiLocale: parsed.uiLocale,
-      storyLocale: parsed.storyLocale,
+      dramaLocale,
       narratorVariant: parsed.narratorVariant,
       updatedAt: typeof parsed.updatedAt === 'number' && Number.isInteger(parsed.updatedAt) ? parsed.updatedAt : null,
     };
@@ -93,13 +97,13 @@ async function savePreviewPreferencesToDevice(preferences: UserPreferences): Pro
 function defaultFromDevice(): UserPreferences {
   const locale = Intl.DateTimeFormat().resolvedOptions().locale?.toLowerCase() ?? 'en-us';
   if (locale.startsWith('vi')) {
-    return { uiLocale: 'vi', storyLocale: 'vi-VN', narratorVariant: 'vi-narrator-female', updatedAt: null };
+    return { uiLocale: 'vi', dramaLocale: 'vi-VN', narratorVariant: 'vi-narrator-female', updatedAt: null };
   }
   return { ...defaultUserPreferences };
 }
 
 function isUiLocale(value: unknown): value is UiLocale { return value === 'en' || value === 'vi'; }
-function isStoryLocale(value: unknown): value is StoryLocale { return value === 'en-US' || value === 'vi-VN'; }
+function isDramaLocale(value: unknown): value is DramaLocale { return value === 'en-US' || value === 'vi-VN'; }
 function isNarratorVariant(value: unknown): value is NarratorVariant {
   return value === 'en-narrator-female' || value === 'vi-narrator-female';
 }

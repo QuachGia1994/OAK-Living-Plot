@@ -10,19 +10,19 @@ import {
   type ViewStyle,
 } from 'react-native';
 import type { UiLocale } from '@/features/preferences/contracts';
-import type { StoryChoice, StoryMood } from '@/features/story/contracts';
+import type { Choice, DramaMood } from '@/features/drama/domain';
 import { dramaVisualCopyFor } from './drama-copy';
 import { buildSubtitleBeats, clampSceneBeat, sceneMotifForText, type SceneMotif } from './drama-storyboard';
 import { cinematic, colors, radius, spacing, typography } from './theme';
 
-type SceneTone = (typeof cinematic.scene)[StoryMood];
+type SceneTone = (typeof cinematic.scene)[DramaMood];
 
 export function DramaPoster({
   title,
   premise,
   characterName,
   mood,
-  episodeLabel,
+  sceneLabel,
   actionLabel,
   onPress,
   style,
@@ -30,8 +30,8 @@ export function DramaPoster({
   title: string;
   premise: string;
   characterName: string;
-  mood: StoryMood;
-  episodeLabel: string;
+  mood: DramaMood;
+  sceneLabel: string;
   actionLabel: string;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
@@ -47,7 +47,7 @@ export function DramaPoster({
       <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${premise}`} />
       <View style={styles.posterTopFade} />
       <View style={styles.posterMetaRow}>
-        <Text style={styles.posterMeta}>{episodeLabel}</Text>
+        <Text style={styles.posterMeta}>{sceneLabel}</Text>
         <View style={[styles.moodSignal, { backgroundColor: tone.rim }]} />
       </View>
       <View style={styles.posterCopy}>
@@ -68,7 +68,7 @@ export function DramaCoverTile({
   premise,
   characterName,
   mood,
-  episodeLabel,
+  sceneLabel,
   statusLabel,
   onPress,
   subdued = false,
@@ -77,8 +77,8 @@ export function DramaCoverTile({
   title: string;
   premise: string;
   characterName: string;
-  mood: StoryMood;
-  episodeLabel: string;
+  mood: DramaMood;
+  sceneLabel: string;
   statusLabel: string;
   onPress: () => void;
   subdued?: boolean;
@@ -101,7 +101,7 @@ export function DramaCoverTile({
       <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${premise}`} compact />
       <View style={styles.coverShade} />
       <View style={styles.coverMetaRow}>
-        <Text style={styles.coverEpisode}>{episodeLabel}</Text>
+        <Text style={styles.coverScene}>{sceneLabel}</Text>
         <View style={[styles.coverSignal, { backgroundColor: tone.rim }]} />
       </View>
       <View style={styles.coverCopy}>
@@ -123,7 +123,7 @@ export function DramaEmptyStage({
   title: string;
   detail: string;
   locale: UiLocale;
-  mood?: StoryMood;
+  mood?: DramaMood;
 }) {
   const tone = cinematic.scene[mood];
   const copy = dramaVisualCopyFor(locale);
@@ -149,7 +149,7 @@ export function DramaComposerPreview({
 }: {
   premise: string;
   characterName: string;
-  mood: StoryMood;
+  mood: DramaMood;
   label: string;
   locale: UiLocale;
 }) {
@@ -181,7 +181,7 @@ export function DramaMoodSwatch({
   locale,
   onPress,
 }: {
-  mood: StoryMood;
+  mood: DramaMood;
   label: string;
   description: string;
   selected: boolean;
@@ -228,7 +228,7 @@ export function DramaCastingPreview({
   locale,
 }: {
   characterName: string;
-  mood: StoryMood;
+  mood: DramaMood;
   premise: string;
   label: string;
   locale: UiLocale;
@@ -259,7 +259,7 @@ export function DramaUtilityHero({
   kicker: string;
   title: string;
   detail?: string;
-  mood?: StoryMood;
+  mood?: DramaMood;
   characterName?: string;
 }) {
   const tone = cinematic.scene[mood];
@@ -277,7 +277,7 @@ export function DramaUtilityHero({
 }
 
 export function DramaRecapFrame({
-  episodeNumber,
+  sceneNumber,
   title,
   summary,
   choiceLabel,
@@ -285,7 +285,7 @@ export function DramaRecapFrame({
   pendingLabel,
   locale,
 }: {
-  episodeNumber: number;
+  sceneNumber: number;
   title: string;
   summary: string;
   choiceLabel?: string;
@@ -298,10 +298,10 @@ export function DramaRecapFrame({
   return (
     <View style={styles.recapFrame}>
       <View style={[styles.recapVisual, { backgroundColor: tone.base }]}>
-        <SceneArtwork mood="mysterious" characterName={`${locale === 'vi' ? 'TẬP' : 'EP'} ${episodeNumber}`} sceneText={sceneText} compact />
+        <SceneArtwork mood="mysterious" characterName={`${locale === 'vi' ? 'CẢNH' : 'SCENE'} ${sceneNumber}`} sceneText={sceneText} compact />
         <View style={styles.recapShade} />
         <View style={styles.recapVisualMeta}>
-          <Text style={styles.recapEpisode}>{locale === 'vi' ? 'TẬP' : 'EP'} {String(episodeNumber).padStart(2, '0')}</Text>
+          <Text style={styles.recapScene}>{locale === 'vi' ? 'CẢNH' : 'SCENE'} {String(sceneNumber).padStart(2, '0')}</Text>
           <View style={[styles.recapSignal, { backgroundColor: tone.rim }]} />
         </View>
         <Text style={styles.recapTitle} numberOfLines={2}>{title}</Text>
@@ -322,21 +322,23 @@ export function DramaRecapFrame({
 }
 
 export function DramaSceneStage({
-  episodeNumber,
+  sceneNumber,
   title,
   body,
   characterName,
   mood,
   locale,
   consequence,
+  onPlaybackComplete,
 }: {
-  episodeNumber: number;
+  sceneNumber: number;
   title: string;
   body: string;
   characterName: string;
-  mood: StoryMood;
+  mood: DramaMood;
   locale: UiLocale;
   consequence?: string;
+  onPlaybackComplete?: () => void;
 }) {
   const beats = useMemo(() => buildSubtitleBeats(body), [body]);
   const [beatIndex, setBeatIndex] = useState(0);
@@ -345,20 +347,32 @@ export function DramaSceneStage({
   const beat = beats[clampSceneBeat(beatIndex, beats.length)] ?? body;
   const hasNextBeat = beatIndex < beats.length - 1;
 
+  useEffect(() => {
+    setBeatIndex(0);
+    if (!consequence && beats.length <= 1) onPlaybackComplete?.();
+  }, [beats.length, body, consequence, onPlaybackComplete]);
+
   return (
     <Pressable
       accessibilityRole={consequence || !hasNextBeat ? undefined : 'button'}
       accessibilityLabel={consequence ? undefined : `${characterName}. ${beat}`}
       accessibilityHint={consequence ? undefined : hasNextBeat ? copy.sceneAdvanceHint : copy.sceneFinalHint}
       disabled={Boolean(consequence) || !hasNextBeat}
-      onPress={() => hasNextBeat && setBeatIndex((current) => current + 1)}
+      onPress={() => {
+        if (!hasNextBeat) return;
+        setBeatIndex((current) => {
+          const next = current + 1;
+          if (next >= beats.length - 1) onPlaybackComplete?.();
+          return next;
+        });
+      }}
       style={[styles.sceneStage, { backgroundColor: tone.base }]}
     >
       <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${body}`} />
       <View style={styles.sceneTopShade} />
       <View style={styles.sceneHeader}>
         <View>
-          <Text style={styles.sceneEpisode}>{locale === 'vi' ? 'TẬP' : 'EP'} {String(episodeNumber).padStart(2, '0')}</Text>
+          <Text style={styles.sceneIndex}>{locale === 'vi' ? 'CẢNH' : 'SCENE'} {String(sceneNumber).padStart(2, '0')}</Text>
           <Text style={styles.sceneTitle} numberOfLines={2}>{title}</Text>
         </View>
         <View
@@ -369,7 +383,7 @@ export function DramaSceneStage({
         >
           {(beats.length > 0 ? beats : [body]).map((_, index) => (
             <View
-              key={`${episodeNumber}-beat-${index}`}
+              key={`${sceneNumber}-beat-${index}`}
               style={[
                 styles.sceneProgressSegment,
                 index <= beatIndex && { backgroundColor: index === beatIndex ? tone.rim : colors.inkMuted },
@@ -387,7 +401,7 @@ export function DramaSceneStage({
             <Text style={[styles.subtitleSpeaker, { color: tone.rim }]}>{characterName}</Text>
             <Text style={styles.subtitleCue}>{hasNextBeat ? copy.sceneAdvanceCue : copy.sceneEndCue}</Text>
           </View>
-          <SubtitleBeat key={`${episodeNumber}-${beatIndex}`} text={beat} />
+          <SubtitleBeat key={`${sceneNumber}-${beatIndex}`} text={beat} />
         </View>
       )}
     </Pressable>
@@ -402,10 +416,10 @@ export function DramaChoiceCard({
   locale,
   onPress,
 }: {
-  choice: StoryChoice;
+  choice: Choice;
   selected: boolean;
   disabled: boolean;
-  mood: StoryMood;
+  mood: DramaMood;
   locale: UiLocale;
   onPress: () => void;
 }) {
@@ -448,7 +462,7 @@ export function DramaGenerationState({
   locale,
 }: {
   characterName: string;
-  mood: StoryMood;
+  mood: DramaMood;
   label: string;
   detail: string;
   locale: UiLocale;
@@ -491,7 +505,7 @@ function SceneArtwork({
   sceneText = '',
   compact = false,
 }: {
-  mood: StoryMood;
+  mood: DramaMood;
   characterName: string;
   sceneText?: string;
   compact?: boolean;
@@ -756,7 +770,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  coverEpisode: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  coverScene: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   coverSignal: { width: 22, height: 2, borderRadius: radius.pill },
   coverCopy: {
     position: 'absolute',
@@ -885,11 +899,11 @@ const styles = StyleSheet.create({
   recapVisual: { minHeight: 230, overflow: 'hidden' },
   recapShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.24)' },
   recapVisualMeta: { position: 'absolute', top: spacing.md, left: spacing.md, right: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  recapEpisode: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
+  recapScene: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
   recapSignal: { width: 24, height: 2, borderRadius: radius.pill },
   recapTitle: { position: 'absolute', left: spacing.md, right: spacing.md, bottom: spacing.md, color: '#FFF9EF', fontFamily: typography.display, fontSize: 25, lineHeight: 29, fontWeight: '700', letterSpacing: -0.45 },
   recapCopy: { gap: spacing.md, padding: spacing.md },
-  recapSummary: { color: colors.storyInk, fontSize: 14, lineHeight: 22 },
+  recapSummary: { color: colors.narrativeInk, fontSize: 14, lineHeight: 22 },
   recapChoice: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
   recapChoiceLabel: { fontFamily: typography.display, fontSize: 17, lineHeight: 22, fontWeight: '700' },
   recapConsequence: { color: colors.ink, fontFamily: typography.display, fontSize: 15, lineHeight: 23 },
@@ -960,7 +974,7 @@ const styles = StyleSheet.create({
   floorShadow: { position: 'absolute', left: -40, right: -40, bottom: -70, height: 210, borderRadius: radius.pill, backgroundColor: '#030303', opacity: 0.88 },
   sceneTopShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: cinematic.overlay.top },
   sceneHeader: { position: 'absolute', top: spacing.lg, left: spacing.lg, right: spacing.lg, gap: spacing.md },
-  sceneEpisode: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
+  sceneIndex: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
   sceneTitle: { maxWidth: 280, color: '#FFF9EF', fontFamily: typography.display, fontSize: 27, lineHeight: 31, fontWeight: '700', letterSpacing: -0.6 },
   sceneProgress: { flexDirection: 'row', gap: 5 },
   sceneProgressSegment: { flex: 1, height: 2, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.16)' },
@@ -998,7 +1012,7 @@ const styles = StyleSheet.create({
   choiceKey: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
   choiceKeyText: { color: colors.ink, fontFamily: typography.mono, fontSize: 13, fontWeight: '900' },
   choiceIntent: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 9, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
-  choiceLabel: { color: colors.storyInk, fontFamily: typography.display, fontSize: 21, lineHeight: 26, fontWeight: '700' },
+  choiceLabel: { color: colors.narrativeInk, fontFamily: typography.display, fontSize: 21, lineHeight: 26, fontWeight: '700' },
   choiceBottomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   choiceLight: { width: 34, height: 2, borderRadius: radius.pill, opacity: 0.82 },
   choiceState: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '800', letterSpacing: 0.8 },

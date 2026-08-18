@@ -33,16 +33,16 @@ export class UnavailableAccountDataClient implements AccountDataClient {
 
 function parseExport(value: Record<string, unknown>): AccountExportSnapshot {
   if (
-    value.schemaVersion !== 1 || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)) ||
-    !isRecord(value.preferences) || !isRecord(value.entitlement) || !Array.isArray(value.usage) || !Array.isArray(value.plots)
+    value.schemaVersion !== 2 || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)) ||
+    !isRecord(value.preferences) || !isRecord(value.entitlement) || !Array.isArray(value.usage) || !Array.isArray(value.dramas)
   ) throw new Error('Account export response is invalid.');
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     exportedAt: value.exportedAt,
     preferences: value.preferences,
     entitlement: value.entitlement,
     usage: value.usage,
-    plots: value.plots,
+    dramas: value.dramas,
   };
 }
 

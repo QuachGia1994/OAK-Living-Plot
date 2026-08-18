@@ -8,7 +8,7 @@ import { HttpAccountDataClient, UnavailableAccountDataClient } from '@/features/
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
-import type { NarratorVariant, StoryLocale, UiLocale } from '@/features/preferences/contracts';
+import type { DramaLocale, NarratorVariant, UiLocale } from '@/features/preferences/contracts';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
 import { DramaNavigationDock } from '@/ui/drama-navigation';
 import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
@@ -28,11 +28,11 @@ export default function SettingsScreen() {
   }, [apiBaseUrl, auth.configured, auth.getToken, auth.isLoaded, auth.isSignedIn]);
   const [preferenceDraft, setPreferenceDraft] = useState<Partial<{
     uiLocale: UiLocale;
-    storyLocale: StoryLocale;
+    dramaLocale: DramaLocale;
     narratorVariant: NarratorVariant;
   }>>({});
   const uiLocale = preferenceDraft.uiLocale ?? preferences.uiLocale;
-  const storyLocale = preferenceDraft.storyLocale ?? preferences.storyLocale;
+  const dramaLocale = preferenceDraft.dramaLocale ?? preferences.dramaLocale;
   const narratorVariant = preferenceDraft.narratorVariant ?? preferences.narratorVariant;
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<'preferences' | 'export' | 'delete' | 'signout' | 'health' | null>(null);
@@ -45,11 +45,11 @@ export default function SettingsScreen() {
     setBusy('preferences');
     setMessage(null);
     try {
-      await save({ uiLocale, storyLocale, narratorVariant });
+      await save({ uiLocale, dramaLocale, narratorVariant });
       setPreferenceDraft({});
       setMessage(uiLocale === 'vi'
-        ? 'Đã lưu tùy chọn. Cốt truyện hiện có vẫn giữ ngôn ngữ ban đầu.'
-        : 'Preferences saved. Existing plots keep their original story locale.');
+        ? 'Đã lưu tùy chọn. Drama hiện có vẫn giữ ngôn ngữ ban đầu.'
+        : 'Preferences saved. Existing dramas keep their original drama language.');
     } catch {
       setMessage(t('Preferences could not be saved.', 'Không thể lưu tùy chọn.'));
     } finally {
@@ -140,7 +140,7 @@ export default function SettingsScreen() {
       <View style={styles.settingsIntro}>
         <Text style={styles.settingsKicker}>{t('YOUR EXPERIENCE', 'TRẢI NGHIỆM CỦA BẠN')}</Text>
         <Text style={styles.settingsTitle}>{t('Make Living Plot feel like yours.', 'Biến Living Plot thành không gian của bạn.')}</Text>
-        <Text style={styles.settingsBody}>{t('Language and narration affect new scenes. Your existing story canon stays untouched.', 'Ngôn ngữ và giọng kể áp dụng cho cảnh mới. Cốt truyện đã có vẫn được giữ nguyên.')}</Text>
+        <Text style={styles.settingsBody}>{t('Language and narration affect new scenes. Your existing drama canon stays untouched.', 'Ngôn ngữ và giọng kể áp dụng cho cảnh mới. Cốt truyện đã có vẫn được giữ nguyên.')}</Text>
       </View>
 
       <DramaNavigationDock
@@ -155,14 +155,14 @@ export default function SettingsScreen() {
       {preferenceError ? <ErrorState title={t('Preferences unavailable', 'Tùy chọn không khả dụng')} message={locale === 'vi' ? t('Preferences could not be loaded.', 'Không thể tải tùy chọn.') : preferenceError} /> : null}
 
       <View style={styles.section}>
-        <SectionHeader index="01" title={t('Story defaults', 'Mặc định câu chuyện')} meta={t('NEW REQUESTS', 'YÊU CẦU MỚI')} />
+        <SectionHeader index="01" title={t('Drama defaults', 'Mặc định drama')} meta={t('NEW REQUESTS', 'YÊU CẦU MỚI')} />
         <PreferenceRow label={t('Interface language', 'Ngôn ngữ giao diện')}>
-          <Option locale={locale} label="English" selected={uiLocale === 'en'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'en', storyLocale: 'en-US', narratorVariant: 'en-narrator-female' }))} />
-          <Option locale={locale} label="Tiếng Việt" selected={uiLocale === 'vi'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'vi', storyLocale: 'vi-VN', narratorVariant: 'vi-narrator-female' }))} />
+          <Option locale={locale} label="English" selected={uiLocale === 'en'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'en', dramaLocale: 'en-US', narratorVariant: 'en-narrator-female' }))} />
+          <Option locale={locale} label="Tiếng Việt" selected={uiLocale === 'vi'} onPress={() => setPreferenceDraft((current) => ({ ...current, uiLocale: 'vi', dramaLocale: 'vi-VN', narratorVariant: 'vi-narrator-female' }))} />
         </PreferenceRow>
-        <PreferenceRow label={t('New story language', 'Ngôn ngữ câu chuyện mới')}>
-          <Option locale={locale} label="English" selected={storyLocale === 'en-US'} onPress={() => setPreferenceDraft((current) => ({ ...current, storyLocale: 'en-US' }))} />
-          <Option locale={locale} label="Tiếng Việt" selected={storyLocale === 'vi-VN'} onPress={() => setPreferenceDraft((current) => ({ ...current, storyLocale: 'vi-VN' }))} />
+        <PreferenceRow label={t('New drama language', 'Ngôn ngữ drama mới')}>
+          <Option locale={locale} label="English" selected={dramaLocale === 'en-US'} onPress={() => setPreferenceDraft((current) => ({ ...current, dramaLocale: 'en-US' }))} />
+          <Option locale={locale} label="Tiếng Việt" selected={dramaLocale === 'vi-VN'} onPress={() => setPreferenceDraft((current) => ({ ...current, dramaLocale: 'vi-VN' }))} />
         </PreferenceRow>
         <PreferenceRow label={t('Narrator', 'Giọng kể')}>
           <Option locale={locale} label={t('English female', 'Nữ tiếng Anh')} selected={narratorVariant === 'en-narrator-female'} onPress={() => setPreferenceDraft((current) => ({ ...current, narratorVariant: 'en-narrator-female' }))} />
@@ -178,9 +178,9 @@ export default function SettingsScreen() {
           <Pill tone={account.configured ? 'success' : 'neutral'}>{account.configured ? t('Connected', 'Đã kết nối') : t('Preview only', 'Chỉ xem trước')}</Pill>
         </View>
         <View style={styles.policyGrid}>
-          <PolicyTile kicker={t('STORIES', 'CỐT TRUYỆN')} title={t('Your story history', 'Lịch sử câu chuyện')} body={t('Stories and locked choices stay attached to your account.', 'Câu chuyện và lựa chọn đã chốt luôn gắn với tài khoản của bạn.')} />
+          <PolicyTile kicker={t('DRAMAS', 'DRAMA')} title={t('Your drama history', 'Lịch sử drama')} body={t('Dramas and locked choices stay attached to your account.', 'Drama và lựa chọn đã chốt luôn gắn với tài khoản của bạn.')} />
           <PolicyTile kicker={t('VOICE', 'GIỌNG ĐỌC')} title={t('Private narration', 'Giọng đọc riêng tư')} body={t('Generated narration remains private and is cleaned up with your account.', 'Giọng đọc đã tạo được giữ riêng tư và dọn cùng tài khoản của bạn.')} />
-          <PolicyTile kicker={t('PRIVACY', 'RIÊNG TƯ')} title={t('No story text in analytics', 'Không đưa nội dung truyện vào analytics')} body={t('Exports exclude auth tokens, provider secrets, telemetry rows and private object keys.', 'Bản xuất loại trừ token, secret nhà cung cấp, telemetry và khóa object riêng tư.')} />
+          <PolicyTile kicker={t('PRIVACY', 'RIÊNG TƯ')} title={t('No drama text in analytics', 'Không đưa nội dung drama vào analytics')} body={t('Exports exclude auth tokens, provider secrets, telemetry rows and private object keys.', 'Bản xuất loại trừ token, secret nhà cung cấp, telemetry và khóa object riêng tư.')} />
         </View>
         <ActionButton label={t('Export my Living Plot data', 'Xuất dữ liệu Living Plot của tôi')} variant="secondary" busy={busy === 'export'} disabled={!account.configured} onPress={() => void exportData()} />
       </View>
@@ -193,7 +193,7 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.dangerSignal} />
         </View>
-        <Text style={styles.dangerBody}>{t('Private narration is cleaned up before your story data is erased. Type the exact phrase to unlock the action.', 'Giọng đọc riêng tư được dọn trước khi dữ liệu câu chuyện bị xóa. Nhập chính xác cụm từ để mở khóa thao tác.')}</Text>
+        <Text style={styles.dangerBody}>{t('Private narration is cleaned up before your drama data is erased. Type the exact phrase to unlock the action.', 'Giọng đọc riêng tư được dọn trước khi dữ liệu drama bị xóa. Nhập chính xác cụm từ để mở khóa thao tác.')}</Text>
         <View style={styles.confirmDock}>
           <Text style={styles.confirmLabel}>{t('CONFIRMATION PHRASE', 'CỤM TỪ XÁC NHẬN')}</Text>
           <Text style={styles.confirmPhrase}>{ACCOUNT_DELETE_CONFIRMATION}</Text>
@@ -248,7 +248,7 @@ export default function SettingsScreen() {
             <ActionButton label={t('Check API health', 'Kiểm tra API')} variant="secondary" busy={busy === 'health'} disabled={!apiBaseUrl} onPress={() => void checkHealth()} style={styles.flexAction} />
             <ActionButton label={t('Share diagnostics', 'Chia sẻ chẩn đoán')} variant="ghost" onPress={() => void Share.share({ message: diagnostics })} style={styles.flexAction} />
           </View>
-          <Text style={styles.compactNote}>{t('No tokens, internal user IDs, API URL, story text or secret values are included.', 'Không gồm token, ID người dùng nội bộ, URL API, nội dung truyện hay secret.')}</Text>
+          <Text style={styles.compactNote}>{t('No tokens, internal user IDs, API URL, drama text or secret values are included.', 'Không gồm token, ID người dùng nội bộ, URL API, nội dung drama hay secret.')}</Text>
         </View>
       ) : null}
 
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   dangerKicker: { color: colors.danger, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
   dangerTitle: { marginTop: spacing.xs, color: colors.ink, fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700' },
   dangerSignal: { width: 34, height: 3, borderRadius: radius.pill, backgroundColor: colors.danger },
-  dangerBody: { color: colors.storyInk, fontSize: 12, lineHeight: 19 },
+  dangerBody: { color: colors.narrativeInk, fontSize: 12, lineHeight: 19 },
   confirmDock: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.background },
   confirmLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
   confirmPhrase: { color: colors.danger, fontFamily: typography.mono, fontSize: 11, lineHeight: 18, fontWeight: '900', letterSpacing: 0.55 },

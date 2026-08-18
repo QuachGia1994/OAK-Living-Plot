@@ -13,7 +13,7 @@ describe('retention snapshot', () => {
 
     expect(snapshot.currentStreakDays).toBe(3);
     expect(snapshot.choicesMade).toBe(6);
-    expect(snapshot.activePlots).toBe(4);
+    expect(snapshot.activeDramas).toBe(4);
   });
 
   it('keeps a yesterday streak alive but resets after a gap', () => {
