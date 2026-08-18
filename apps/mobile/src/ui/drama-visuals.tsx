@@ -557,9 +557,9 @@ function CharacterPortrait({
     ]}>
       <View style={[styles.portraitAura, { backgroundColor: tone.rim, borderColor: clothingAccent }]} />
       <Image
-        source={require('../../assets/living-plot-scene-lead-01.png')}
+        source={require('../../assets/living-plot-scene-mina-3d.jpg')}
         style={styles.portraitArtwork}
-        resizeMode="contain"
+        resizeMode="cover"
         accessibilityIgnoresInvertColors
       />
     </View>
@@ -924,14 +924,6 @@ const styles = StyleSheet.create({
   portraitRight: { right: -24 },
   portraitAura: { position: 'absolute', top: 34, width: 230, height: 300, borderRadius: 116, borderWidth: StyleSheet.hairlineWidth, opacity: 0.16 },
   portraitArtwork: { width: '100%', height: '100%' },
-  characterRig: { position: 'absolute', bottom: 128, width: 190, height: 330, alignItems: 'center' },
-  characterRigCompact: { bottom: 54, transform: [{ scale: 0.72 }] },
-  characterLeft: { left: 18 },
-  characterRight: { right: 18 },
-  characterRimBody: { position: 'absolute', bottom: -2, width: 154, height: 250, borderTopLeftRadius: 82, borderTopRightRadius: 82, opacity: 0.5 },
-  characterBody: { position: 'absolute', bottom: 0, width: 146, height: 248, borderTopLeftRadius: 78, borderTopRightRadius: 78, backgroundColor: '#070707' },
-  characterRimHead: { position: 'absolute', top: 0, width: 94, height: 94, borderRadius: 47, opacity: 0.56 },
-  characterHead: { position: 'absolute', top: 4, width: 88, height: 88, borderRadius: 44, backgroundColor: '#060606' },
   signalRig: { position: 'absolute', top: 170, right: 38, width: 96, height: 168, alignItems: 'center', justifyContent: 'center' },
   signalHalo: { position: 'absolute', width: 132, height: 132, borderRadius: 66, opacity: 0.14 },
   signalDevice: { width: 72, height: 132, gap: 10, paddingHorizontal: 12, paddingTop: 24, borderRadius: 16, borderWidth: 1, backgroundColor: 'rgba(3,3,3,0.72)' },
