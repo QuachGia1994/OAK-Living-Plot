@@ -286,7 +286,7 @@ The cinematic redesign is considered complete after that exact-SHA native gate. 
 
 The screenshot-based product review exposed two gaps in the earlier RC: visual hierarchy was still too close to an editorial reader, and preview mode could mix Vietnamese UI with English story content. Stage C corrects both without changing canonical backend story rules.
 
-- Preview story clients are keyed by both `uiLocale` and `storyLocale`; `storyLocale` now controls the seed plot, Episode 1, continuation episodes, choices, intents and consequences.
+- Preview story clients are keyed by both `uiLocale` and `storyLocale`, but share one preview story state so changing preferences does not hide existing plots. `storyLocale` controls the locale-specific seed and new Episode 1 content, while each created plot records its original story locale for all later continuation episodes.
 - Vietnamese preview content now includes the seed story, Daily Spark, episode titles/body/summary, branch labels and `Vừa xong` metadata instead of falling back to English.
 - Preview preferences persist through SecureStore so a selected Vietnamese experience survives app relaunch in unsigned/APK test builds.
 - Selecting Vietnamese UI sets Vietnamese story/narrator defaults in the same draft operation; story and narrator remain independently adjustable afterward.

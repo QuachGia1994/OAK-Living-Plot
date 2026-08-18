@@ -14,23 +14,28 @@ import { StoryClientError } from './contracts';
 import type { StoryLocale, UiLocale } from '@/features/preferences/contracts';
 import { hasDraftErrors, normalizePlotDraft, validatePlotDraft } from './draft';
 
-export class PreviewStoryExperienceClient implements StoryExperienceClient {
-  private readonly plots = new Map<string, StoryPlotSession>();
-  private readonly archivedPlotIds = new Set<string>();
-  private readonly histories = new Map<string, StoryHistoryItem[]>();
-  private createdPlotCount = 0;
+const PREVIEW_SEED_PLOT_ID = 'preview-midnight-message';
 
+export class PreviewStoryExperienceState {
+  readonly createdPlots = new Map<string, StoryPlotSession>();
+  readonly seedPlots = new Map<StoryLocale, StoryPlotSession>();
+  readonly archivedPlotIds = new Set<string>();
+  readonly histories = new Map<string, StoryHistoryItem[]>();
+  readonly plotLocales = new Map<string, StoryLocale>();
+  createdPlotCount = 0;
+}
+
+export class PreviewStoryExperienceClient implements StoryExperienceClient {
   constructor(
     private readonly uiLocale: UiLocale = 'en',
     private readonly storyLocale: StoryLocale = uiLocale === 'vi' ? 'vi-VN' : 'en-US',
+    private readonly state = new PreviewStoryExperienceState(),
   ) {
-    const seeded = createSeedPlot(storyLocale);
-    this.plots.set(seeded.id, seeded);
-    this.histories.set(seeded.id, [historyItem(seeded.episode)]);
+    this.ensureSeedPlot();
   }
 
   async loadHome(): Promise<StoryHomeSnapshot> {
-    const active = [...this.plots.values()].filter((plot) => !this.archivedPlotIds.has(plot.id));
+    const active = this.allPlots().filter((plot) => !this.state.archivedPlotIds.has(plot.id));
     return {
       recentPlots: active.map((plot) => toSummary(plot, this.uiLocale)).reverse(),
       quota: {
@@ -50,10 +55,10 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
   }
 
   async loadLibrary(): Promise<StoryLibrarySnapshot> {
-    const summaries = [...this.plots.values()].map((plot) => toSummary(plot, this.uiLocale)).reverse();
+    const summaries = this.allPlots().map((plot) => toSummary(plot, this.uiLocale)).reverse();
     return {
-      active: summaries.filter((plot) => !this.archivedPlotIds.has(plot.id)),
-      archived: summaries.filter((plot) => this.archivedPlotIds.has(plot.id)),
+      active: summaries.filter((plot) => !this.state.archivedPlotIds.has(plot.id)),
+      archived: summaries.filter((plot) => this.state.archivedPlotIds.has(plot.id)),
     };
   }
 
@@ -63,8 +68,8 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
       throw new StoryClientError('invalid_input', 'The plot setup is incomplete.');
     }
 
-    this.createdPlotCount += 1;
-    const plotId = `preview-created-${this.createdPlotCount}`;
+    this.state.createdPlotCount += 1;
+    const plotId = `preview-created-${this.state.createdPlotCount}`;
     const session: StoryPlotSession = {
       id: plotId,
       title: titleFromPremise(normalized.premise),
@@ -73,8 +78,9 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
       characterName: normalized.characterName,
       episode: buildFirstEpisode(plotId, normalized, this.storyLocale),
     };
-    this.plots.set(plotId, session);
-    this.histories.set(plotId, [historyItem(session.episode)]);
+    this.state.createdPlots.set(plotId, session);
+    this.state.plotLocales.set(plotId, this.storyLocale);
+    this.state.histories.set(plotId, [historyItem(session.episode)]);
     return cloneSession(session);
   }
 
@@ -84,19 +90,19 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
 
   async loadHistory(plotId: string): Promise<StoryHistorySnapshot> {
     const plot = this.requirePlot(plotId);
-    const items = this.histories.get(plotId) ?? [historyItem(plot.episode)];
+    const items = this.state.histories.get(this.historyKey(plotId)) ?? [historyItem(plot.episode)];
     return { plotId, title: plot.title, items: items.map((item) => ({ ...item })) };
   }
 
   async archivePlot(plotId: string): Promise<StoryPlotSummary> {
     const plot = this.requirePlot(plotId);
-    this.archivedPlotIds.add(plotId);
+    this.state.archivedPlotIds.add(plotId);
     return toSummary(plot, this.uiLocale);
   }
 
   async restorePlot(plotId: string): Promise<StoryPlotSummary> {
     const plot = this.requirePlot(plotId);
-    this.archivedPlotIds.delete(plotId);
+    this.state.archivedPlotIds.delete(plotId);
     return toSummary(plot, this.uiLocale);
   }
 
@@ -130,29 +136,54 @@ export class PreviewStoryExperienceClient implements StoryExperienceClient {
     }
 
     const previous = plot.episode;
-    plot.episode = buildContinuationEpisode(plot, previous, this.storyLocale);
-    const items = this.histories.get(plotId) ?? [];
+    plot.episode = buildContinuationEpisode(plot, previous, this.storyLocaleForPlot(plotId));
+    const key = this.historyKey(plotId);
+    const items = this.state.histories.get(key) ?? [];
     items.push(historyItem(plot.episode));
-    this.histories.set(plotId, items);
+    this.state.histories.set(key, items);
     return cloneSession(plot);
   }
 
   private replaceCurrentHistory(plotId: string, item: StoryHistoryItem): void {
-    const items = this.histories.get(plotId) ?? [];
+    const key = this.historyKey(plotId);
+    const items = this.state.histories.get(key) ?? [];
     if (items.length === 0) items.push(item);
     else items[items.length - 1] = item;
-    this.histories.set(plotId, items);
+    this.state.histories.set(key, items);
   }
 
   private requireActivePlot(plotId: string): StoryPlotSession {
-    if (this.archivedPlotIds.has(plotId)) throw new StoryClientError('not_found', 'Archived stories are read-only until restored.');
+    if (this.state.archivedPlotIds.has(plotId)) throw new StoryClientError('not_found', 'Archived stories are read-only until restored.');
     return this.requirePlot(plotId);
   }
 
   private requirePlot(plotId: string): StoryPlotSession {
-    const plot = this.plots.get(plotId);
+    const plot = plotId === PREVIEW_SEED_PLOT_ID
+      ? this.state.seedPlots.get(this.storyLocale)
+      : this.state.createdPlots.get(plotId);
     if (!plot) throw new StoryClientError('not_found', 'This story could not be found.');
     return plot;
+  }
+
+  private allPlots(): StoryPlotSession[] {
+    const seed = this.state.seedPlots.get(this.storyLocale);
+    return [...this.state.createdPlots.values(), ...(seed ? [seed] : [])];
+  }
+
+  private ensureSeedPlot(): void {
+    if (this.state.seedPlots.has(this.storyLocale)) return;
+    const seeded = createSeedPlot(this.storyLocale);
+    this.state.seedPlots.set(this.storyLocale, seeded);
+    this.state.histories.set(this.historyKey(seeded.id), [historyItem(seeded.episode)]);
+  }
+
+  private historyKey(plotId: string): string {
+    return plotId === PREVIEW_SEED_PLOT_ID ? `${this.storyLocale}:${plotId}` : plotId;
+  }
+
+  private storyLocaleForPlot(plotId: string): StoryLocale {
+    if (plotId === PREVIEW_SEED_PLOT_ID) return this.storyLocale;
+    return this.state.plotLocales.get(plotId) ?? this.storyLocale;
   }
 }
 
@@ -171,7 +202,7 @@ function previewDailyPrompt(storyLocale: StoryLocale): StoryHomeSnapshot['retent
 }
 
 function createSeedPlot(storyLocale: StoryLocale): StoryPlotSession {
-  const plotId = 'preview-midnight-message';
+  const plotId = PREVIEW_SEED_PLOT_ID;
   const vi = storyLocale === 'vi-VN';
   const episodeId = `${plotId}-episode-1`;
   return {

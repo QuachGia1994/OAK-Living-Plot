@@ -3,8 +3,9 @@ import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
 import type { StoryExperienceClient } from './contracts';
 import { AuthRequiredStoryExperienceClient, HttpStoryExperienceClient } from './http-client';
-import { PreviewStoryExperienceClient } from './preview-client';
+import { PreviewStoryExperienceClient, PreviewStoryExperienceState } from './preview-client';
 
+const previewState = new PreviewStoryExperienceState();
 const previewClients = new Map<string, PreviewStoryExperienceClient>();
 const defaultPreviewClient = previewClientFor('en', 'en-US');
 const authRequiredClient = new AuthRequiredStoryExperienceClient();
@@ -31,7 +32,7 @@ function previewClientFor(uiLocale: 'en' | 'vi', storyLocale: 'en-US' | 'vi-VN')
   const key = `${uiLocale}:${storyLocale}`;
   const existing = previewClients.get(key);
   if (existing) return existing;
-  const client = new PreviewStoryExperienceClient(uiLocale, storyLocale);
+  const client = new PreviewStoryExperienceClient(uiLocale, storyLocale, previewState);
   previewClients.set(key, client);
   return client;
 }

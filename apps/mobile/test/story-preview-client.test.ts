@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PreviewStoryExperienceClient } from '../src/features/story/preview-client';
+import { PreviewStoryExperienceClient, PreviewStoryExperienceState } from '../src/features/story/preview-client';
 
 describe('PreviewStoryExperienceClient', () => {
   it('exposes a resumable recent plot with exactly three choices', async () => {
@@ -145,5 +145,28 @@ describe('PreviewStoryExperienceClient', () => {
     expect(next.episode.title).toBe('Hậu Quả Ập Đến');
     expect(next.episode.body).toContain(committed.episode.committedConsequence);
     expect(next.episode.summary).toContain('Tập 2');
+  });
+
+  it('preserves existing preview plots and their original story locale when preferences switch', async () => {
+    const state = new PreviewStoryExperienceState();
+    const english = new PreviewStoryExperienceClient('en', 'en-US', state);
+    const created = await english.createPlot({
+      premise: 'A singer hears tomorrow’s apology hidden inside tonight’s rehearsal recording.',
+      mood: 'mysterious',
+      characterName: 'June',
+    });
+    const committed = await english.commitChoice(created.id, created.episode.id, created.episode.choices[0].id);
+
+    const vietnamese = new PreviewStoryExperienceClient('vi', 'vi-VN', state);
+    const visibleAfterSwitch = await vietnamese.loadPlot(created.id);
+    const homeAfterSwitch = await vietnamese.loadHome();
+    const next = await vietnamese.requestNextEpisode(created.id);
+
+    expect(visibleAfterSwitch.id).toBe(created.id);
+    expect(homeAfterSwitch.recentPlots.some((plot) => plot.id === created.id)).toBe(true);
+    expect(homeAfterSwitch.recentPlots.find((plot) => plot.id === created.id)?.updatedLabel).toBe('Vừa xong');
+    expect(next.episode.body).toContain(committed.episode.committedConsequence);
+    expect(next.episode.title).toBe('The Consequence Arrives');
+    expect(next.episode.summary).toContain('Episode 2');
   });
 });
