@@ -3,7 +3,12 @@ import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { DramaClientError, type DramaClientErrorCode } from './contracts';
 import type { Drama } from './domain';
 import { useDramaExperienceClient } from './drama-client-context';
-import { derivePlaybackState, type PlaybackAction } from './playback-state';
+import {
+  derivePlaybackState,
+  releasePlaybackAction,
+  tryAcquirePlaybackAction,
+  type PlaybackAction,
+} from './playback-state';
 
 export type DramaFailureSource = 'load' | 'refresh' | 'commit_choice' | 'continue';
 
@@ -16,6 +21,7 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
   const client = useDramaExperienceClient();
   const currentSceneId = useRef<string | null>(null);
   const loadVersion = useRef(0);
+  const actionLock = useRef<PlaybackAction>(null);
   const [drama, setDrama] = useState<Drama | null>(null);
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
   const [sceneComplete, setSceneComplete] = useState(false);
@@ -74,7 +80,7 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
   }, [input.enabled, load]);
 
   const commitChoice = useCallback(async () => {
-    if (!drama || !selectedChoiceId || action) return;
+    if (!drama || !selectedChoiceId || !tryAcquirePlaybackAction(actionLock, 'commit_choice')) return;
     setAction('commit_choice');
     setFailure(null);
     try {
@@ -83,12 +89,13 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
     } catch (error) {
       setFailure(toFailure('commit_choice', error));
     } finally {
+      releasePlaybackAction(actionLock, 'commit_choice');
       setAction(null);
     }
-  }, [action, adoptDrama, client, drama, selectedChoiceId]);
+  }, [adoptDrama, client, drama, selectedChoiceId]);
 
   const continueDrama = useCallback(async () => {
-    if (!drama || action || drama.currentScene.branch.state !== 'committed') return;
+    if (!drama || drama.currentScene.branch.state !== 'committed' || !tryAcquirePlaybackAction(actionLock, 'continue')) return;
     setAction('continue');
     setFailure(null);
     try {
@@ -96,9 +103,10 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
     } catch (error) {
       setFailure(toFailure('continue', error));
     } finally {
+      releasePlaybackAction(actionLock, 'continue');
       setAction(null);
     }
-  }, [action, adoptDrama, client, drama]);
+  }, [adoptDrama, client, drama]);
 
   const markSceneComplete = useCallback(() => setSceneComplete(true), []);
 

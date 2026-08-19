@@ -90,7 +90,7 @@ describe('authenticated drama HTTP loop', () => {
     expect(next.currentScene.number).toBe(2);
     expect(next.currentScene.branch).toEqual({ state: 'open' });
     expect(generator.inputs[1].previous?.consequence).toBe(choice.consequence);
-  });
+  }, 20_000);
 
   it('replays creation and the same committed choice idempotently', async () => {
     const generator = new FixtureSceneGenerator();

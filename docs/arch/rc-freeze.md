@@ -27,10 +27,11 @@ Frozen surfaces: Home, Create, Playback A/B/C, Library, Settings, Plus, LP brand
 - Quota cannot double-charge: reservation key + ledger transitions; release on provider failure.
 - Voice replay: existing non-failed `audio_assets` returns without new reservation.
 - Voice configuration != auth session: public API URL + Clerk configuration select the authenticated HTTP voice client; a missing session surfaces `auth_required`, while only an intentionally unconfigured preview uses the unavailable client.
+- Session ownership is fail-closed: auth loading/sign-out/account change changes the keyed authenticated runtime owner, unmounting prior Drama playback and private narration state before another principal can render it.
 - Navigation params carry identity only (`dramaId`), not business DB.
 
 ## Client concurrency
-`useDramaPlayback` gates `commitChoice` / `continueDrama` on `action !== null` so double-tap cannot start parallel mutations.
+`useDramaPlayback` acquires a synchronous ref-backed playback-action lock before updating React presentation state. `commitChoice` / `continueDrama` therefore reject a second tap in the same render tick as well as later taps while a mutation is in flight.
 
 ## Platform
 - Android: `DynamicColorIOS` only under `Platform.OS === 'ios'`.

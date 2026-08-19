@@ -87,6 +87,9 @@ All notable changes to Living Plot will be documented in this file.
 - Narrative prompt guidance now keeps the canonical protagonist visible, requires durable scene progress, and keeps narrative/branch output in the requested locale.
 
 ### Fixed
+- Closed the same-render double-action race in Drama playback: commit/continue now acquire a synchronous action lock before React rerenders, so rapid taps cannot start parallel canonical mutations.
+- Closed RC session ownership leakage: sign-out, auth loading transitions, and Clerk account changes now remount the session-owned runtime so stale canonical Drama state and already-loaded private narration cannot survive across principals; added ownership regression coverage.
+- Repaired the live beta smoke runner after Drama/Scene/Media canonicalization: it now exercises `/v1/dramas`, `/v1/scenes/:sceneId/voice`, and `/v1/media/:assetId` DTOs instead of removed Story/Plot/Episode/audio routes.
 - Closed the RC voice-client state gap: configured builds now keep the authenticated HTTP voice client before sign-in and surface `auth_required` truthfully, while deliberately unconfigured preview builds show a neutral unavailable state without a dead generate action; TTS architecture docs now match the current `/v1/scenes/:sceneId/voice` and `/v1/media/:assetId` routes.
 - Replaced the shared `SceneArtwork` flat face/hair/eyes primitive rig with bundled shaded anime character artwork, so story playback and every drama surface using that renderer no longer show the old geometric portrait; Plus now uses the same replacement artwork.
 - Aligned Free/Plus quota metrics on one typographic baseline and constrained Vietnamese Settings privacy/delete-data headers so long copy wraps cleanly without the old danger signal protruding beyond its card.

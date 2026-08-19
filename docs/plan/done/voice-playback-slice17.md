@@ -2,11 +2,13 @@
 
 Status: COMPLETE WITH LIVE PROVIDER SMOKE BLOCKED
 
+> route vocabulary synchronized 2026-08-19 · 0.0.0
+
 ## Scope
 Connected the existing private TTS/R2 lifecycle to the Expo story experience while keeping text canonical and independently usable.
 
 ## Implemented
-- Added owner-scoped JSON `GET /v1/audio/:assetId/status` for safe polling.
+- Added owner-scoped JSON `GET /v1/media/:assetId/status` for safe polling, with private bytes at `GET /v1/media/:assetId`.
 - Added authenticated mobile audio request/status/playback client.
 - Added Expo Audio playback with Authorization headers, progress, pause, replay, pending polling, and graceful failure copy.
 - Preserved server voice-quota and approved-voice authority.

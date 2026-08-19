@@ -29,13 +29,13 @@ describe('AuthenticatedJsonTransport', () => {
       return reads === 1 ? Response.json({ error: 'temporary' }, { status: 503 }) : Response.json({ value: 'ready' });
     });
     const readTransport = new AuthenticatedJsonTransport('https://api.test', async () => 'token', readFetcher, 100);
-    const read = await readTransport.request('/v1/story/home', 'GET');
+    const read = await readTransport.request('/v1/dramas/home', 'GET');
     expect(read.status).toBe(200);
     expect(readFetcher).toHaveBeenCalledTimes(2);
 
     const writeFetcher = vi.fn<TestFetch>(async () => { throw new Error('response lost'); });
     const writeTransport = new AuthenticatedJsonTransport('https://api.test', async () => 'token', writeFetcher, 100);
-    await expect(writeTransport.request('/v1/story/plots', 'POST', { creationKey: 'stable' })).rejects.toMatchObject({ code: 'network' });
+    await expect(writeTransport.request('/v1/dramas', 'POST', { creationKey: 'stable' })).rejects.toMatchObject({ code: 'network' });
     expect(writeFetcher).toHaveBeenCalledTimes(1);
   });
 
@@ -45,7 +45,7 @@ describe('AuthenticatedJsonTransport', () => {
     }));
     const transport = new AuthenticatedJsonTransport('https://api.test', async () => 'token', fetcher, 5);
 
-    await expect(transport.request('/v1/story/plots', 'POST', {})).rejects.toEqual(
+    await expect(transport.request('/v1/dramas', 'POST', {})).rejects.toEqual(
       new HttpTransportError('timeout', 'The request timed out.'),
     );
     expect(fetcher).toHaveBeenCalledTimes(1);

@@ -1,6 +1,21 @@
 import type { Drama } from './domain';
 
 export type PlaybackAction = 'commit_choice' | 'continue' | null;
+export type ActivePlaybackAction = Exclude<PlaybackAction, null>;
+
+export interface PlaybackActionLock {
+  current: PlaybackAction;
+}
+
+export function tryAcquirePlaybackAction(lock: PlaybackActionLock, action: ActivePlaybackAction): boolean {
+  if (lock.current !== null) return false;
+  lock.current = action;
+  return true;
+}
+
+export function releasePlaybackAction(lock: PlaybackActionLock, action: ActivePlaybackAction): void {
+  if (lock.current === action) lock.current = null;
+}
 
 export type PlaybackState =
   | { phase: 'restoring' }

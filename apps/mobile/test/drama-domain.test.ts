@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Drama } from '../src/features/drama/domain';
-import { derivePlaybackState } from '../src/features/drama/playback-state';
+import {
+  derivePlaybackState,
+  releasePlaybackAction,
+  tryAcquirePlaybackAction,
+  type PlaybackActionLock,
+} from '../src/features/drama/playback-state';
 
 const openDrama: Drama = {
   id: 'drama-1',
@@ -85,5 +90,18 @@ describe('drama playback domain', () => {
         action: 'commit_choice',
       }),
     ).toEqual({ phase: 'committing_choice' });
+  });
+
+  it('serializes commit and continue synchronously before React can rerender', () => {
+    const lock: PlaybackActionLock = { current: null };
+
+    expect(tryAcquirePlaybackAction(lock, 'commit_choice')).toBe(true);
+    expect(tryAcquirePlaybackAction(lock, 'commit_choice')).toBe(false);
+    expect(tryAcquirePlaybackAction(lock, 'continue')).toBe(false);
+
+    releasePlaybackAction(lock, 'commit_choice');
+    expect(tryAcquirePlaybackAction(lock, 'continue')).toBe(true);
+    releasePlaybackAction(lock, 'continue');
+    expect(lock.current).toBeNull();
   });
 });

@@ -3,28 +3,24 @@ import { SceneVoiceClientError } from '../src/features/audio/contracts';
 import { HttpSceneVoiceClient, UnavailableSceneVoiceClient } from '../src/features/audio/http-audio-client';
 
 describe('HttpSceneVoiceClient', () => {
-  it('requests and polls private scene voice with fresh bearer tokens', async () => {
-    const tokens = ['token-one', 'token-two'];
+  it('uses a fresh bearer token for request, status, and private playback source', async () => {
+    const tokens = ['token-one', 'token-two', 'token-three'];
     const getToken = vi.fn(async () => tokens.shift() ?? null);
     const fetcher = vi.fn<TestFetch>(async () => Response.json({ media: mediaPayload('queued') }, { status: 202 }));
     const client = new HttpSceneVoiceClient('https://api.test/', getToken, fetcher);
 
     await client.request('scene-1', 'vi-narrator-female', 'voice-stable-001');
     await client.loadStatus('media-1');
+    await expect(client.playbackSource('media-1')).resolves.toEqual({
+      uri: 'https://api.test/v1/media/media-1',
+      headers: { Authorization: 'Bearer token-three' },
+    });
 
-    expect(getToken).toHaveBeenCalledTimes(2);
+    expect(getToken).toHaveBeenCalledTimes(3);
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer token-one');
     expect(new Headers(fetcher.mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer token-two');
     expect(String(fetcher.mock.calls[0][0])).toBe('https://api.test/v1/scenes/scene-1/voice');
     expect(String(fetcher.mock.calls[1][0])).toBe('https://api.test/v1/media/media-1/status');
-  });
-
-  it('builds an authenticated media source without exposing a public URL', async () => {
-    const client = new HttpSceneVoiceClient('https://api.test', async () => 'private-token', vi.fn());
-    await expect(client.playbackSource('media-1')).resolves.toEqual({
-      uri: 'https://api.test/v1/media/media-1',
-      headers: { Authorization: 'Bearer private-token' },
-    });
   });
 
   it('rejects persistence-only media states at the product boundary', async () => {

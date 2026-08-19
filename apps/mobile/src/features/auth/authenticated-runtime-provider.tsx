@@ -4,6 +4,7 @@ import type { BillingSession } from '@/features/billing/contracts';
 import { DramaExperienceClientProvider } from '@/features/drama/drama-client-context';
 import { loadBackendUserId } from './backend-identity';
 import { useMobileAuth } from './mobile-auth-context';
+import { runtimeOwnershipKey } from './runtime-ownership';
 
 export function AuthenticatedRuntimeProvider({ children }: { children: ReactNode }) {
   const auth = useMobileAuth();
@@ -28,6 +29,14 @@ export function AuthenticatedRuntimeProvider({ children }: { children: ReactNode
     return { appUserId: resolvedIdentity.appUserId, getBearerToken: auth.getToken };
   }, [auth.clerkUserId, auth.getToken, auth.isSignedIn, resolvedIdentity]);
 
+  return (
+    <SessionOwnedRuntime key={runtimeOwnershipKey(apiBaseUrl, auth)} billingSession={billingSession}>
+      {children}
+    </SessionOwnedRuntime>
+  );
+}
+
+function SessionOwnedRuntime({ children, billingSession }: { children: ReactNode; billingSession: BillingSession | null }) {
   return (
     <BillingSessionProvider session={billingSession}>
       <DramaExperienceClientProvider>{children}</DramaExperienceClientProvider>

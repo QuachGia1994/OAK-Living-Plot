@@ -2,6 +2,8 @@
 
 Status: COMPLETE — STOP GATE PASSED
 
+> route vocabulary synchronized 2026-08-19 · 0.0.0
+
 ## Scope
 Connect the Expo core loop to authenticated canonical Living Plot state. Add Clerk Expo identity, internal-user resolution, protected live-story HTTP orchestration, idempotent mobile plot creation, and shared internal identity for RevenueCat while preserving the existing server-authoritative auth/quota/entitlement/publication/choice boundaries. Preserve uncommitted Slice 8–12 work. Do not provision/deploy production infrastructure, run real store purchases, submit stores, commit, or push.
 
@@ -14,12 +16,12 @@ Connect the Expo core loop to authenticated canonical Living Plot state. Add Cle
 - Billing backend refresh now asks Clerk for a current bearer token per request instead of retaining a session JWT string indefinitely.
 - Added migration `0007_live_story_integration.sql` with per-user `creation_key` idempotency plus persisted plot locale and initial mood.
 - Added owner-scoped D1 live-story repository and orchestration service.
-- Added protected core-loop endpoints:
-  - `GET /v1/story/home`;
-  - `POST /v1/story/plots`;
-  - `GET /v1/story/plots/:plotId`;
-  - `POST /v1/story/plots/:plotId/episodes`;
-  - `POST /v1/story/plots/:plotId/episodes/:episodeId/choices/:choiceId`.
+- Added protected core-loop endpoints, now canonicalized as:
+  - `GET /v1/dramas/home`;
+  - `POST /v1/dramas`;
+  - `GET /v1/dramas/:dramaId`;
+  - `POST /v1/dramas/:dramaId/scenes`;
+  - `POST /v1/dramas/:dramaId/scenes/:sceneId/choices/:choiceId`.
 - Client body cannot select `userId` or authoritative plot state version; owner comes from verified Clerk/internal-user mapping and choice state version is derived from D1.
 - First/next text generation resolves backend Free/Plus, reserves text quota, invokes the current Gemini 3.5 Flash-Lite provider boundary, atomically publishes through `D1EpisodePublisher`, then consumes quota; provider/publication failure releases quota.
 - Lost-response/retry paths converge on an existing ready episode instead of double-generation/double-charge.

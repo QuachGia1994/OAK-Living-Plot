@@ -2,6 +2,8 @@
 
 Status: COMPLETE — STOP GATE PASSED
 
+> route vocabulary synchronized 2026-08-19 · 0.0.0
+
 ## Scope
 Implement Google Cloud TTS OAuth/provider isolation, asynchronous Queue/DLQ processing, private R2 audio persistence, owner-scoped audio delivery, and voice-quota orchestration. Preserve Slice 8 mobile changes. RevenueCat, analytics/cost telemetry, remote production resources/deploy, and mobile audio playback are outside this slice.
 
@@ -14,7 +16,7 @@ Implement Google Cloud TTS OAuth/provider isolation, asynchronous Queue/DLQ proc
 - Queue consumer processing lease, retryable provider/R2 retry behavior, staged recovery that avoids duplicate TTS spend, and terminal quota release.
 - Wrangler Queue producer/consumer retry configuration plus `living-plot-tts-dlq` consumer.
 - Private `AUDIO_BUCKET` R2 binding with deterministic backend-only MP3 object keys.
-- Authenticated `POST /v1/episodes/:episodeId/audio` and owner-scoped `GET /v1/audio/:assetId`; object keys/provider voice IDs are not exposed.
+- Authenticated canonical `POST /v1/scenes/:sceneId/voice` plus owner-scoped `GET /v1/media/:assetId/status` and `GET /v1/media/:assetId`; object keys/provider voice IDs are not exposed.
 - Until RevenueCat is implemented, HTTP voice requests intentionally use the server-side Free tier and cannot trust a client Plus flag.
 - Durable TTS/audio, foundation, data-model, README, docs-index, and changelog updates.
 

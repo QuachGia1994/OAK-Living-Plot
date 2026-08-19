@@ -1,6 +1,6 @@
 # Phase 1 mobile auth and live drama
 
-> updated 2026-08-18 · current application contract
+> updated 2026-08-19 · current application contract
 
 ## Identity boundary
 
@@ -28,6 +28,8 @@ All IDs are checked against the authenticated internal owner before canonical st
 `DramaExperienceClient` is the application interface. The authenticated implementation uses fresh Clerk bearer tokens through the shared bounded transport. Preview implements the same Drama/Scene/Branch behavior for local UI development but is never used as a runtime fallback after a configured live provider/API failure.
 
 Safe GETs may retry once with a fresh token. POST mutations are never automatically retried by the transport. Instead, drama creation/continuation uses stable idempotency keys and canonical resync behavior.
+
+`AuthenticatedRuntimeProvider` keys the session-owned runtime by preview/live-auth state and Clerk user ID. A sign-out, sign-in transition, or account switch therefore unmounts the prior Drama/voice runtime subtree, disposing private narration state and transient canonical projections before a different principal can render them.
 
 ## Canonical resync
 

@@ -1,5 +1,7 @@
 # Live development setup
 
+> updated 2026-08-19 · 0.0.0
+
 Living Plot keeps preview-safe local/UI work separate from provider-backed development. Do not put Worker secrets in `EXPO_PUBLIC_*` values.
 
 ## Readiness check
@@ -67,6 +69,6 @@ npm run live:smoke:billing
 npm run live:smoke:all
 ```
 
-`core` proves authenticated create → choice commit → next episode → resume and archives the smoke plot afterward. `voice` requires either the episode created by `all` or `LIVING_PLOT_SMOKE_EPISODE_ID`; it waits for Queue/TTS/R2 to reach `ready` and then fetches private audio bytes. `billing` is intentionally strict: it passes only when `/v1/entitlement` is actually Plus with a provider sync timestamp, so a local RevenueCat SDK action without webhook/D1 convergence is not accepted as proof.
+`core` proves authenticated Drama creation → choice commit → next Scene → resume and archives the smoke Drama afterward. `voice` requires either the Scene created by `all` or `LIVING_PLOT_SMOKE_SCENE_ID`; it calls the canonical `/v1/scenes/:sceneId/voice` + `/v1/media/:assetId` boundary, waits for Queue/TTS/R2 to reach `ready`, and then fetches private audio bytes. `billing` is intentionally strict: it passes only when `/v1/entitlement` is actually Plus with a provider sync timestamp, so a local RevenueCat SDK action without webhook/D1 convergence is not accepted as proof.
 
 These commands are external gates, not CI substitutes. Missing live values/resources are reported as blocked rather than replaced by fixtures.
