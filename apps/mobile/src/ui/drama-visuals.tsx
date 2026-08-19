@@ -14,7 +14,7 @@ import {
 import type { UiLocale } from '@/features/preferences/contracts';
 import type { Choice, DramaMood } from '@/features/drama/domain';
 import { dramaVisualCopyFor } from './drama-copy';
-import { buildSubtitleBeats, clampSceneBeat, sceneMotifForText, type SceneMotif } from './drama-storyboard';
+import { buildSubtitleBeats, clampSceneBeat, moveSceneBeat, sceneMotifForText, type SceneMotif } from './drama-storyboard';
 import { cinematic, colors, radius, spacing, typography } from './theme';
 
 type SceneTone = (typeof cinematic.scene)[DramaMood];
@@ -355,6 +355,20 @@ export function DramaSceneStage({
   const beat = beats[clampSceneBeat(beatIndex, beats.length)] ?? body;
   const hasNextBeat = beatIndex < beats.length - 1;
 
+  const selectBeat = (targetIndex: number) => {
+    const next = clampSceneBeat(targetIndex, beats.length);
+    setBeatIndex(next);
+    if (next >= beats.length - 1) onPlaybackComplete?.();
+  };
+
+  const advanceBeat = () => {
+    setBeatIndex((current) => {
+      const next = moveSceneBeat(current, 1, beats.length);
+      if (next >= beats.length - 1) onPlaybackComplete?.();
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (consequence || beats.length > 1) return;
     const timer = setTimeout(() => onPlaybackComplete?.(), 0);
@@ -366,14 +380,9 @@ export function DramaSceneStage({
       accessibilityRole={consequence || !hasNextBeat ? undefined : 'button'}
       accessibilityLabel={consequence ? undefined : `${characterName}. ${beat}`}
       accessibilityHint={consequence ? undefined : hasNextBeat ? copy.sceneAdvanceHint : copy.sceneFinalHint}
-      disabled={Boolean(consequence) || !hasNextBeat}
+      disabled={Boolean(consequence) || beats.length <= 1}
       onPress={() => {
-        if (!hasNextBeat) return;
-        setBeatIndex((current) => {
-          const next = current + 1;
-          if (next >= beats.length - 1) onPlaybackComplete?.();
-          return next;
-        });
+        if (hasNextBeat) advanceBeat();
       }}
       style={[styles.sceneStage, { backgroundColor: tone.base }]}
     >
@@ -391,8 +400,17 @@ export function DramaSceneStage({
           accessibilityValue={{ min: 1, max: Math.max(beats.length, 1), now: Math.min(beatIndex + 1, Math.max(beats.length, 1)) }}
         >
           {(beats.length > 0 ? beats : [body]).map((_, index) => (
-            <View
+            <Pressable
               key={`${sceneNumber}-beat-${index}`}
+              accessibilityRole="button"
+              accessibilityLabel={locale === 'vi' ? `Mở đoạn ${index + 1}` : `Open beat ${index + 1}`}
+              accessibilityState={{ selected: index === beatIndex }}
+              disabled={Boolean(consequence)}
+              hitSlop={8}
+              onPress={(event) => {
+                event.stopPropagation();
+                selectBeat(index);
+              }}
               style={[
                 styles.sceneProgressSegment,
                 index <= beatIndex && { backgroundColor: index === beatIndex ? tone.rim : colors.inkMuted },

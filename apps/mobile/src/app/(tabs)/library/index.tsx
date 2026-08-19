@@ -90,7 +90,7 @@ export default function DramaLibraryScreen() {
                 mood={featured.mood}
                 sceneLabel={`${t('SCENE', 'CẢNH')} ${String(featured.sceneNumber).padStart(2, '0')}`}
                 statusLabel={featured.status === 'awaiting_choice' ? t('Your choice is waiting', 'Đang chờ lựa chọn của bạn') : t('Continue from consequence', 'Tiếp tục từ hậu quả')}
-                onPress={() => router.push({ pathname: '/drama', params: { dramaId: featured.id } })}
+                onPress={() => router.push({ pathname: '/library/drama', params: { dramaId: featured.id } })}
               />
               <View style={styles.coverFooter}>
                 <Text style={styles.updated}>{featured.updatedLabel}</Text>
@@ -113,7 +113,7 @@ export default function DramaLibraryScreen() {
               action="archive"
               busyId={busyId}
               t={t}
-              onOpen={(drama) => router.push({ pathname: '/drama', params: { dramaId: drama.id } })}
+              onOpen={(drama) => router.push({ pathname: '/library/drama', params: { dramaId: drama.id } })}
               onChange={change}
             />
           ) : null}
@@ -125,7 +125,7 @@ export default function DramaLibraryScreen() {
               action="restore"
               busyId={busyId}
               t={t}
-              onOpen={(drama) => router.push({ pathname: '/drama', params: { dramaId: drama.id, readOnly: '1' } })}
+              onOpen={(drama) => router.push({ pathname: '/library/drama', params: { dramaId: drama.id, readOnly: '1' } })}
               onChange={change}
             />
           ) : null}

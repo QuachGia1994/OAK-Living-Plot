@@ -59,7 +59,7 @@ export default function CreateDramaScreen() {
     setGenerationJob({ state: 'running', operation: 'first_scene', requestKey: attempt.key });
     try {
       const drama = await dramaExperienceClient.createDrama(normalizedDraft, attempt.key);
-      router.replace({ pathname: '/drama', params: { dramaId: drama.id } });
+      router.replace({ pathname: '/library/drama', params: { dramaId: drama.id } });
     } catch (caught) {
       setSubmitError(createErrorMessage(caught, locale));
       setGenerationJob({ state: 'failed', operation: 'first_scene', code: generationFailureCode(caught) });

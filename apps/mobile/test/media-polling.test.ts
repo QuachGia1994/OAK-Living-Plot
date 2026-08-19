@@ -9,8 +9,9 @@ describe('media polling policy', () => {
     expect(nextMediaPoll('failed', 0)).toBeNull();
   });
 
-  it('stops automatic polling after the bounded schedule', () => {
-    expect(nextMediaPoll('processing', 5)).toEqual({ delayMs: 5_000 });
-    expect(nextMediaPoll('processing', 6)).toBeNull();
+  it('keeps polling through the server retry window, then stops at a bounded ceiling', () => {
+    expect(nextMediaPoll('processing', 5)).toEqual({ delayMs: 8_000 });
+    expect(nextMediaPoll('processing', 12)).toEqual({ delayMs: 30_000 });
+    expect(nextMediaPoll('processing', 13)).toBeNull();
   });
 });

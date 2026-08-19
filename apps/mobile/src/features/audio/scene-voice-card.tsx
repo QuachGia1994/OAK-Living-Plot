@@ -193,15 +193,26 @@ export function SceneVoiceCard({ sceneId, sceneText }: { sceneId: string; sceneT
             <ActionButton label={t('Replay', 'Phát lại')} variant="ghost" disabled={!playerStatus.isLoaded} onPress={() => void replay()} />
           </View>
         </>
+      ) : asset && isPending(asset.status) ? (
+        <View style={styles.cloudPending}>
+          <Text style={styles.notice} accessibilityLiveRegion="polite">
+            {t('Cloud narration is still processing in the background. You can use device voice immediately or keep reading.', 'Giọng cloud vẫn đang xử lý nền. Bạn có thể dùng giọng máy ngay hoặc tiếp tục đọc.')}
+          </Text>
+          {needsStatusRefresh ? (
+            <ActionButton
+              label={t('Check cloud voice', 'Kiểm tra giọng cloud')}
+              variant="ghost"
+              busy={busy}
+              onPress={() => void refreshStatus()}
+            />
+          ) : null}
+        </View>
       ) : (
         <ActionButton
-          label={asset && isPending(asset.status)
-            ? needsStatusRefresh ? t('Check voice status', 'Kiểm tra trạng thái giọng') : t('Preparing voice…', 'Đang chuẩn bị giọng…')
-            : asset?.status === 'failed' ? t('Retry voice', 'Thử lại giọng đọc') : t('Generate voice', 'Tạo giọng đọc')}
-          variant="secondary"
+          label={asset?.status === 'failed' ? t('Retry cloud voice', 'Thử lại giọng cloud') : t('Generate cloud voice', 'Tạo giọng cloud')}
+          variant="ghost"
           busy={busy}
-          disabled={Boolean(asset && isPending(asset.status) && !needsStatusRefresh)}
-          onPress={() => void (asset && isPending(asset.status) ? refreshStatus() : requestVoice())}
+          onPress={() => void requestVoice()}
         />
       )}
 
@@ -209,7 +220,7 @@ export function SceneVoiceCard({ sceneId, sceneText }: { sceneId: string; sceneT
         <View style={styles.deviceVoiceFallback}>
           <ActionButton
             label={deviceSpeaking ? t('Stop device voice', 'Dừng giọng máy') : t('Read with device voice', 'Đọc bằng giọng máy')}
-            variant="ghost"
+            variant="secondary"
             onPress={() => void toggleDeviceSpeech()}
           />
           <Text style={styles.deviceVoiceNote}>{t('Uses your phone’s system voice and does not consume a narration slot.', 'Dùng giọng hệ thống trên điện thoại và không tốn lượt giọng đọc.')}</Text>
@@ -230,9 +241,9 @@ function voiceLabel(asset: MediaAsset | null, locale: 'en' | 'vi'): string {
   const vi = locale === 'vi';
   if (!asset) return vi ? 'Tùy chọn' : 'Optional';
   if (asset.status === 'ready') return asset.cached ? (vi ? 'Đã lưu' : 'Cached') : (vi ? 'Sẵn sàng' : 'Ready');
-  if (asset.status === 'failed') return vi ? 'Có thể thử lại' : 'Retry available';
-  if (asset.status === 'queued') return vi ? 'Đang xếp hàng' : 'Queued';
-  return vi ? 'Đang xử lý' : 'Processing';
+  if (asset.status === 'failed') return vi ? 'Giọng cloud chưa sẵn sàng' : 'Cloud voice unavailable';
+  if (asset.status === 'queued') return vi ? 'Giọng cloud đang chuẩn bị' : 'Cloud voice preparing';
+  return vi ? 'Giọng cloud đang xử lý' : 'Cloud voice processing';
 }
 
 function isDefiniteVoiceRequestFailure(error: unknown): boolean {
@@ -275,6 +286,7 @@ const styles = StyleSheet.create({
   flexButton: { flex: 1 },
   kicker: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
   notice: { color: colors.inkMuted, fontSize: 12, lineHeight: 18 },
+  cloudPending: { gap: spacing.xs },
   deviceVoiceFallback: { gap: spacing.xs },
   deviceVoiceNote: { color: colors.quietInk, fontSize: 11, lineHeight: 16 },
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSubtitleBeats, clampSceneBeat, sceneMotifForText } from '../src/ui/drama-storyboard';
+import { buildSubtitleBeats, clampSceneBeat, moveSceneBeat, sceneMotifForText } from '../src/ui/drama-storyboard';
 
 describe('drama storyboard', () => {
   it('keeps short scene copy as sentence-sized subtitle beats', () => {
@@ -35,5 +35,12 @@ describe('drama storyboard', () => {
     expect(clampSceneBeat(2, 4)).toBe(2);
     expect(clampSceneBeat(8, 4)).toBe(3);
     expect(clampSceneBeat(2, 0)).toBe(0);
+  });
+
+  it('supports reversible beat navigation instead of a one-way storyboard', () => {
+    expect(moveSceneBeat(1, 1, 4)).toBe(2);
+    expect(moveSceneBeat(2, -1, 4)).toBe(1);
+    expect(moveSceneBeat(0, -1, 4)).toBe(0);
+    expect(moveSceneBeat(3, 1, 4)).toBe(3);
   });
 });

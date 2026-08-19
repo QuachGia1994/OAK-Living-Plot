@@ -104,7 +104,7 @@ export default function HomeScreen() {
             : t('TODAY · NEW DRAMA', 'HÔM NAY · DRAMA MỚI')}
           actionLabel={featuredDrama ? t('Resume drama', 'Tiếp tục drama') : t('Start today’s drama', 'Bắt đầu drama hôm nay')}
           onPress={() => featuredDrama
-            ? router.push({ pathname: '/drama', params: { dramaId: featuredDrama.id } })
+            ? router.push({ pathname: '/library/drama', params: { dramaId: featuredDrama.id } })
             : openDailySpark(snapshot)}
           style={styles.heroPoster}
         />
@@ -121,7 +121,7 @@ export default function HomeScreen() {
               snapshot={snapshot}
               featuredDramaId={featuredDrama.id}
               t={t}
-              onOpenDrama={(drama) => router.push({ pathname: '/drama', params: { dramaId: drama.id } })}
+              onOpenDrama={(drama) => router.push({ pathname: '/library/drama', params: { dramaId: drama.id } })}
               onOpenSpark={() => openDailySpark(snapshot)}
             />
           ) : (

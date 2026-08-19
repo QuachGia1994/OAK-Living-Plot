@@ -37,3 +37,7 @@ export function clampSceneBeat(index: number, beatCount: number): number {
   if (beatCount <= 0) return 0;
   return Math.max(0, Math.min(index, beatCount - 1));
 }
+
+export function moveSceneBeat(currentIndex: number, delta: -1 | 1, beatCount: number): number {
+  return clampSceneBeat(currentIndex + delta, beatCount);
+}
