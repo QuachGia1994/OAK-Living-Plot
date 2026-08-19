@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { HttpPreferencesClient, PreviewPreferencesClient } from './client';
-import type { UserPreferences } from './contracts';
-import { defaultUserPreferences } from './contracts';
+import type { PreferencesClient, UserPreferences } from './contracts';
+import { deviceDefaultPreferences } from './device-locale';
+import { preferenceSeedForUnsavedRemote } from './locale-policy';
 
 interface PreferencesContextValue {
   preferences: UserPreferences;
@@ -13,8 +14,9 @@ interface PreferencesContextValue {
 }
 
 const previewClient = new PreviewPreferencesClient();
+const initialDevicePreferences = deviceDefaultPreferences();
 const PreferencesContext = createContext<PreferencesContextValue>({
-  preferences: defaultUserPreferences,
+  preferences: initialDevicePreferences,
   loading: false,
   error: null,
   async save() {},
@@ -28,28 +30,41 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     if (!apiBaseUrl || !auth.configured || !auth.isLoaded || !auth.isSignedIn) return previewClient;
     return new HttpPreferencesClient(apiBaseUrl, auth.getToken);
   }, [apiBaseUrl, auth.configured, auth.getToken, auth.isLoaded, auth.isSignedIn]);
-  const [preferences, setPreferences] = useState<UserPreferences>(defaultUserPreferences);
+  const [preferences, setPreferences] = useState<UserPreferences>(initialDevicePreferences);
+  const preferencesRef = useRef(preferences);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const applyPreferences = useCallback((next: UserPreferences) => {
+    preferencesRef.current = next;
+    setPreferences(next);
+  }, []);
+
+  const loadResolvedPreferences = useCallback(async (target: PreferencesClient): Promise<UserPreferences> => {
+    const loaded = await target.load();
+    if (!target.configured) return loaded;
+    const seed = preferenceSeedForUnsavedRemote(loaded, preferencesRef.current, deviceDefaultPreferences());
+    return seed ? target.save(seed) : loaded;
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setPreferences(await client.load());
+      applyPreferences(await loadResolvedPreferences(client));
     } catch {
       setError('Preferences could not be loaded. Existing dramas are unchanged.');
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [applyPreferences, client, loadResolvedPreferences]);
 
   useEffect(() => {
     let active = true;
-    void client.load()
+    void loadResolvedPreferences(client)
       .then((next) => {
         if (!active) return;
-        setPreferences(next);
+        applyPreferences(next);
         setError(null);
       })
       .catch(() => {
@@ -59,20 +74,20 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [client]);
+  }, [applyPreferences, client, loadResolvedPreferences]);
 
   const save = useCallback(async (next: Omit<UserPreferences, 'updatedAt'>) => {
     setLoading(true);
     setError(null);
     try {
-      setPreferences(await client.save(next));
+      applyPreferences(await client.save(next));
     } catch {
       setError('Preferences could not be saved. Existing dramas are unchanged.');
       throw new Error('preferences_save_failed');
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [applyPreferences, client]);
 
   const value = useMemo(() => ({ preferences, loading, error, save, refresh }), [error, loading, preferences, refresh, save]);
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

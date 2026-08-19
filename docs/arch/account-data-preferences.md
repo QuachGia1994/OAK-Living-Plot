@@ -1,6 +1,6 @@
 # Phase 1 preferences, sharing, and account-data boundary
 
-> updated 2026-08-18 · current application contract
+> updated 2026-08-19 · current application contract
 
 ## Preferences SSoT
 
@@ -9,7 +9,7 @@
 - `dramaLocale: en-US | vi-VN` for newly created dramas;
 - approved narrator variant.
 
-`GET/POST /v1/preferences` are authenticated and owner-scoped. The existing D1 column remains named `story_locale` for migration compatibility; `D1UserPreferencesRepository` validates and maps it to application `dramaLocale`. Mobile does not use the physical column name.
+`GET/POST /v1/preferences` are authenticated and owner-scoped. The existing D1 column remains named `story_locale` for migration compatibility; `D1UserPreferencesRepository` validates and maps it to application `dramaLocale`. Mobile does not use the physical column name. Before a profile has any saved row (`updatedAt: null`), mobile resolves the device/app language and persists matching EN/VI defaults after authentication; this prevents the UI from changing language merely because the backend default is English. Once the user explicitly saves preferences, that saved profile remains authoritative.
 
 Changing UI language does not rewrite existing drama content. A drama keeps the locale captured on creation. Preview SecureStore accepts legacy `storyLocale` only as a one-way compatibility read, then exposes `dramaLocale`.
 

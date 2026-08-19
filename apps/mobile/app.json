@@ -28,6 +28,15 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": ["en", "vi"],
+            "android": ["en", "vi"]
+          }
+        }
+      ],
       "@clerk/expo"
     ],
     "experiments": {

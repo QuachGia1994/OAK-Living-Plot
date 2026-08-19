@@ -52,3 +52,13 @@ export function validateDramaDraft(draft: DramaDraft, locale: UiLocale = 'en'): 
 export function hasDraftErrors(errors: DramaDraftErrors): boolean {
   return Boolean(errors.premise || errors.characterName);
 }
+
+export function dramaDraftValidationSummary(errors: DramaDraftErrors, locale: UiLocale = 'en'): string | null {
+  const missing: string[] = [];
+  if (errors.premise) missing.push(locale === 'vi' ? 'mầm drama' : 'drama spark');
+  if (errors.characterName) missing.push(locale === 'vi' ? 'tên nhân vật' : 'lead name');
+  if (missing.length === 0) return null;
+  return locale === 'vi'
+    ? `Hoàn tất ${missing.join(' và ')} trước khi tạo cảnh 1.`
+    : `Complete the ${missing.join(' and ')} before creating scene 1.`;
+}

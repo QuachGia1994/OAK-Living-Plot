@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasDraftErrors, normalizeDramaDraft, validateDramaDraft } from '../src/features/drama/setup';
+import { dramaDraftValidationSummary, hasDraftErrors, normalizeDramaDraft, validateDramaDraft } from '../src/features/drama/setup';
 
 describe('drama setup contract', () => {
   it('normalizes user text to NFC and trims repeated whitespace', () => {
@@ -19,6 +19,12 @@ describe('drama setup contract', () => {
     expect(errors.premise).toBeTruthy();
     expect(errors.characterName).toBeTruthy();
     expect(hasDraftErrors(errors)).toBe(true);
+  });
+
+  it('returns a visible localized submit summary when local validation blocks generation', () => {
+    const errors = validateDramaDraft({ premise: '', mood: 'tense', characterName: '' }, 'vi');
+    expect(dramaDraftValidationSummary(errors, 'vi')).toBe('Hoàn tất mầm drama và tên nhân vật trước khi tạo cảnh 1.');
+    expect(dramaDraftValidationSummary({}, 'vi')).toBeNull();
   });
 
   it('accepts the minimal drama setup', () => {

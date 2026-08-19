@@ -4,7 +4,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { GenerationJob } from '@/features/drama/domain';
 import type { DramaDraft, DramaMood } from '@/features/drama/contracts';
 import { DramaClientError } from '@/features/drama/contracts';
-import { dramaMoodOptionsFor, hasDraftErrors, normalizeDramaDraft, validateDramaDraft } from '@/features/drama/setup';
+import { dramaDraftValidationSummary, dramaMoodOptionsFor, hasDraftErrors, normalizeDramaDraft, validateDramaDraft } from '@/features/drama/setup';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useUiCopy } from '@/features/localization/ui-copy';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
@@ -26,6 +26,7 @@ export default function CreateDramaScreen() {
   const { locale, t } = useUiCopy();
   const dramaExperienceClient = useDramaExperienceClient();
   const creationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const submitting = useRef(false);
   const [draft, setDraft] = useState<DramaDraft>(() => ({
     premise: readParam(params.premise) ?? initialDraft.premise,
     mood: readMood(params.mood) ?? initialDraft.mood,
@@ -38,9 +39,14 @@ export default function CreateDramaScreen() {
   const moodOptions = dramaMoodOptionsFor(locale);
 
   async function submit() {
+    if (submitting.current) return;
+    const currentErrors = validateDramaDraft(draft, locale);
     setShowValidation(true);
     setSubmitError(null);
-    if (hasDraftErrors(errors)) return;
+    if (hasDraftErrors(currentErrors)) {
+      setSubmitError(dramaDraftValidationSummary(currentErrors, locale));
+      return;
+    }
 
     const normalizedDraft = normalizeDramaDraft(draft);
     const fingerprint = JSON.stringify(normalizedDraft);
@@ -49,6 +55,7 @@ export default function CreateDramaScreen() {
       ? previousAttempt
       : { fingerprint, key: createIdempotencyKey('creation') };
     creationAttempt.current = attempt;
+    submitting.current = true;
     setGenerationJob({ state: 'running', operation: 'first_scene', requestKey: attempt.key });
     try {
       const drama = await dramaExperienceClient.createDrama(normalizedDraft, attempt.key);
@@ -56,6 +63,8 @@ export default function CreateDramaScreen() {
     } catch (caught) {
       setSubmitError(createErrorMessage(caught, locale));
       setGenerationJob({ state: 'failed', operation: 'first_scene', code: generationFailureCode(caught) });
+    } finally {
+      submitting.current = false;
     }
   }
 
@@ -100,7 +109,7 @@ export default function CreateDramaScreen() {
             accessibilityLabel={t('Drama premise', 'Tình huống drama')}
             multiline
             maxLength={600}
-            placeholder={t('A junior chef realizes tonight’s critic is the person who vanished from her family ten years ago…', 'Một đầu bếp trẻ nhận ra vị khách phê bình tối nay chính là người đã biến mất khỏi gia đình cô mười năm trước…')}
+            placeholder={t('Example: A junior chef realizes tonight’s critic is the person who vanished from her family ten years ago…', 'Ví dụ: Một đầu bếp trẻ nhận ra vị khách phê bình tối nay chính là người đã biến mất khỏi gia đình cô mười năm trước…')}
             placeholderTextColor={colors.placeholder}
             style={styles.sparkInput}
             textAlignVertical="top"
@@ -146,7 +155,7 @@ export default function CreateDramaScreen() {
             accessibilityLabel={t('Main character name', 'Tên nhân vật chính')}
             autoCapitalize="words"
             maxLength={50}
-            placeholder="Mina"
+            placeholder={t('Example: Mina', 'Ví dụ: Mina')}
             placeholderTextColor={colors.placeholder}
             style={styles.castInput}
             value={draft.characterName}
@@ -158,7 +167,7 @@ export default function CreateDramaScreen() {
       </View>
 
       {submitError ? (
-        <View style={styles.submitError}>
+        <View style={styles.submitError} accessibilityLiveRegion="assertive">
           <Text style={styles.submitErrorTitle}>{t('Scene 1 could not start', 'Không thể bắt đầu cảnh 1')}</Text>
           <Text style={styles.submitErrorBody}>{submitError}</Text>
         </View>
@@ -174,7 +183,7 @@ export default function CreateDramaScreen() {
         />
       ) : (
         <View style={styles.submitBlock}>
-          <ActionButton label={generationJob.state === 'failed' ? t('Retry scene 1', 'Thử lại cảnh 1') : t('Play scene 1', 'Xem cảnh 1')} onPress={() => void submit()} />
+          <ActionButton label={generationJob.state === 'failed' ? t('Retry scene 1', 'Thử lại cảnh 1') : t('Create scene 1', 'Tạo cảnh 1')} onPress={() => void submit()} />
         </View>
       )}
     </Screen>
@@ -192,6 +201,9 @@ function createErrorMessage(error: unknown, locale: 'en' | 'vi'): string {
   if (error.code === 'auth_required') return vi ? 'Phiên đăng nhập đã hết hạn. Đăng nhập lại trước khi tạo drama.' : 'Your session expired. Sign in again before generating this drama.';
   if (error.code === 'provider_unavailable') return vi ? 'Bộ máy tạo drama tạm thời không khả dụng. Thiết lập không thay đổi; hãy thử lại sau.' : 'The drama engine is temporarily unavailable. Your setup is unchanged; try again later.';
   if (error.code === 'choice_required') return vi ? 'Lần tạo này không còn khớp với bản trên máy chủ. Chỉnh thiết lập hoặc về trang chủ để tiếp tục drama hiện có.' : 'This creation attempt no longer matches the server copy. Edit the setup or return home to resume the existing drama.';
+  if (error.code === 'backend_unavailable') return vi ? 'Không thể kết nối dịch vụ Living Plot. Thiết lập vẫn được giữ để bạn thử lại.' : 'Living Plot could not reach the server. Your setup is still here so you can retry.';
+  if (error.code === 'invalid_generation') return vi ? 'Cảnh được tạo chưa đạt hợp đồng drama. Thiết lập vẫn được giữ để thử lại.' : 'The generated scene did not satisfy the drama contract. Your setup is still here so you can retry.';
+  if (error.code === 'invalid_input') return vi ? 'Thiết lập cảnh chưa hợp lệ. Kiểm tra mầm drama và tên nhân vật rồi thử lại.' : 'The scene setup is invalid. Check the drama spark and lead name, then retry.';
   return error.message;
 }
 
