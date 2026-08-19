@@ -7,7 +7,6 @@ const apiValues = loadValues(resolve(root, 'apps/api/.dev.vars'));
 const mobileValues = loadValues(resolve(root, 'apps/mobile/.env'));
 
 const checks = [
-  check('api', 'CLERK_PUBLISHABLE_KEY', apiValues, (value) => /^pk_(test|live)_/.test(value) && nonPlaceholder(value)),
   check('api', 'CLERK_JWT_KEY', apiValues, (value) => value.includes('BEGIN PUBLIC KEY') && nonPlaceholder(value)),
   check('api', 'CLERK_AUTHORIZED_PARTIES', apiValues, looksLikeHttpsList),
   check('api', 'GEMINI_API_KEY', apiValues, nonPlaceholder),

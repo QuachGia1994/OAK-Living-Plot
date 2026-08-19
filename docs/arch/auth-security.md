@@ -31,11 +31,12 @@ The health endpoint remains public. Unknown routes remain 404.
 
 The Worker auth path uses networkless JWT verification and does not require a Clerk secret key.
 
-Required runtime values:
+Required Worker runtime values:
 
-- `CLERK_PUBLISHABLE_KEY`
 - `CLERK_JWT_KEY` — Clerk JWT public key/PEM
 - `CLERK_AUTHORIZED_PARTIES` — comma-separated allowlist of approved token parties/origins
+
+The mobile app separately requires the public `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`; the Worker verifier does not.
 
 `apps/api/.dev.vars.example` documents names only. Real `.dev.vars` files are ignored and must never be committed.
 

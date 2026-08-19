@@ -1,31 +1,37 @@
-import { createClerkClient } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 import type { AppEnv } from '../env';
 import type { AuthenticatedPrincipal, SessionVerifier } from './session-verifier';
 
 export class ClerkSessionVerifier implements SessionVerifier {
-  private readonly client;
   private readonly jwtKey: string;
   private readonly authorizedParties: string[];
 
-  constructor(env: Pick<AppEnv, 'CLERK_PUBLISHABLE_KEY' | 'CLERK_JWT_KEY' | 'CLERK_AUTHORIZED_PARTIES'>) {
-    const publishableKey = requireValue(env.CLERK_PUBLISHABLE_KEY, 'CLERK_PUBLISHABLE_KEY');
-    this.jwtKey = requireValue(env.CLERK_JWT_KEY, 'CLERK_JWT_KEY');
+  constructor(env: Pick<AppEnv, 'CLERK_JWT_KEY' | 'CLERK_AUTHORIZED_PARTIES'>) {
+    this.jwtKey = requirePublicKey(env.CLERK_JWT_KEY);
     this.authorizedParties = parseAuthorizedParties(env.CLERK_AUTHORIZED_PARTIES);
-    this.client = createClerkClient({ publishableKey, jwtKey: this.jwtKey });
   }
 
   async authenticate(request: Request): Promise<AuthenticatedPrincipal | null> {
-    const state = await this.client.authenticateRequest(request, {
-      acceptsToken: 'session_token',
-      authorizedParties: this.authorizedParties,
-      jwtKey: this.jwtKey,
-    });
-    if (!state.isAuthenticated) return null;
+    const token = bearerToken(request.headers.get('Authorization'));
+    if (!token) return null;
 
-    const auth = state.toAuth();
-    const subject = auth.userId?.trim();
-    return subject ? { subject } : null;
+    try {
+      const payload = await verifyToken(token, {
+        authorizedParties: this.authorizedParties,
+        jwtKey: this.jwtKey,
+      });
+      const subject = typeof payload.sub === 'string' ? payload.sub.trim() : '';
+      return subject ? { subject } : null;
+    } catch {
+      return null;
+    }
   }
+}
+
+function bearerToken(authorization: string | null): string | null {
+  if (!authorization?.startsWith('Bearer ')) return null;
+  const token = authorization.slice('Bearer '.length).trim();
+  return token || null;
 }
 
 function parseAuthorizedParties(raw: string): string[] {
@@ -39,8 +45,10 @@ function parseAuthorizedParties(raw: string): string[] {
   return parties;
 }
 
-function requireValue(value: string, name: string): string {
-  const normalized = value.trim();
-  if (!normalized) throw new Error(`${name} is required.`);
+function requirePublicKey(value: string): string {
+  const normalized = value.trim().replaceAll('\\n', '\n');
+  if (!normalized.includes('-----BEGIN PUBLIC KEY-----') || !normalized.includes('-----END PUBLIC KEY-----')) {
+    throw new Error('CLERK_JWT_KEY must be a PEM public key.');
+  }
   return normalized;
 }

@@ -14,7 +14,6 @@ const testEnv: AppEnv = {
   TTS_DLQ_NAME: 'living-plot-tts-dlq-test',
   AUDIO_BUCKET: runtimeEnv.AUDIO_BUCKET,
   ANALYTICS: runtimeEnv.ANALYTICS,
-  CLERK_PUBLISHABLE_KEY: 'unused-in-injected-tests',
   CLERK_JWT_KEY: 'unused-in-injected-tests',
   CLERK_AUTHORIZED_PARTIES: 'https://living-plot.test',
   GEMINI_API_KEY: 'unused-in-auth-tests',
@@ -94,7 +93,7 @@ describe('protected HTTP boundary', () => {
   it('fails closed when Clerk runtime configuration is missing', async () => {
     const response = await handleRequest(request('/v1/me'), {
       ...testEnv,
-      CLERK_PUBLISHABLE_KEY: '',
+      CLERK_JWT_KEY: '',
     });
 
     expect(response.status).toBe(503);

@@ -18,7 +18,7 @@ const runtimeEnv = env as unknown as AppEnv;
 const db = runtimeEnv.DB;
 const testEnv: AppEnv = {
   ...runtimeEnv,
-  CLERK_PUBLISHABLE_KEY: 'unused', CLERK_JWT_KEY: 'unused', CLERK_AUTHORIZED_PARTIES: 'https://living-plot.test',
+  CLERK_JWT_KEY: 'unused', CLERK_AUTHORIZED_PARTIES: 'https://living-plot.test',
   GEMINI_API_KEY: 'unused',
   REVENUECAT_SECRET_API_KEY: 'unused', REVENUECAT_PLUS_ENTITLEMENT_ID: 'plus',
   REVENUECAT_WEBHOOK_AUTHORIZATION: 'Bearer unused', REVENUECAT_WEBHOOK_SIGNING_SECRET: 'unused',

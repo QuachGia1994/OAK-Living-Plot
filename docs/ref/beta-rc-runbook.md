@@ -23,7 +23,7 @@ As verified on 2026-08-19, the development Worker secret store contains Clerk ve
 
 Required before authenticated private-voice E2E:
 
-- Clerk publishable key, JWT verification key, and authorized party on the Worker.
+- Clerk JWT verification key and authorized party on the Worker; the publishable key remains mobile-only public configuration.
 - Gemini API key on the Worker for both scene generation and Gemini TTS.
 - Mobile HTTPS development API URL and Clerk publishable key.
 
