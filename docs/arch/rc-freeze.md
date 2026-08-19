@@ -34,8 +34,8 @@ Frozen surfaces: Home, Create, Playback A/B/C, Library, Settings, Plus, LP brand
 `useDramaPlayback` acquires a synchronous ref-backed playback-action lock before updating React presentation state. `commitChoice` / `continueDrama` therefore reject a second tap in the same render tick as well as later taps while a mutation is in flight.
 
 ## Platform
-- Android: `DynamicColorIOS` only under `Platform.OS === 'ios'`.
-- iOS: NativeTabs + `minimizeBehavior="onScrollDown"` retained.
+- Android: `DynamicColorIOS` only under `Platform.OS === 'ios'`; the four-tab shell uses Expo Router JavaScript Tabs because Expo NativeTabs has no Android minimize API. One shared thresholded scroll controller compacts labels/height on downward scroll and expands on upward/top/route reset without changing route ownership.
+- iOS: NativeTabs + `minimizeBehavior="onScrollDown"` retained unchanged.
 
 ## External live gate
 Preview-safe APK/IPA builds remain valid RC artifacts when public live configuration is absent. Private narration becomes live only after the mobile API/Clerk values and backend Queue/Gemini TTS/private R2 resources are provisioned; the current narration path uses the server-side `GEMINI_API_KEY` and has no Google Cloud billing/service-account dependency. The client must report live state honestly and never fall back to fixture audio.

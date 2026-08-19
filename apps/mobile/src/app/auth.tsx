@@ -1,8 +1,19 @@
 import { useSignIn, useSignUp } from '@clerk/expo';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
+import {
+  beginPasswordlessEmailOtp,
+  createAsyncActionGate,
+  passwordlessConfigurationMessage,
+  passwordlessErrorMessage,
+  resendPasswordlessEmailOtp,
+  resetPasswordlessEmailOtp,
+  verifyPasswordlessEmailOtp,
+  type PasswordlessSignInResource,
+  type PasswordlessSignUpResource,
+} from '@/features/auth/passwordless-email-otp';
 import { useUiCopy } from '@/features/localization/ui-copy';
 import { DramaLoadingStage, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, Screen } from '@/ui/primitives';
@@ -59,64 +70,81 @@ export default function AuthScreen() {
 
 function ClerkEmailOtpForm() {
   const router = useRouter();
-  const { t } = useUiCopy();
+  const { locale, t } = useUiCopy();
   const { signIn, fetchStatus } = useSignIn();
   const { signUp, fetchStatus: signUpFetchStatus } = useSignUp();
+  const actionGate = useRef(createAsyncActionGate());
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [localBusy, setLocalBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const busy = fetchStatus === 'fetching' || signUpFetchStatus === 'fetching';
+  const busy = localBusy || fetchStatus === 'fetching' || signUpFetchStatus === 'fetching';
 
   async function sendCode() {
     const identifier = email.trim().toLocaleLowerCase();
     if (!identifier) return setMessage(t('Enter your email address.', 'Nhập địa chỉ email của bạn.'));
-    setMessage(null);
-    const { error: createError } = await signIn.create({
-      identifier,
-      signUpIfMissing: true,
-    } as Parameters<typeof signIn.create>[0]);
-    if (createError) return setMessage(clerkMessage(createError));
-    const { error: sendError } = await signIn.emailCode.sendCode();
-    if (sendError) return setMessage(clerkMessage(sendError));
-    setVerifying(true);
+    await runExclusive(async () => {
+      setMessage(null);
+      const outcome = await beginPasswordlessEmailOtp(
+        signIn as unknown as PasswordlessSignInResource,
+        signUp as unknown as PasswordlessSignUpResource,
+        identifier,
+      );
+      if (outcome.kind === 'code_sent') setVerifying(true);
+      else if (outcome.kind === 'error') setMessage(passwordlessErrorMessage(outcome.code, locale));
+    });
   }
 
   async function verifyCode() {
-    if (!code.trim()) return setMessage(t('Enter the verification code.', 'Nhập mã xác minh.'));
-    setMessage(null);
-    const { error } = await signIn.emailCode.verifyCode({ code: code.trim() });
-    if (error) {
-      if (clerkErrorCode(error) === 'sign_up_if_missing_transfer') {
-        await transferToSignUp();
-        return;
+    const normalizedCode = code.trim();
+    if (!normalizedCode) return setMessage(t('Enter the verification code.', 'Nhập mã xác minh.'));
+    await runExclusive(async () => {
+      setMessage(null);
+      const outcome = await verifyPasswordlessEmailOtp(
+        signIn as unknown as PasswordlessSignInResource,
+        signUp as unknown as PasswordlessSignUpResource,
+        normalizedCode,
+        () => router.replace('/'),
+      );
+      if (outcome.kind === 'configuration_error') {
+        setMessage(passwordlessConfigurationMessage(outcome.missingFields, locale));
+      } else if (outcome.kind === 'not_complete') {
+        setMessage(t('This Clerk instance requires an authentication step that Living Plot does not enable for Phase 1.', 'Cấu hình Clerk này yêu cầu thêm một bước xác thực mà Living Plot Phase 1 không bật.'));
+      } else if (outcome.kind === 'error') {
+        setMessage(passwordlessErrorMessage(outcome.code, locale));
       }
-      setMessage(clerkMessage(error));
-      return;
-    }
-    if (signIn.status !== 'complete') {
-      setMessage(t('This Clerk instance requires additional verification. Phase 1 expects email-code-only authentication.', 'Cấu hình Clerk này yêu cầu xác minh bổ sung. Phase 1 chỉ hỗ trợ xác thực bằng mã email.'));
-      return;
-    }
-    await signIn.finalize({ navigate: () => router.replace('/') });
+    });
   }
 
-  async function transferToSignUp() {
-    const { error } = await signUp.create({ transfer: true });
-    if (error) return setMessage(clerkMessage(error));
-    if (signUp.status === 'complete') {
-      await signUp.finalize({ navigate: () => router.replace('/') });
-      return;
-    }
-    const missing = signUp.missingFields?.join(', ') || 'additional fields';
-    setMessage(t(`Your Clerk instance requires ${missing}. Living Plot Phase 1 expects email-only public sign-up; update Clerk Dashboard requirements before continuing.`, `Clerk đang yêu cầu ${missing}. Living Plot Phase 1 chỉ hỗ trợ đăng ký công khai bằng email; hãy cập nhật yêu cầu trong Clerk Dashboard trước khi tiếp tục.`));
+  async function resendCode() {
+    await runExclusive(async () => {
+      setMessage(null);
+      const outcome = await resendPasswordlessEmailOtp(signIn as unknown as PasswordlessSignInResource);
+      if (outcome.kind === 'error') setMessage(passwordlessErrorMessage(outcome.code, locale));
+    });
   }
 
-  function startOver() {
-    signIn.reset();
-    setCode('');
-    setVerifying(false);
-    setMessage(null);
+  async function runExclusive(action: () => Promise<void>) {
+    if (actionGate.current.locked()) return;
+    setLocalBusy(true);
+    try {
+      await actionGate.current.run(action);
+    } finally {
+      setLocalBusy(false);
+    }
+  }
+
+  async function startOver() {
+    await runExclusive(async () => {
+      await resetPasswordlessEmailOtp(
+        signIn as unknown as PasswordlessSignInResource,
+        signUp as unknown as PasswordlessSignUpResource,
+      );
+      setCode('');
+      setVerifying(false);
+      setMessage(null);
+    });
   }
 
   return (
@@ -175,25 +203,13 @@ function ClerkEmailOtpForm() {
 
         {verifying ? (
           <View style={styles.secondaryActions}>
-            <ActionButton label={t('Resend code', 'Gửi lại mã')} variant="secondary" disabled={busy} onPress={() => void signIn.emailCode.sendCode()} style={styles.secondaryButton} />
-            <ActionButton label={t('Start over', 'Làm lại')} variant="ghost" disabled={busy} onPress={startOver} style={styles.secondaryButton} />
+            <ActionButton label={t('Resend code', 'Gửi lại mã')} variant="secondary" disabled={busy} onPress={() => void resendCode()} style={styles.secondaryButton} />
+            <ActionButton label={t('Start over', 'Làm lại')} variant="ghost" disabled={busy} onPress={() => void startOver()} style={styles.secondaryButton} />
           </View>
         ) : null}
       </View>
     </Screen>
   );
-}
-
-function clerkErrorCode(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null || !('errors' in error)) return null;
-  const errors = (error as { errors?: { code?: string }[] }).errors;
-  return errors?.[0]?.code ?? null;
-}
-
-function clerkMessage(error: unknown): string {
-  if (typeof error !== 'object' || error === null || !('errors' in error)) return 'Authentication could not continue.';
-  const errors = (error as { errors?: { longMessage?: string; message?: string }[] }).errors;
-  return errors?.[0]?.longMessage ?? errors?.[0]?.message ?? 'Authentication could not continue.';
 }
 
 const styles = StyleSheet.create({

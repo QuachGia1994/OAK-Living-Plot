@@ -16,6 +16,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAndroidTabBarState } from './android-tab-bar-state';
 import { colors, radius, spacing, typography } from './theme';
 
 export function Screen({
@@ -27,6 +28,7 @@ export function Screen({
   contentStyle?: StyleProp<ViewStyle>;
   footer?: ReactNode;
 }) {
+  const androidTabBar = useAndroidTabBarState();
   return (
     <SafeAreaView style={styles.safeArea} edges={footer ? ['top', 'right', 'bottom', 'left'] : ['top', 'right', 'left']}>
       <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -36,6 +38,8 @@ export function Screen({
           contentContainerStyle={[styles.screenContent, footer ? styles.screenContentWithFooter : null, contentStyle]}
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           keyboardShouldPersistTaps="handled"
+          onScroll={Platform.OS === 'android' && androidTabBar ? (event) => androidTabBar.reportScroll(event.nativeEvent.contentOffset.y) : undefined}
+          scrollEventThrottle={32}
         >
           {children}
         </ScrollView>

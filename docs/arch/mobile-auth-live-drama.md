@@ -6,6 +6,8 @@
 
 Clerk authenticates the external session. The Worker resolves that subject to one internal Living Plot user before any protected application read or mutation. Mobile never supplies the canonical internal user ID for drama ownership.
 
+Living Plot Phase 1 authentication is passwordless email OTP. The custom Expo flow starts `signIn.create({ identifier, signUpIfMissing: true })`, sends and verifies an email code, finalizes an existing-user sign-in directly, and transfers a verified unknown email with `signUp.create({ transfer: true })`. A transferred sign-up must complete with email alone; `password` or other extra required fields are treated as Clerk Dashboard configuration drift rather than added to the product UI. Same-tick auth mutations are single-flight guarded, and Start over resets both Clerk sign-in and sign-up attempts.
+
 ## Protected drama API
 
 The live mobile core uses:

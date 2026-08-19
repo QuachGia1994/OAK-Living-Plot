@@ -47,6 +47,9 @@ Home receives retention metadata derived from canonical choice history. It shows
 ## Localization and first run
 The saved `uiLocale` (`en`/`vi`) drives core native product copy independently from each Drama's persisted drama locale. Validation, mood labels, auth, navigation/actions, library/history, Plus, Settings/Data, voice controls, and daily-spark copy switch with the UI preference; canonical Scene text is never translated in place. A new user with no active Drama sees a prefilled daily-spark path first and can still choose custom creation, so onboarding removes setup decisions without auto-generating or creating a hidden mutation.
 
+## Platform tab behavior
+The four top-level destinations remain one tab navigation owner. iOS continues using system `NativeTabs` with `minimizeBehavior="onScrollDown"`. Expo's native minimize API is iOS-only, so Android uses the Expo Router JavaScript Tabs navigator for the same four routes. The shared `Screen` scroll owner reports thresholded scroll intent to one Android tab-shell controller: meaningful downward travel compacts the bar and hides labels while preserving all four tap targets; meaningful upward travel or returning to the top expands it. Route changes reset to expanded state. The controller updates React state only when compact/expanded state changes, not on every scroll pixel.
+
 ## Visual system
 The mobile design stays dependency-light and token-driven:
 - cinematic dark surfaces and warm decision accent;
@@ -57,4 +60,4 @@ The mobile design stays dependency-light and token-driven:
 - Safe Area handling at the root and screen level.
 
 ## Verification
-Mobile tests cover setup/localization validation, preview semantics, authenticated story DTO parsing, fresh bearer tokens, retry-key reuse, canonical resync after conflict, retention parsing, private audio request/status/playback-source authorization, RevenueCat Test Store selection, and backend entitlement refresh behavior. GitHub quality now also applies local D1 migrations and a Cloudflare development dry-run; iOS production export and Android native release APK are separate CI gates.
+Mobile tests cover setup/localization validation, passwordless email-OTP existing/new-user transitions and single-flight guards, Android compact-tab scroll thresholds/route mapping, preview semantics, authenticated story DTO parsing, fresh bearer tokens, retry-key reuse, canonical resync after conflict, retention parsing, private audio request/status/playback-source authorization, RevenueCat Test Store selection, and backend entitlement refresh behavior. GitHub quality now also applies local D1 migrations and a Cloudflare development dry-run; iOS production export and Android native release APK are separate CI gates.
