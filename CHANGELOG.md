@@ -4,6 +4,9 @@ All notable changes to Living Plot will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Phase 2 narrative quality: consequenceRealization, threadPayoff, pacingRole rhythm, branchCommitment, relationshipProgression, protagonistAgency, arcCoherence, returnPull proxy; objective publication hard codes; long-horizon synthetic fixtures; no new schema migration; no mandatory LLM judge.
+
 ### Changed
 - Phase 1 long-run narrative novelty: trajectory diversity, structural beat rotation (`BEAT_COOLDOWN_SCENES`), long-range motif signatures, evaluator dimensions, and Gemini publication reject/retry gate without Vector DB.
 - Raised owner-data export to schema v3 so referral/bonus-credit state and privacy-safe portrait metadata travel with account export while internal IDs, reward events, reservation keys, portrait fingerprints, private R2 keys, and generated media bytes remain excluded.

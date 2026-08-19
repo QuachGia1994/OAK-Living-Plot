@@ -11,6 +11,17 @@ import {
   type SceneMotifSignature,
   type TrajectoryConstraint,
 } from './narrative-novelty';
+import {
+  isPhase2HardFailure,
+  scoreArcCoherence,
+  scoreBranchCommitment,
+  scoreConsequenceRealization,
+  scorePacingQuality,
+  scoreProtagonistAgency,
+  scoreRelationshipProgression,
+  scoreReturnPull,
+  scoreThreadPayoff,
+} from './narrative-quality';
 
 export type NarrativeEvalDimension =
   | 'continuity'
@@ -23,7 +34,15 @@ export type NarrativeEvalDimension =
   | 'sceneProgression'
   | 'trajectoryDiversity'
   | 'structuralVariety'
-  | 'longRangeNovelty';
+  | 'longRangeNovelty'
+  | 'consequenceRealization'
+  | 'threadPayoff'
+  | 'pacingQuality'
+  | 'branchCommitment'
+  | 'relationshipProgression'
+  | 'protagonistAgency'
+  | 'arcCoherence'
+  | 'returnPull';
 
 export interface NarrativeEvalFinding {
   dimension: NarrativeEvalDimension | 'structure';
@@ -50,10 +69,19 @@ const DIMENSIONS: NarrativeEvalDimension[] = [
   'trajectoryDiversity',
   'structuralVariety',
   'longRangeNovelty',
+  'consequenceRealization',
+  'threadPayoff',
+  'pacingQuality',
+  'branchCommitment',
+  'relationshipProgression',
+  'protagonistAgency',
+  'arcCoherence',
+  'returnPull',
 ];
 
-/** Hard floors for novelty dimensions when novelty constraints are present. */
+/** Hard floors for novelty and objective Phase-2 dimensions. */
 const NOVELTY_HARD_MINIMUM = 60;
+const PHASE2_OBJECTIVE_MINIMUM = 60;
 
 export function evaluateNarrative(
   input: SceneGenerationInput,
@@ -87,13 +115,26 @@ export function evaluateNarrative(
     trajectoryDiversity: scoreTrajectoryDiversity(proposal, novelty.trajectoryConstraints, findings),
     structuralVariety: scoreStructuralVariety(proposal, novelty.excludedBeats, findings, novelty.requireBeat),
     longRangeNovelty: scoreLongRangeNovelty(proposal, novelty.motifHistory, findings),
+    consequenceRealization: scoreConsequenceRealization(input, proposal, findings),
+    threadPayoff: scoreThreadPayoff(input, proposal, findings),
+    pacingQuality: scorePacingQuality(input, proposal, findings),
+    branchCommitment: scoreBranchCommitment(proposal, findings),
+    relationshipProgression: scoreRelationshipProgression(input, proposal, findings),
+    protagonistAgency: scoreProtagonistAgency(input, proposal, findings),
+    arcCoherence: scoreArcCoherence(input, proposal, findings),
+    returnPull: scoreReturnPull(proposal, findings),
   };
   const score = Math.round(DIMENSIONS.reduce((sum, key) => sum + dimensions[key], 0) / DIMENSIONS.length);
+  const hardPhase2Fail = findings.some((finding) => isPhase2HardFailure(finding.code));
   const passed = score >= 80
     && DIMENSIONS.every((key) => dimensions[key] >= 60)
     && dimensions.trajectoryDiversity >= NOVELTY_HARD_MINIMUM
     && dimensions.structuralVariety >= NOVELTY_HARD_MINIMUM
-    && dimensions.longRangeNovelty >= NOVELTY_HARD_MINIMUM;
+    && dimensions.longRangeNovelty >= NOVELTY_HARD_MINIMUM
+    && dimensions.branchCommitment >= PHASE2_OBJECTIVE_MINIMUM
+    && dimensions.consequenceRealization >= PHASE2_OBJECTIVE_MINIMUM
+    && dimensions.threadPayoff >= PHASE2_OBJECTIVE_MINIMUM
+    && !hardPhase2Fail;
   return { passed, score, dimensions, findings };
 }
 
@@ -430,6 +471,14 @@ function emptyDimensions(): Record<NarrativeEvalDimension, number> {
     trajectoryDiversity: 0,
     structuralVariety: 0,
     longRangeNovelty: 0,
+    consequenceRealization: 0,
+    threadPayoff: 0,
+    pacingQuality: 0,
+    branchCommitment: 0,
+    relationshipProgression: 0,
+    protagonistAgency: 0,
+    arcCoherence: 0,
+    returnPull: 0,
   };
 }
 

@@ -37,6 +37,7 @@ export interface SceneGenerationInput {
     consequence: string | null;
     choiceLabels: string[];
     beat?: string | null;
+    pacingRole?: string | null;
     motifSignature?: {
       beat: string;
       threadCategory: string;
@@ -116,6 +117,8 @@ export interface SceneProposal {
   summary: string;
   /** Phase-1 structural narrative beat (required for novelty publication gate). */
   beat?: string;
+  /** Phase-2 local arc function: setup|build|escalate|payoff|breather|cliffhanger. */
+  pacingRole?: string;
   establishedFacts: string[];
   threadChanges: {
     open: ThreadProposal[];

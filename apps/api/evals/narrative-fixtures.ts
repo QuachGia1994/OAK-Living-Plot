@@ -44,6 +44,7 @@ function confessionAftermathFixture(): NarrativeFixture {
 
   const proposal: SceneProposal = {
     title: 'Phần Còn Lại',
+    pacingRole: 'payoff',
     script: [
       'Linh yêu cầu An nói toàn bộ sự thật ngay lập tức, và An thừa nhận đã giấu tin nhắn vì sợ cô bị kéo vào chuyện nguy hiểm.',
       'Không khí trong căn bếp chật hẹp nặng đến mức tiếng mưa ngoài cửa sổ nghe như một chiếc đồng hồ đếm ngược.',
@@ -101,6 +102,7 @@ function familyDebtFixture(): NarrativeFixture {
 
   const proposal: SceneProposal = {
     title: 'What the Watch Bought',
+    pacingRole: 'escalate',
     script: [
       'Maya realizes Theo sold the watch to pay the debt, and Theo confesses the sale before she can ask another question.',
       'He explains that the money covered only the interest, not the amount he originally borrowed, which makes Maya’s anger turn into alarm.',
@@ -153,6 +155,7 @@ function injectionDataFixture(): NarrativeFixture {
 
   const proposal: SceneProposal = {
     title: 'The Message That Knows Too Much',
+    pacingRole: 'build',
     script: [
       'Nora reads the fake system message aloud, including its demand to ignore prior rules, while Eli records the header instead of obeying anything written inside it.',
       'The wording is dramatic, but the timestamp reveals the message crossed the school network three minutes before the server logged the account as active.',

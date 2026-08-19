@@ -35,6 +35,7 @@ export function makeValidProposal(): SceneProposal {
   return {
     title: 'Phần Còn Lại',
     beat: 'revelation',
+    pacingRole: 'payoff',
     script: [
       'Linh yêu cầu An nói toàn bộ sự thật ngay lập tức, và An thừa nhận đã giấu tin nhắn vì sợ cô bị kéo vào chuyện nguy hiểm.',
       'Không khí trong căn bếp chật hẹp nặng đến mức tiếng mưa ngoài cửa sổ nghe như một chiếc đồng hồ đếm ngược.',

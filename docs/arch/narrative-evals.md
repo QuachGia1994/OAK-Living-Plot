@@ -1,70 +1,70 @@
-# Phase 1 narrative quality evaluations
+# Narrative quality evaluations
 
-> updated 2026-08-17 · 0.0.0
+> updated 2026-08-19 · 0.0.0
 
 ## Purpose
-Schema validation protects canonical state, but valid JSON can still produce weak interactive drama. Slice 12 adds a deterministic offline evaluation layer for narrative regressions without granting an evaluator authority over runtime story state.
+Schema validation protects canonical state, but valid JSON can still produce weak interactive drama. Deterministic offline evaluation scores narrative regressions without granting an evaluator authority over runtime story state (except objective publication gates).
 
-The required CI gate does not call an LLM-as-judge and does not require a paid provider request. This keeps the gate reproducible, cheap, and independent from provider availability.
+The required CI gate does not call an LLM-as-judge and does not require a paid provider request.
+
+## Phase split
+
+**Phase 1 — novelty / anti-repeat**
+Answers: “Is this Scene structurally new enough to publish?”
+Dimensions: trajectoryDiversity, structuralVariety, longRangeNovelty (+ continuity stack).
+
+**Phase 2 — consequence depth / payoff / pacing / meaningful continuation**
+Answers: “Was the player’s choice worth making, and does the resulting story make them want the next Scene?”
+Dimensions: consequenceRealization, threadPayoff, pacingQuality, branchCommitment, relationshipProgression, protagonistAgency, arcCoherence, returnPull.
+
+`returnPull` is a **narrative proxy** only. Real retention is measured from user behavior telemetry when present; the heuristic is not claimed to equal retention.
 
 ## Fixture corpus
-`apps/api/evals/narrative-fixtures.ts` contains a small representative corpus covering:
-
-- a Vietnamese confession aftermath where the previous committed choice must become visible immediately;
-- an English family-debt escalation with a secret, threatened relationship, and branch-specific fallout;
-- a school mystery containing prompt-injection-like text as ordinary story data.
-
-Each fixture contains bounded canonical `EpisodeGenerationInput` plus a provider-neutral `EpisodeProposal`. The corpus intentionally exercises existing facts, relationships, open threads, exactly three choices, and state deltas.
+`apps/api/evals/narrative-fixtures.ts` plus focused Phase-2 unit tests in `apps/api/test/narrative-quality.test.ts`.
 
 ## Deterministic dimensions
-`evaluateNarrative()` first passes the proposal through the same structural/canonical validator used by production. A structural failure receives score zero.
+`evaluateNarrative()` validates structure first, then scores 0–100 on:
 
-Valid proposals are then scored from 0–100 on eleven dimensions:
+### Phase-1 / continuity stack
+1. continuity
+2. threadMomentum
+3. branchDistinctness
+4. consequenceSpecificity
+5. repetitionControl
+6. characterConsistency
+7. localeAlignment
+8. sceneProgression
+9. trajectoryDiversity
+10. structuralVariety
+11. longRangeNovelty
 
-1. `continuity` — a previous committed consequence must be materially visible in the first third of the episode, and the chosen action must be reflected in the opening/summary.
-2. `threadMomentum` — at least one open thread must be resolved or materially reflected in the new narrative.
-3. `branchDistinctness` — choice labels/intents cannot be near-duplicates and all three state-delta signatures must differ.
-4. `consequenceSpecificity` — branch consequences must be sufficiently specific and materially different from each other.
-5. `repetitionControl` — the script must not collapse into repeated three-word sequences.
-6. `characterConsistency` — the canonical protagonist must remain visibly anchored in the scene/summary/branches instead of disappearing behind a replacement lead.
-7. `localeAlignment` — supported English/Vietnamese requests must produce visible language signal matching the requested locale across the narrative and branches.
-8. `sceneProgression` — the episode must establish a durable fact or open/resolve a canonical thread before branching, preventing structurally valid scene resets.
-9. `trajectoryDiversity` — after ≥3 material same-direction relationship moves on one pair/dimension, not all three choices may continue that trajectory; at least one must reverse materiality or open independent fact/thread progression.
-10. `structuralVariety` — proposals declare a finite narrative beat; beats inside the shared cooldown (`BEAT_COOLDOWN_SCENES = 3`) are rejected.
-11. `longRangeNovelty` — compact per-scene motif signatures detect recycled structure beyond the bounded recent prompt window without Vector DB.
+### Phase-2 quality
+12. consequenceRealization — prior committed consequence causes canonical development (fact/thread/durable branch), not mere echo
+13. threadPayoff — critical high-urgency threads must not starve while new mysteries proliferate
+14. pacingQuality — pacingRole in setup|build|escalate|payoff|breather|cliffhanger; forbid endless escalation / endless breather
+15. branchCommitment — each of A/B/C creates at least one durable state effect
+16. relationshipProgression — material relationship deltas should be narratively visible
+17. protagonistAgency — structured choice intent + durable effects (eval-first)
+18. arcCoherence — long-run opens vs payoffs stay balanced
+19. returnPull — prefer payoff + concrete return hook over pure cliffhanger
 
-A fixture passes only when the average score is at least 80 and every dimension is at least 60 (novelty dimensions share the same floor). These metrics are regression heuristics, not claims of objective literary quality.
+Pass rule: average ≥ 80, every dimension ≥ 60, plus hard floors on novelty dimensions and objective Phase-2 dimensions (branchCommitment, consequenceRealization, threadPayoff). Hard codes may reject publication: BRANCH_NO_DURABLE_EFFECT, CRITICAL_THREAD_STALLED, THREAD_EXPLOSION, CONSEQUENCE_NOT_REALIZED, PACING_ROLE_INVALID.
 
-### Anti-repeat stack
-Bounded prompt memory + trajectory diversity + beat rotation + long-range motif signatures + deterministic publication validation in the Gemini adapter (reject → controlled retry → no publish). Shadow LLM predictability judges remain **deferred** (YAGNI).
+## Runtime publication gate
+provider proposal → structural validation → Phase-1 novelty → Phase-2 objective invariants → one bounded regeneration if rejected → publish exactly once. Failed proposals never persist; quota released per existing ledger.
 
-## Adversarial coverage
-The suite explicitly proves failure for:
+## Persistence
+No Phase-2 schema migration. Thread age/urgency/pacing history derived from canonical Scene history + generation input.
 
-- semantically near-duplicate choices that still use different strings;
-- an episode that ignores the prior committed consequence;
-- an unknown canonical thread key;
-- generic branch consequences;
-- a structurally valid but excessively repetitive script;
-- a proposal that drops the canonical protagonist;
-- English narrative output for a Vietnamese locale;
-- an episode that adds no durable canonical progression before branching.
+## LLM judge
+Deferred. No production mandatory judge. Optional shadow telemetry remains YAGNI unless a trivial seam already exists.
 
-Run the focused gate with:
+## Telemetry
+Prefer existing product events (scene_viewed / choice_committed / next_scene_requested) when present. No new analytics SDK in this stage.
+
+Run focused gates:
 
 ```bash
+npm --workspace @living-plot/api test -- narrative-quality
 npm --workspace @living-plot/api run eval:narrative
 ```
-
-The same tests are also included in the normal API Vitest suite.
-
-## Model baseline
-The production story adapter now targets `gemini-3.5-flash-lite` through the Gemini Interactions API with `thinking_level: minimal`. This replaces the deprecated Gemini 2.5 Flash-Lite baseline before narrative results are treated as the Phase 1 reference corpus.
-
-Provider-generated live eval sampling can be added later, but the required gate remains provider-neutral and deterministic so a model outage, rate limit, or billing state cannot make CI nondeterministic.
-
-## Boundary
-Narrative evaluation is engineering evidence only. It does not mutate D1, publish episodes, consume user quota, grant entitlements, or decide access. Runtime provider output still must pass the production schema/canonical validator before persistence.
-
-## Deferred
-Large live-model benchmark sets, human preference studies, A/B experimentation, automated quality dashboards, production alert thresholds, and per-locale editorial tuning remain later product-validation work.

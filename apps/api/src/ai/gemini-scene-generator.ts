@@ -9,6 +9,7 @@ import type {
 import { sceneResponseSchema, parseAndValidateSceneProposal } from './scene-schema';
 import { buildScenePrompt, validateSceneGenerationInput } from './scene-prompt';
 import { evaluateNarrative } from '../evals/narrative-evaluator';
+import { isPhase2HardFailure } from '../evals/narrative-quality';
 import {
   NOOP_GENERATION_TELEMETRY,
   type GenerationAttemptOutcome,
@@ -63,14 +64,15 @@ export class GeminiSceneGenerator implements SceneGenerator {
         validationErrors = validated.error;
       } else {
         const narrative = evaluateNarrative(input, validated.value);
-        const noveltyFailures = narrative.findings.filter((finding) =>
+        const gateFailures = narrative.findings.filter((finding) =>
           finding.dimension === 'trajectoryDiversity'
           || finding.dimension === 'structuralVariety'
           || finding.dimension === 'longRangeNovelty'
-          || finding.code === 'STRUCTURAL_OR_CANONICAL_FAILURE');
-        if (!narrative.passed && noveltyFailures.length > 0) {
+          || finding.code === 'STRUCTURAL_OR_CANONICAL_FAILURE'
+          || isPhase2HardFailure(finding.code));
+        if (!narrative.passed && gateFailures.length > 0) {
           this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
-          validationErrors = noveltyFailures.map((finding) => `${finding.code}: ${finding.message}`);
+          validationErrors = gateFailures.map((finding) => `${finding.code}: ${finding.message}`);
         } else if (!narrative.passed) {
           this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
           validationErrors = narrative.findings.map((finding) => `${finding.code}: ${finding.message}`);

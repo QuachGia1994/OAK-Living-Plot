@@ -53,7 +53,7 @@ export function parseAndValidateSceneProposal(
 }
 
 function parseProposal(value: unknown): Result<SceneProposal, string[]> {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['title', 'script', 'summary', 'establishedFacts', 'threadChanges', 'choices'], ['beat'])) {
+  if (!isRecord(value) || !hasOnlyKeys(value, ['title', 'script', 'summary', 'establishedFacts', 'threadChanges', 'choices'], ['beat', 'pacingRole'])) {
     return invalid('Scene proposal has an invalid top-level shape.');
   }
   if (!isBoundedText(value.title, 1, 120) || !isBoundedText(value.script, 1, 6000) || !isBoundedText(value.summary, 1, 800)) {
@@ -82,6 +82,7 @@ function parseProposal(value: unknown): Result<SceneProposal, string[]> {
       script: value.script,
       summary: value.summary,
       ...(typeof value.beat === 'string' ? { beat: value.beat } : {}),
+      ...(typeof value.pacingRole === 'string' ? { pacingRole: value.pacingRole } : {}),
       establishedFacts: value.establishedFacts,
       threadChanges: { open: openThreads.value, resolve: value.threadChanges.resolve },
       choices: [choices[0], choices[1], choices[2]],
