@@ -7,6 +7,7 @@ import { useDramaPlayback, type DramaFailure } from '@/features/drama/use-drama-
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeDramaShareText } from '@/features/share/drama-share';
+import { CharacterPortraitCard } from '@/features/portrait/character-portrait-card';
 import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, MotionReveal, Screen } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
@@ -171,6 +172,13 @@ export default function DramaScreen() {
             </View>
           </MotionReveal>
         ) : null}
+
+        <CharacterPortraitCard
+          key={`portrait-${drama.id}-${scene.number}`}
+          dramaId={drama.id}
+          characterName={drama.leadCharacter.name}
+          storyRevision={`${scene.number}:${scene.branch.state}:${scene.branch.state === 'committed' ? scene.branch.choiceId : 'open'}`}
+        />
 
         <SceneVoiceCard key={scene.id} sceneId={scene.id} sceneText={scene.script} />
 

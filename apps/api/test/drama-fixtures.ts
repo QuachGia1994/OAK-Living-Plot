@@ -20,6 +20,7 @@ export function makeGenerationInput(): SceneGenerationInput {
     ],
     activeFacts: [{ key: 'fact-hidden-message', text: 'An hid a message from Linh.' }],
     openThreads: [{ key: 'thread-trust', title: 'Linh questions An’s honesty.', urgency: 80 }],
+    recentHistory: [],
     previous: {
       sceneSummary: 'Linh found the hidden message.',
       chosenAction: 'An admits hiding it.',
@@ -56,7 +57,11 @@ function makeChoice(
     key,
     label,
     intent,
-    consequence: `Immediate consequence for choice ${key}.`,
+    consequence: key === 'A'
+      ? 'Linh hears the full confession and demands proof before trusting An again.'
+      : key === 'B'
+        ? 'Linh agrees to wait one night but sets a deadline that raises the pressure on An.'
+        : 'An keeps the final secret, protecting one fact while damaging Linh’s trust further.',
     stateDelta: {
       relationships: [
         {

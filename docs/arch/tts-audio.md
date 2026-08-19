@@ -83,6 +83,9 @@ The consumer writes deterministic MP3 keys:
 
 The Expo client requests one approved narrator variant, polls the status route while work is pending, and uses Expo Audio with the protected stream URL plus an Authorization header after `ready`. Automatic polling now spans the server retry window instead of stopping after the first ~20 seconds, so `queued/processing` can naturally converge to `ready` or `failed` after provider retries. Pending cloud narration is presented as background work rather than a blocking action. Until that generated-media path is healthy, `expo-speech` can read the Scene locally as an explicitly separate device-voice fallback. Public live configuration and signed-in session state are separate concerns: API URL + Clerk configuration select the authenticated HTTP client, while a missing session produces `auth_required` at the transport boundary. A deliberately unconfigured preview build exposes cloud voice as unavailable and never fabricates private audio. Playback/provider failure never invalidates or hides the text scene.
 
+## Quota and referral credits
+Fresh cloud narration first reserves from the user's normal daily voice allowance (Free 1/day, Plus 10/day). Only when that daily allowance is exhausted may `D1VoiceQuota` reserve one persistent referral bonus credit. Bonus credits use their own D1 reservation lifecycle and are restored on queue/provider failure; successful private audio consumes exactly one. Device-system speech never touches either quota source.
+
 ## Idempotency and failure semantics
 - same episode/voice request while work exists returns the canonical asset;
 - concurrent different request keys for one episode/voice create one asset, one quota reservation, and one queue message;

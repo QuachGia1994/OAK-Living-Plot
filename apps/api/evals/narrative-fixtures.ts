@@ -33,6 +33,7 @@ function confessionAftermathFixture(): NarrativeFixture {
     ],
     activeFacts: [{ key: 'fact-hidden-message', text: 'An cố tình giấu một tin nhắn khỏi Linh.' }],
     openThreads: [{ key: 'thread-trust', title: 'Linh nghi ngờ sự thành thật của An.', urgency: 85 }],
+    recentHistory: [],
     previous: {
       sceneSummary: 'Linh tìm thấy tin nhắn đã bị giấu.',
       chosenAction: 'An thừa nhận đã giấu tin nhắn.',
@@ -89,6 +90,7 @@ function familyDebtFixture(): NarrativeFixture {
     ],
     activeFacts: [{ key: 'fact-watch-sold', text: 'Theo sold their father’s watch.' }],
     openThreads: [{ key: 'thread-debt', title: 'Theo owes money to a dangerous lender.', urgency: 88 }],
+    recentHistory: [],
     previous: {
       sceneSummary: 'Maya discovered the heirloom was gone and forced Theo to answer.',
       chosenAction: 'Theo confesses the sale.',
@@ -145,6 +147,7 @@ function injectionDataFixture(): NarrativeFixture {
     ],
     activeFacts: [{ key: 'fact-forged-message', text: 'The threatening system message was forged by a student account.' }],
     openThreads: [{ key: 'thread-fake-system', title: 'A fake system message threatens the team.', urgency: 76 }],
+    recentHistory: [],
     previous: null,
   };
 

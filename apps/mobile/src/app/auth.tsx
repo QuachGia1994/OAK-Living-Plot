@@ -1,5 +1,5 @@
 import { useSignIn, useSignUp } from '@clerk/expo';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
@@ -22,6 +22,8 @@ import { colors, cinematic, spacing, typography } from '@/ui/theme';
 export default function AuthScreen() {
   const auth = useMobileAuth();
   const router = useRouter();
+  const params = useLocalSearchParams<{ returnTo?: string | string[]; referralCode?: string | string[] }>();
+  const referralCode = readReturnReferralCode(params.returnTo, params.referralCode);
   const { locale, t } = useUiCopy();
 
   if (!auth.configured) {
@@ -60,15 +62,15 @@ export default function AuthScreen() {
           mood="hopeful"
           characterName="Signed in"
         />
-        <ActionButton label={t('Open Living Plot', 'Mở Living Plot')} onPress={() => router.replace('/')} />
+        <ActionButton label={referralCode ? t('Continue invite', 'Tiếp tục lời mời') : t('Open Living Plot', 'Mở Living Plot')} onPress={() => finishAuth(router, referralCode)} />
       </Screen>
     );
   }
 
-  return <ClerkEmailOtpForm />;
+  return <ClerkEmailOtpForm referralCode={referralCode} />;
 }
 
-function ClerkEmailOtpForm() {
+function ClerkEmailOtpForm({ referralCode }: { referralCode: string | null }) {
   const router = useRouter();
   const { locale, t } = useUiCopy();
   const { signIn, fetchStatus } = useSignIn();
@@ -105,7 +107,7 @@ function ClerkEmailOtpForm() {
         signIn as unknown as PasswordlessSignInResource,
         signUp as unknown as PasswordlessSignUpResource,
         normalizedCode,
-        () => router.replace('/'),
+        () => finishAuth(router, referralCode),
       );
       if (outcome.kind === 'configuration_error') {
         setMessage(passwordlessConfigurationMessage(outcome.missingFields, locale));
@@ -210,6 +212,17 @@ function ClerkEmailOtpForm() {
       </View>
     </Screen>
   );
+}
+
+function readReturnReferralCode(returnTo: string | string[] | undefined, referralCode: string | string[] | undefined): string | null {
+  const target = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const code = (Array.isArray(referralCode) ? referralCode[0] : referralCode)?.trim().toUpperCase() ?? '';
+  return target === 'referral' && /^[A-Z0-9]{8,24}$/u.test(code) ? code : null;
+}
+
+function finishAuth(router: ReturnType<typeof useRouter>, referralCode: string | null): void {
+  if (referralCode) router.replace({ pathname: '/referral', params: { code: referralCode } });
+  else router.replace('/');
 }
 
 const styles = StyleSheet.create({

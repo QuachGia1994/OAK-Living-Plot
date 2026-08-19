@@ -214,7 +214,7 @@ function parseChoice(value: unknown): Choice {
 function parseHome(value: Record<string, unknown>, nowMs: number, uiLocale: UiLocale): DramaHomeSnapshot {
   if (!Array.isArray(value.recentDramas) || !isRecord(value.quota)) throw invalidBackendResponse();
   const quota = value.quota;
-  if (![quota.textRemaining, quota.textLimit, quota.voiceRemaining, quota.voiceLimit].every(Number.isInteger) || typeof quota.resetAt !== 'string') {
+  if (![quota.textRemaining, quota.textLimit, quota.voiceRemaining, quota.voiceLimit, quota.voiceBonusCredits].every(Number.isInteger) || typeof quota.resetAt !== 'string') {
     throw invalidBackendResponse();
   }
   return {
@@ -224,6 +224,7 @@ function parseHome(value: Record<string, unknown>, nowMs: number, uiLocale: UiLo
       textLimit: Number(quota.textLimit),
       voiceRemaining: Number(quota.voiceRemaining),
       voiceLimit: Number(quota.voiceLimit),
+      voiceBonusCredits: Number(quota.voiceBonusCredits),
       resetLabel: resetLabel(quota.resetAt, uiLocale),
     },
     retention: parseRetention(value.retention),

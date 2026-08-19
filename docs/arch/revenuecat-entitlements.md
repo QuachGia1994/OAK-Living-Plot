@@ -41,12 +41,14 @@ One materialized row per internal user containing effective tier, optional Plus 
 
 Older provider snapshots cannot overwrite newer state. Independently, the read path fails closed to effective Free after a finite `plus_expires_at` passes even if an expiration webhook is delayed. A null Plus expiration represents a provider-reported non-expiring entitlement.
 
-## Quota integration
+## Quota and referral integration
 `GET /v1/entitlement` exposes only backend-materialized Free/Plus state to an authenticated owner.
 
-Voice generation now resolves the user's tier from D1 immediately before quota reservation. Free remains 1 fresh voice/day; verified Plus receives 10. The client cannot elevate quota by sending a tier flag.
+Voice generation resolves the user's tier from D1 immediately before quota reservation. Free receives 1 fresh cloud narration/day; verified Plus receives 10. If that daily allowance is exhausted, a persistent referral voice-credit balance may be used. The client cannot elevate quota by sending a tier or bonus flag.
 
-Text generation orchestration is not yet wired to mobile HTTP, so its eventual request path must use the same repository instead of trusting the client.
+Referral reward authority is also server-side. A referred account may claim exactly one inviter code, but that claim itself grants nothing. The inviter reward is eligible only when a verified RevenueCat `INITIAL_PURCHASE` event for that referred account refreshes to Plus and the referral claim predates that purchase event. The webhook path then grants 50 persistent voice credits exactly once. Renewal-only events do not create a new referral reward, replayed events and later Plus refreshes do not double-grant it, and referral-reward persistence failure returns non-2xx so the provider delivery can retry safely.
+
+Scene generation likewise resolves quota from backend entitlement state. Current text limits are Free 50/day and Plus 100/day.
 
 ## Mobile boundary
 The Expo client installs `react-native-purchases`, `react-native-purchases-ui`, and `expo-dev-client`.

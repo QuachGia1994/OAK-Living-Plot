@@ -106,7 +106,7 @@ describe('HttpDramaExperienceClient', () => {
       async () => 'token',
       async () => Response.json({ home: {
         recentDramas: [summaryPayload(now - 3_600_000)],
-        quota: { textRemaining: 2, textLimit: 3, voiceRemaining: 1, voiceLimit: 1, resetAt: '2026-08-18T00:00:00.000Z' },
+        quota: { textRemaining: 49, textLimit: 50, voiceRemaining: 1, voiceLimit: 1, voiceBonusCredits: 0, resetAt: '2026-08-18T00:00:00.000Z' },
         retention: {
           currentStreakDays: 1,
           choicesMade: 2,
@@ -132,7 +132,7 @@ describe('HttpDramaExperienceClient', () => {
       async () => 'token',
       async () => Response.json({ home: {
         recentDramas: [{ ...summaryPayload(now - 3_600_000), sceneNumber: 2 }],
-        quota: { textRemaining: 2, textLimit: 3, voiceRemaining: 1, voiceLimit: 1, resetAt: '2026-08-18T00:00:00.000Z' },
+        quota: { textRemaining: 49, textLimit: 50, voiceRemaining: 1, voiceLimit: 1, voiceBonusCredits: 7, resetAt: '2026-08-18T00:00:00.000Z' },
         retention: {
           currentStreakDays: 2,
           choicesMade: 5,
@@ -147,6 +147,7 @@ describe('HttpDramaExperienceClient', () => {
 
     const home = await client.loadHome();
     expect(home.recentDramas[0]).toMatchObject({ updatedLabel: '1h ago', sceneNumber: 2 });
+    expect(home.quota).toMatchObject({ textRemaining: 49, textLimit: 50, voiceRemaining: 1, voiceLimit: 1, voiceBonusCredits: 7 });
     expect(home.retention).toMatchObject({ currentStreakDays: 2, choicesMade: 5, activeDramas: 1 });
   });
 });

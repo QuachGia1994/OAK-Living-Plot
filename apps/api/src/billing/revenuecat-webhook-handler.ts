@@ -3,6 +3,7 @@ import { D1EntitlementRepository } from './d1-entitlement-repository';
 import type { RevenueCatSubscriberProvider } from './contracts';
 import { RevenueCatSubscriberClient } from './revenuecat-subscriber-client';
 import { verifyRevenueCatWebhook } from './revenuecat-webhook-verifier';
+import { D1ReferralService } from '../referrals/d1-referral-service';
 
 export interface RevenueCatWebhookDependencies {
   subscriberProvider?: RevenueCatSubscriberProvider;
@@ -31,10 +32,22 @@ export async function handleRevenueCatWebhookRequest(
 
   const repository = new D1EntitlementRepository(env.DB, dependencies.clock);
   if (await repository.hasEvent(verification.event.id)) {
+    const entitlement = await repository.getEntitlement(verification.event.appUserId);
+    const stored = await repository.getStoredEventOutcome(verification.event.id);
+    if (stored && !(await settleReferralReward(
+      env.DB,
+      verification.event.appUserId,
+      verification.event.id,
+      stored.eventType,
+      stored.tierAfter,
+      stored.eventTimestampMs,
+    ))) {
+      return json({ error: 'referral_reward_unavailable' }, 503);
+    }
     return json({
       accepted: true,
       replayed: true,
-      entitlement: clientEntitlement(await repository.getEntitlement(verification.event.appUserId)),
+      entitlement: clientEntitlement(entitlement),
     });
   }
 
@@ -54,11 +67,39 @@ export async function handleRevenueCatWebhookRequest(
     return json({ error: 'persistence_error' }, 503);
   }
 
+  if (!(await settleReferralReward(
+    env.DB,
+    verification.event.appUserId,
+    verification.event.id,
+    verification.event.type,
+    providerResult.value.tier,
+    verification.event.eventTimestampMs,
+  ))) {
+    return json({ error: 'referral_reward_unavailable' }, 503);
+  }
+
   return json({
     accepted: true,
     replayed: applied.value.replayed,
     entitlement: clientEntitlement(applied.value.entitlement),
   });
+}
+
+async function settleReferralReward(
+  db: D1Database,
+  referredUserId: string,
+  eventId: string,
+  eventType: string,
+  tier: 'free' | 'plus',
+  plusActivatedAt: number,
+): Promise<boolean> {
+  if (tier !== 'plus' || !isReferralRewardActivation(eventType)) return true;
+  const result = await new D1ReferralService(db).grantForPlusActivation(referredUserId, eventId, plusActivatedAt);
+  return result.ok;
+}
+
+function isReferralRewardActivation(eventType: string): boolean {
+  return eventType.trim().toUpperCase() === 'INITIAL_PURCHASE';
 }
 
 function clientEntitlement(entitlement: Awaited<ReturnType<D1EntitlementRepository['getEntitlement']>>) {

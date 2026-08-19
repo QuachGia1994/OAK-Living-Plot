@@ -66,6 +66,16 @@ interface PreviousRow {
   consequence: string;
 }
 
+interface RecentHistoryRow {
+  episode_id: string;
+  episode_number: number;
+  title: string;
+  summary: string;
+  chosen_action: string | null;
+  intent: string | null;
+  consequence: string | null;
+}
+
 interface HistoryRow {
   episode_id: string;
   episode_number: number;
@@ -183,7 +193,10 @@ export class D1DramaRepository {
     const characters = await this.loadCharacters(plot.id);
     if (characters.length === 0) return null;
     const state = normalizeDramaStateSemantics(parseDramaState(plot.state_json));
-    const previous = await this.loadPrevious(plot.id);
+    const [previous, recentHistory] = await Promise.all([
+      this.loadPrevious(plot.id),
+      this.loadRecentHistory(plot.id),
+    ]);
     return {
       dramaId: plot.id,
       stateVersion: plot.version,
@@ -196,6 +209,7 @@ export class D1DramaRepository {
         relationships: state.relationships,
         activeFacts: state.facts,
         openThreads: state.openThreads,
+        recentHistory,
         previous,
       },
     };
@@ -348,6 +362,31 @@ export class D1DramaRepository {
       .first<CommitRow>();
   }
 
+  private async loadRecentHistory(plotId: string, limit = 12): Promise<SceneGenerationInputRecentHistory> {
+    const rows = await this.db
+      .prepare(
+        `SELECT e.id AS episode_id, e.episode_number, e.title, e.summary,
+                c.label AS chosen_action, cc.intent AS intent, cc.consequence AS consequence
+         FROM episodes e
+         LEFT JOIN choice_commits cc ON cc.episode_id = e.id
+         LEFT JOIN episode_choices c ON c.id = cc.choice_id AND c.episode_id = e.id
+         WHERE e.plot_id = ?
+         ORDER BY e.episode_number DESC LIMIT ?`,
+      )
+      .bind(plotId, limit)
+      .all<RecentHistoryRow>();
+    const chronological = [...rows.results].reverse();
+    return Promise.all(chronological.map(async (row) => ({
+      sceneNumber: row.episode_number,
+      title: row.title,
+      summary: row.summary,
+      committedChoice: row.chosen_action,
+      choiceIntent: row.intent,
+      consequence: row.consequence,
+      choiceLabels: (await this.loadChoices(row.episode_id)).map((choice) => choice.label),
+    })));
+  }
+
   private async loadPrevious(plotId: string): Promise<SceneGenerationInputPrevious | null> {
     const row = await this.db
       .prepare(
@@ -371,6 +410,7 @@ export class D1DramaRepository {
 }
 
 type SceneGenerationInputPrevious = GenerationContext['input']['previous'] extends infer T ? Exclude<T, null> : never;
+type SceneGenerationInputRecentHistory = GenerationContext['input']['recentHistory'];
 
 function toScene(episode: EpisodeRow, rows: ChoiceRow[], commit: CommitRow | null): Scene {
   if (rows.length !== 3) throw new Error('Stored live scene must have exactly three choices.');

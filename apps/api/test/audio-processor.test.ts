@@ -5,11 +5,13 @@ import migrationTwo from '../migrations/0002_episode_publication.sql?raw';
 import migrationThree from '../migrations/0003_choice_commit.sql?raw';
 import migrationFour from '../migrations/0004_quota_ledger.sql?raw';
 import migrationFive from '../migrations/0005_tts_audio.sql?raw';
+import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import { AudioProcessor } from '../src/audio/audio-processor';
 import { D1AudioService } from '../src/audio/d1-audio-service';
 import type { AudioJob, AudioQueue } from '../src/audio/contracts';
 import type { AppEnv } from '../src/env';
 import { D1QuotaLedger } from '../src/quota/d1-quota-ledger';
+import type { VoiceQuota } from '../src/quota/voice-quota';
 import type { SpeechResult, SpeechSynthesizer } from '../src/tts/contracts';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
 
@@ -23,6 +25,7 @@ beforeAll(async () => {
   await applySqlMigration(db, migrationThree);
   await applySqlMigration(db, migrationFour);
   await applySqlMigration(db, migrationFive);
+  await applySqlMigration(db, migrationTen);
 });
 
 beforeEach(async () => {
@@ -126,9 +129,12 @@ describe('AudioProcessor', () => {
     const failingBucket = {
       async delete() { throw new Error('r2 unavailable'); },
     } as unknown as R2Bucket;
-    const missingQuota = {
-      async consume() { return { ok: false as const, error: { code: 'not_found' as const, message: 'reservation missing' } }; },
-    } as unknown as D1QuotaLedger;
+    const missingQuota: VoiceQuota = {
+      async reserve() { return { ok: false, error: { code: 'not_found', message: 'reservation missing' } }; },
+      async consume() { return { ok: false, error: { code: 'not_found', message: 'reservation missing' } }; },
+      async release() { return { ok: false, error: { code: 'not_found', message: 'reservation missing' } }; },
+      async status() { return null; },
+    };
     const processor = new AudioProcessor(db, failingBucket, recordingSynthesizer(successSpeech()), missingQuota);
 
     const result = await processor.process({ assetId: requested.id });

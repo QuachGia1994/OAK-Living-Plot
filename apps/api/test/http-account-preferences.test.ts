@@ -8,6 +8,7 @@ import migrationFive from '../migrations/0005_tts_audio.sql?raw';
 import migrationSix from '../migrations/0006_revenuecat_entitlements.sql?raw';
 import migrationSeven from '../migrations/0007_live_story_integration.sql?raw';
 import migrationEight from '../migrations/0008_user_preferences.sql?raw';
+import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
 import { handleRequest } from '../src/http/app';
@@ -25,7 +26,7 @@ const testEnv: AppEnv = {
 };
 
 beforeAll(async () => {
-  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven, migrationEight]) {
+  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven, migrationEight, migrationTen]) {
     await applySqlMigration(db, migration);
   }
 });
@@ -59,25 +60,55 @@ describe('preferences and account data boundary', () => {
     const owner = await seedOwnedDrama('owner-auth-subject');
     await db.prepare(`INSERT INTO user_preferences (user_id, ui_locale, story_locale, narrator_variant) VALUES (?, 'vi', 'vi-VN', 'vi-narrator-female')`).bind(owner.id).run();
     await db.prepare(`INSERT INTO user_entitlements (user_id, tier, plus_expires_at, provider_request_date_ms) VALUES (?, 'plus', ?, ?)`).bind(owner.id, Date.now() + 60_000, Date.now()).run();
+    await db.prepare(`INSERT INTO referral_codes (user_id, code) VALUES (?, 'EXPORTME1')`).bind(owner.id).run();
+    await db.prepare(`INSERT INTO voice_bonus_accounts (user_id, available_credits, earned_credits, spent_credits) VALUES (?, 30, 50, 20)`).bind(owner.id).run();
+    await db.prepare(
+      `INSERT INTO character_portraits
+         (plot_id, character_id, story_fingerprint, object_key, status, attempts, ready_at)
+       VALUES ('plot-export', 'character-export', 'export-portrait-fingerprint', 'portraits/private/export-secret.jpg', 'ready', 2, ?)`,
+    ).bind(Date.now()).run();
 
-    const response = await call('/v1/account/export', 'GET', undefined, 'owner-auth-subject');
+    const response = await call('/v1/account/export?schema=3', 'GET', undefined, 'owner-auth-subject');
     expect(response.status).toBe(200);
     const body = await response.json() as { export: Record<string, unknown> };
     const serialized = JSON.stringify(body);
-    expect(body.export).toMatchObject({ schemaVersion: 2, preferences: { uiLocale: 'vi', dramaLocale: 'vi-VN' } });
+    expect(body.export).toMatchObject({
+      schemaVersion: 3,
+      preferences: { uiLocale: 'vi', dramaLocale: 'vi-VN' },
+      referral: {
+        code: 'EXPORTME1',
+        claimedCode: null,
+        successfulReferrals: 0,
+        voiceCredits: { available: 30, earned: 50, spent: 20 },
+      },
+      dramas: [{ portraits: [{ status: 'ready', attempts: 2, readyAt: expect.any(String) }] }],
+    });
     expect(serialized).toContain('A portable scene script.');
     expect(serialized).toContain('"dramas"');
     expect(serialized).toContain('"scenes"');
     expect(serialized).not.toContain('private/audio/object.mp3');
+    expect(serialized).not.toContain('portraits/private/export-secret.jpg');
+    expect(serialized).not.toContain('export-portrait-fingerprint');
     expect(serialized).not.toContain('provider-secret-voice-id');
     expect(serialized).not.toContain('owner-auth-subject');
     expect(serialized).not.toContain('reservation-export-001');
+
+    const legacy = await call('/v1/account/export', 'GET', undefined, 'owner-auth-subject');
+    expect(legacy.status).toBe(200);
+    const legacyBody = await legacy.json() as { export: Record<string, unknown> };
+    expect(legacyBody.export.schemaVersion).toBe(2);
+    expect(legacyBody.export).not.toHaveProperty('referral');
+    const legacyDramas = legacyBody.export.dramas as Array<Record<string, unknown>>;
+    expect(legacyDramas[0]).not.toHaveProperty('portraits');
   });
 
   it('requires the exact deletion phrase and removes private audio before D1 cascade', async () => {
     const owner = await seedOwnedDrama('owner-auth-subject');
     await seedCascadingAccountRows(owner.id);
     await runtimeEnv.AUDIO_BUCKET.put('private/audio/object.mp3', new TextEncoder().encode('audio'));
+    await db.prepare(`INSERT INTO character_portraits (plot_id, character_id, story_fingerprint, object_key, status, ready_at) VALUES ('plot-export', 'character-export', 'portrait-fingerprint-001', 'portraits/plot-export/portrait.jpg', 'ready', ?)`).bind(Date.now()).run();
+    await runtimeEnv.AUDIO_BUCKET.put('portraits/plot-export/portrait.jpg', new TextEncoder().encode('portrait'));
+    await runtimeEnv.AUDIO_BUCKET.put('portraits/plot-export/orphan-from-race.jpg', new TextEncoder().encode('orphan portrait'));
 
     const wrong = await call('/v1/account/delete', 'POST', { confirmation: 'DELETE' }, 'owner-auth-subject');
     expect(wrong.status).toBe(400);
@@ -87,6 +118,8 @@ describe('preferences and account data boundary', () => {
     expect(deleted.status).toBe(200);
     expect(await deleted.json()).toEqual({ deleted: true });
     expect(await runtimeEnv.AUDIO_BUCKET.get('private/audio/object.mp3')).toBeNull();
+    expect(await runtimeEnv.AUDIO_BUCKET.get('portraits/plot-export/portrait.jpg')).toBeNull();
+    expect(await runtimeEnv.AUDIO_BUCKET.get('portraits/plot-export/orphan-from-race.jpg')).toBeNull();
     expect(await db.prepare('SELECT id FROM users WHERE id = ?').bind(owner.id).first()).toBeNull();
     expect(await db.prepare('SELECT id FROM plots WHERE user_id = ?').bind(owner.id).first()).toBeNull();
     expect(await db.prepare('SELECT user_id FROM user_preferences WHERE user_id = ?').bind(owner.id).first()).toBeNull();

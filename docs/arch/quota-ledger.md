@@ -1,12 +1,13 @@
-# Phase 1 quota ledger and UTC enforcement
+# Quota ledger and UTC enforcement
 
-> updated 2026-08-18 · current server contract
+> updated 2026-08-19 · current server contract
 
 ## Policy
-Phase 1 limits remain server-owned:
+Current limits remain server-owned:
 
-- Free: 3 generated scenes per UTC day, 1 fresh voice generation per UTC day.
-- Plus: 20 generated scenes per UTC day, 10 fresh voice generations per UTC day.
+- Free: 50 generated Scenes per UTC day, 1 fresh cloud narration per UTC day.
+- Plus: 100 generated Scenes per UTC day, 10 fresh cloud narrations per UTC day.
+- Successful referral rewards may add persistent voice bonus credits; these are not a daily tier and do not raise text quota.
 - No unlimited tier.
 
 The trusted tier comes from backend entitlement state; clients cannot select their own quota tier. D1 still stores historical resource strings `text_episode` and `voice_episode`; those are persistence vocabulary for generated-scene and fresh-voice usage.
@@ -71,4 +72,4 @@ Because retries append new events, the arithmetic remains valid for same-day and
 
 ## Integration boundary
 
-`DramaService` reserves before `SceneGenerator`; provider failure releases the reservation. Retrying the same generation key re-arms that reservation. `D1AudioService` uses the same ledger primitive for fresh voice generation. Neither UI nor provider adapter mutates quota counters directly.
+`DramaService` reserves before `SceneGenerator`; provider failure releases the reservation. Retrying the same generation key re-arms that reservation. `D1AudioService` uses `D1VoiceQuota`: it first reserves from the normal daily voice ledger, then falls back to a persistent referral bonus credit only when daily voice quota is exhausted. Referral bonus reservations have the same reserve/release/consume lifecycle so queue/provider failures refund the bonus credit and successful private audio consumes exactly one. Neither UI nor provider adapter mutates quota counters directly.

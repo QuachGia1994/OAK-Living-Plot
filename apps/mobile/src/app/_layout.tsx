@@ -52,6 +52,7 @@ function LocalizedRuntime() {
               <Stack.Screen name="drama" />
               <Stack.Screen name="history" />
               <Stack.Screen name="plus" />
+              <Stack.Screen name="referral" />
               <Stack.Screen name="auth" />
             </Stack>
           </ThemeProvider>

@@ -21,15 +21,15 @@ Sharing is a client-only native Share action built from a bounded drama title, c
 
 It excludes IDs, bearer tokens, full scene scripts, committed consequences, provider metadata, and private media information. There is no public drama endpoint or public deep-link backend in Phase 1.
 
-## Owner data export v2
+## Owner data export v3
 
-`GET /v1/account/export` returns `schemaVersion: 2` with application vocabulary:
+New clients request `GET /v1/account/export?schema=3`, which returns `schemaVersion: 3` with application vocabulary. The queryless `GET /v1/account/export` remains a v2 compatibility projection for already-installed clients and omits the new referral/portrait fields rather than breaking their parser:
 - preferences and effective entitlement;
 - UTC usage as generated/voiced scenes;
-- `dramas[]` with characters and `scenes[]`;
-- client-safe voice media metadata.
+- privacy-safe referral state: own share code, claimed code, successful-referral count, and available/earned/spent bonus voice-credit totals;
+- `dramas[]` with characters, `scenes[]`, client-safe voice media metadata, and derived portrait status/attempt/ready timestamps.
 
-The export excludes Clerk subjects/tokens, provider credentials, RevenueCat secrets/raw webhook bodies, Analytics Engine rows, reservation keys, provider voice IDs, private R2 object keys, and audio bytes.
+The export excludes Clerk subjects/tokens, inviter/referred internal user IDs, referral event IDs, provider credentials, RevenueCat secrets/raw webhook bodies, Analytics Engine rows, quota/bonus reservation keys, portrait story fingerprints, provider voice IDs, private R2 object keys, and generated audio/image bytes.
 
 D1 queries may still read `plots/episodes/story_locale`; those names are normalized before the export crosses the HTTP boundary.
 
@@ -38,10 +38,10 @@ D1 queries may still read `plots/episodes/story_locale`; those names are normali
 `POST /v1/account/delete` requires the exact phrase `DELETE MY LIVING PLOT DATA`. Mutation requests are never automatically retried.
 
 Deletion is fail-closed:
-1. resolve owner-scoped private voice object keys;
+1. resolve owner-scoped private voice keys and enumerate every `portraits/{dramaId}/` R2 prefix for owned dramas, including any race-orphan portrait object no longer referenced by a canonical row;
 2. delete those R2 objects;
 3. only after private-object cleanup succeeds, delete the internal D1 user;
-4. D1 foreign-key cascades remove application-owned drama/media/preference/quota/billing rows.
+4. D1 foreign-key cascades remove application-owned drama/media/preference/quota/billing/referral rows.
 
 This deletes Living Plot application data, not the separate Clerk identity or store/RevenueCat account.
 

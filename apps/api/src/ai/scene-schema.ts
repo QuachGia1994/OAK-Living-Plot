@@ -166,6 +166,15 @@ function validateBusinessRules(proposal: SceneProposal, input: SceneGenerationIn
   if (choiceKeys.join(',') !== 'A,B,C') errors.push('Choices must be ordered and keyed A, B, C exactly once.');
   if (new Set(proposal.choices.map((choice) => normalize(choice.label))).size !== 3) errors.push('Choice labels must be materially distinct.');
   if (new Set(proposal.choices.map((choice) => normalize(choice.intent))).size !== 3) errors.push('Choice intents must be materially distinct.');
+  if (hasMateriallySimilarPair(proposal.choices.map((choice) => choice.label), 0.78, 3)) {
+    errors.push('Choice labels must represent materially distinct actions.');
+  }
+  if (hasMateriallySimilarPair(proposal.choices.map((choice) => choice.intent), 0.76, 3)) {
+    errors.push('Choice intents must be materially distinct intents.');
+  }
+  if (hasMateriallySimilarPair(proposal.choices.map((choice) => choice.consequence), 0.72, 5)) {
+    errors.push('Choice consequences must create materially distinct consequences.');
+  }
 
   if (input.previous) {
     const previousSummary = semanticText(input.previous.sceneSummary);
@@ -178,6 +187,8 @@ function validateBusinessRules(proposal: SceneProposal, input: SceneGenerationIn
       errors.push('Continuation choices must not repeat the previously committed action.');
     }
   }
+
+  validateRecentNovelty(proposal, input, errors);
 
   const existingThreadTitles = new Set(input.openThreads.map((thread) => semanticText(thread.title)));
   for (const thread of proposal.threadChanges.open) {
@@ -222,6 +233,38 @@ function validateChoice(
   }
   for (const key of choice.stateDelta.threadKeysToResolve) {
     if (!threadKeys.has(key)) errors.push(`Choice ${choice.key} references unknown thread key: ${key}`);
+  }
+}
+
+function validateRecentNovelty(proposal: SceneProposal, input: SceneGenerationInput, errors: string[]): void {
+  if (input.recentHistory.length === 0) return;
+
+  const historicalTitles = input.recentHistory.map((scene) => scene.title);
+  if (historicalTitles.some((title) => materiallySimilar(proposal.title, title, 0.8, 3))) {
+    errors.push('Scene title is too similar to recent history.');
+  }
+
+  const historicalSummaries = input.recentHistory.map((scene) => scene.summary);
+  if (historicalSummaries.some((summary) => materiallySimilar(proposal.summary, summary, 0.72, 7))) {
+    errors.push('Scene summary is too similar to recent history.');
+  }
+
+  const historicalChoices = input.recentHistory.flatMap((scene) => [
+    ...scene.choiceLabels,
+    ...(scene.committedChoice ? [scene.committedChoice] : []),
+  ]);
+  if (proposal.choices.some((choice) => historicalChoices.some((prior) => materiallySimilar(choice.label, prior, 0.78, 3)))) {
+    errors.push('Scene choices must introduce new actions instead of recycling recent choices.');
+  }
+
+  const historicalIntents = input.recentHistory.flatMap((scene) => scene.choiceIntent ? [scene.choiceIntent] : []);
+  if (proposal.choices.some((choice) => historicalIntents.some((prior) => materiallySimilar(choice.intent, prior, 0.76, 3)))) {
+    errors.push('Scene choices must introduce new motives instead of recycling recent choice intent.');
+  }
+
+  const historicalConsequences = input.recentHistory.flatMap((scene) => scene.consequence ? [scene.consequence] : []);
+  if (proposal.choices.some((choice) => historicalConsequences.some((prior) => materiallySimilar(choice.consequence, prior, 0.72, 5)))) {
+    errors.push('Choice consequences must open new outcomes instead of repeating recent consequences.');
   }
 }
 
@@ -324,6 +367,33 @@ function semanticText(value: string): string {
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/gu, ' ')
     .trim();
+}
+
+function hasMateriallySimilarPair(values: string[], threshold: number, minTokens: number): boolean {
+  for (let left = 0; left < values.length; left += 1) {
+    for (let right = left + 1; right < values.length; right += 1) {
+      if (materiallySimilar(values[left], values[right], threshold, minTokens)) return true;
+    }
+  }
+  return false;
+}
+
+function materiallySimilar(left: string, right: string, threshold: number, minTokens: number): boolean {
+  const leftTokens = semanticTokens(left);
+  const rightTokens = semanticTokens(right);
+  if (leftTokens.length < minTokens || rightTokens.length < minTokens) {
+    return semanticText(left) === semanticText(right);
+  }
+  const leftSet = new Set(leftTokens);
+  const rightSet = new Set(rightTokens);
+  let intersection = 0;
+  for (const token of leftSet) if (rightSet.has(token)) intersection += 1;
+  const union = new Set([...leftSet, ...rightSet]).size;
+  return union > 0 && intersection / union >= threshold;
+}
+
+function semanticTokens(value: string): string[] {
+  return semanticText(value).split(' ').filter((token) => token.length >= 2);
 }
 
 function invalid<T>(message: string): Result<T, string[]> {

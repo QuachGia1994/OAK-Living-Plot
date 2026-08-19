@@ -16,8 +16,21 @@ export function validateSceneGenerationInput(input: SceneGenerationInput): Resul
   }
   if (!Number.isInteger(input.drama.stateVersion) || input.drama.stateVersion < 0) errors.push('Drama state version is invalid.');
   if (input.characters.length === 0 || input.characters.length > 12) errors.push('Character count is invalid.');
-  if (input.relationships.length > 30 || input.activeFacts.length > 40 || input.openThreads.length > 20) {
+  if (input.relationships.length > 30 || input.activeFacts.length > 40 || input.openThreads.length > 20 || input.recentHistory.length > 12) {
     errors.push('Canonical drama context exceeds Phase 1 bounds.');
+  }
+
+  for (const scene of input.recentHistory) {
+    if (
+      !Number.isInteger(scene.sceneNumber) || scene.sceneNumber < 1 ||
+      !bounded(scene.title, 1, 160) || !bounded(scene.summary, 1, 1000) ||
+      !nullableBounded(scene.committedChoice, 240) || !nullableBounded(scene.choiceIntent, 240) ||
+      !nullableBounded(scene.consequence, 600) || scene.choiceLabels.length > 3 ||
+      scene.choiceLabels.some((label) => !bounded(label, 1, 240))
+    ) {
+      errors.push('Recent drama history is invalid.');
+      break;
+    }
   }
 
   const characterKeys = new Set<string>();
@@ -61,6 +74,8 @@ export function buildScenePrompt(input: SceneGenerationInput, validationErrors: 
       'Do not contradict canonical facts, resurrect resolved threads, rename existing characters, or invent prior events.',
       'Keep the canonical protagonist visibly anchored in the scene without renaming or replacing them.',
       'If previous is present, make the committed choice consequence visible within the first third of the scene.',
+      'RECENT HISTORY IS A NOVELTY BLOCKLIST: do not reuse or lightly paraphrase prior scene titles, summaries, committed choices, choice labels, choice intents, or consequences.',
+      'Every continuation must add a genuinely new dramatic development, reveal, relationship shift, obstacle, or goal change that is absent from recentHistory.',
       'Advance at least one open thread and increase tension, information, or relationship pressure.',
       'Establish at least one durable fact or open/resolve at least one canonical thread before the next branch.',
       'Write the script, summary, choice labels, and consequences consistently in the requested locale for roughly 60–90 seconds of speech.',
@@ -78,4 +93,8 @@ export function buildScenePrompt(input: SceneGenerationInput, validationErrors: 
 
 function bounded(value: string, min: number, max: number): boolean {
   return value.trim().length >= min && value.length <= max;
+}
+
+function nullableBounded(value: string | null, max: number): boolean {
+  return value === null || bounded(value, 1, max);
 }

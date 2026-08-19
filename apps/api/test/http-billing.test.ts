@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import migrationOne from '../migrations/0001_initial.sql?raw';
 import migrationSix from '../migrations/0006_revenuecat_entitlements.sql?raw';
+import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import type { RevenueCatSubscriberProvider } from '../src/billing/contracts';
 import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
@@ -31,7 +32,7 @@ const testEnv: AppEnv = {
 };
 
 beforeAll(async () => {
-  for (const migration of [migrationOne, migrationSix]) {
+  for (const migration of [migrationOne, migrationSix, migrationTen]) {
     await applySqlMigration(db, migration);
   }
 });
@@ -64,6 +65,53 @@ describe('RevenueCat HTTP trust boundary', () => {
     });
     expect(entitlement.status).toBe(200);
     expect(await entitlement.json()).toMatchObject({ entitlement: { tier: 'plus', plusActive: true } });
+  });
+
+  it('grants the inviter fifty persistent voice credits only when the referred account activates Plus', async () => {
+    const inviter = await new D1UserRepository(db).resolveOrCreate('clerk-inviter');
+    const referred = await new D1UserRepository(db).resolveOrCreate('clerk-referred');
+    await db.prepare(`INSERT INTO referral_codes (user_id, code) VALUES (?, 'SHAREPLUS1')`).bind(inviter.id).run();
+    await db.prepare(`INSERT INTO referral_claims (referred_user_id, inviter_user_id, code, claimed_at) VALUES (?, ?, 'SHAREPLUS1', ?)`).bind(referred.id, inviter.id, WEBHOOK_NOW_MS - 60_000).run();
+    const provider = fakeProvider(referred.id, 'plus');
+
+    const first = await handleRequest(
+      await signedWebhookRequest(revenueCatWebhookPayload(referred.id, 'rc-referral-plus')),
+      testEnv,
+      { revenueCatSubscriberProvider: provider, revenueCatWebhookClock: () => WEBHOOK_NOW_MS },
+    );
+    const replay = await handleRequest(
+      await signedWebhookRequest(revenueCatWebhookPayload(referred.id, 'rc-referral-plus')),
+      testEnv,
+      { revenueCatSubscriberProvider: provider, revenueCatWebhookClock: () => WEBHOOK_NOW_MS },
+    );
+
+    expect(first.status).toBe(200);
+    expect(replay.status).toBe(200);
+    const balance = await db.prepare('SELECT available_credits, earned_credits FROM voice_bonus_accounts WHERE user_id = ?').bind(inviter.id).first<{ available_credits: number; earned_credits: number }>();
+    expect(balance).toEqual({ available_credits: 50, earned_credits: 50 });
+    const claim = await db.prepare('SELECT reward_event_id, reward_granted_at FROM referral_claims WHERE referred_user_id = ?').bind(referred.id).first<{ reward_event_id: string | null; reward_granted_at: number | null }>();
+    expect(claim?.reward_event_id).toBe('rc-referral-plus');
+    expect(claim?.reward_granted_at).not.toBeNull();
+  });
+
+  it('does not grant a referral reward for a renewal-only webhook even when provider state is Plus', async () => {
+    const inviter = await new D1UserRepository(db).resolveOrCreate('renewal-inviter');
+    const referred = await new D1UserRepository(db).resolveOrCreate('renewal-referred');
+    await db.prepare(`INSERT INTO referral_codes (user_id, code) VALUES (?, 'RENEWPLUS1')`).bind(inviter.id).run();
+    await db.prepare(`INSERT INTO referral_claims (referred_user_id, inviter_user_id, code, claimed_at) VALUES (?, ?, 'RENEWPLUS1', ?)`).bind(referred.id, inviter.id, WEBHOOK_NOW_MS - 60_000).run();
+    const provider = fakeProvider(referred.id, 'plus');
+
+    const response = await handleRequest(
+      await signedWebhookRequest(revenueCatWebhookPayload(referred.id, 'rc-renewal-only', 'RENEWAL')),
+      testEnv,
+      { revenueCatSubscriberProvider: provider, revenueCatWebhookClock: () => WEBHOOK_NOW_MS },
+    );
+
+    expect(response.status).toBe(200);
+    const balance = await db.prepare('SELECT available_credits FROM voice_bonus_accounts WHERE user_id = ?').bind(inviter.id).first<{ available_credits: number }>();
+    expect(balance).toBeNull();
+    const claim = await db.prepare('SELECT reward_event_id FROM referral_claims WHERE referred_user_id = ?').bind(referred.id).first<{ reward_event_id: string | null }>();
+    expect(claim?.reward_event_id).toBeNull();
   });
 
   it('deduplicates the same event id before a second provider lookup', async () => {

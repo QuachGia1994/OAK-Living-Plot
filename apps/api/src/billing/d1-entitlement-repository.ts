@@ -18,6 +18,12 @@ interface EventRow {
   ingest_token: string;
 }
 
+export interface StoredEntitlementEventOutcome {
+  tierAfter: 'free' | 'plus';
+  eventType: string;
+  eventTimestampMs: number;
+}
+
 type Clock = () => number;
 
 export class D1EntitlementRepository {
@@ -33,6 +39,15 @@ export class D1EntitlementRepository {
       .bind(eventId)
       .first<{ found: number }>();
     return row?.found === 1;
+  }
+
+  async getStoredEventOutcome(eventId: string): Promise<StoredEntitlementEventOutcome | null> {
+    if (!eventId.trim()) return null;
+    const row = await this.db
+      .prepare('SELECT tier_after, event_type, event_timestamp_ms FROM revenuecat_events WHERE id = ?')
+      .bind(eventId)
+      .first<{ tier_after: 'free' | 'plus'; event_type: string; event_timestamp_ms: number }>();
+    return row ? { tierAfter: row.tier_after, eventType: row.event_type, eventTimestampMs: row.event_timestamp_ms } : null;
   }
 
   async getEntitlement(userId: string): Promise<EntitlementSnapshot> {

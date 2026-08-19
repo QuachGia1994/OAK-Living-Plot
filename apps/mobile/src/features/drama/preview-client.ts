@@ -37,10 +37,11 @@ export class PreviewDramaExperienceClient implements DramaExperienceClient {
     return {
       recentDramas: active.map((drama) => toSummary(drama, this.uiLocale)).reverse(),
       quota: {
-        textRemaining: 2,
-        textLimit: 3,
+        textRemaining: 49,
+        textLimit: 50,
         voiceRemaining: 1,
         voiceLimit: 1,
+        voiceBonusCredits: 0,
         resetLabel: this.uiLocale === 'vi' ? 'Đặt lại lúc 00:00 UTC' : 'Resets at 00:00 UTC',
       },
       retention: {

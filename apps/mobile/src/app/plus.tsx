@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Platform, Share, StyleSheet, Text, View } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
@@ -8,6 +9,7 @@ import { BillingClientError } from '@/features/billing/contracts';
 import { useBillingSession } from '@/features/billing/billing-session-context';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
 import { createBillingCoordinator } from '@/features/billing/runtime';
+import { HttpReferralClient, type ReferralSnapshot } from '@/features/referrals/referral-client';
 import { DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, Pill, Screen } from '@/ui/primitives';
 import { colors, cinematic, radius, spacing, typography } from '@/ui/theme';
@@ -18,6 +20,8 @@ export default function PlusScreen() {
   const { locale, t } = useUiCopy();
   const session = useBillingSession();
   const coordinator = useMemo(() => createBillingCoordinator(), []);
+  const apiBaseUrl = process.env.EXPO_PUBLIC_LIVING_PLOT_API_URL?.trim() ?? '';
+  const referralClient = useMemo(() => apiBaseUrl && auth.configured ? new HttpReferralClient(apiBaseUrl, auth.getToken) : null, [apiBaseUrl, auth.configured, auth.getToken]);
   const storeMode = useMemo(() => {
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') return 'not_configured' as const;
     return revenueCatStoreModeFromEnv(Platform.OS);
@@ -25,6 +29,15 @@ export default function PlusScreen() {
   const [busyAction, setBusyAction] = useState<'paywall' | 'restore' | 'refresh' | null>(null);
   const [entitlement, setEntitlement] = useState<BackendEntitlement | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [referral, setReferral] = useState<ReferralSnapshot | null>(null);
+  const [referralBusy, setReferralBusy] = useState(false);
+
+  useEffect(() => {
+    if (!referralClient || !auth.isLoaded || !auth.isSignedIn) return;
+    let active = true;
+    void referralClient.load().then((value) => { if (active) setReferral(value); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [auth.isLoaded, auth.isSignedIn, referralClient]);
 
   async function presentPaywall() {
     if (!session) return setMessage(t('A signed-in development build is required before the store paywall can use your canonical account ID.', 'Cần bản development đã đăng nhập để paywall dùng đúng tài khoản chuẩn của bạn.'));
@@ -73,6 +86,27 @@ export default function PlusScreen() {
     }
   }
 
+  async function shareInvite() {
+    if (!referralClient || !auth.isSignedIn) return setMessage(t('Sign in before sharing a Plus invite.', 'Đăng nhập trước khi chia sẻ lời mời Plus.'));
+    setReferralBusy(true);
+    setMessage(null);
+    try {
+      const current = referral ?? await referralClient.load();
+      setReferral(current);
+      const inviteUrl = Linking.createURL('referral', { queryParams: { code: current.code } });
+      await Share.share({
+        message: t(
+          `Join my Living Plot invite. Code: ${current.code}\nOpen invite: ${inviteUrl}\nIf you activate Plus, I receive 50 extra cloud narration credits.`,
+          `Tham gia Living Plot bằng lời mời của tôi. Mã: ${current.code}\nMở lời mời: ${inviteUrl}\nNếu bạn kích hoạt Plus, tôi nhận thêm 50 lượt giọng cloud.`,
+        ),
+      });
+    } catch {
+      setMessage(t('The invite could not be shared right now.', 'Hiện chưa thể chia sẻ lời mời.'));
+    } finally {
+      setReferralBusy(false);
+    }
+  }
+
   const entitlementActive = entitlement?.plusActive ?? false;
 
   return (
@@ -103,7 +137,7 @@ export default function PlusScreen() {
         </View>
 
         <View style={styles.metricGrid}>
-          <PlanMetric locale={locale} label={t('Drama scenes', 'Cảnh drama')} free="3" plus="20" />
+          <PlanMetric locale={locale} label={t('Drama scenes', 'Cảnh drama')} free="50" plus="100" />
           <PlanMetric locale={locale} label={t('Fresh narration', 'Giọng đọc mới')} free="1" plus="10" />
         </View>
 
@@ -116,8 +150,8 @@ export default function PlusScreen() {
       <View style={styles.benefits}>
         <Eyebrow>{t('WHY PLUS', 'VÌ SAO NÂNG CẤP PLUS')}</Eyebrow>
         <BenefitRow
-          title={t('More story before the cliffhanger stops', 'Đi tiếp câu chuyện lâu hơn')}
-          detail={t('Generate up to 20 drama scenes per day instead of 3 on Free.', 'Tạo tối đa 20 cảnh drama mỗi ngày thay vì 3 cảnh ở gói Miễn phí.')}
+          title={t('More room for branching stories', 'Nhiều không gian hơn cho cốt truyện phân nhánh')}
+          detail={t('Free includes 50 generated scenes per day; Plus raises that to 100.', 'Gói Miễn phí có 50 cảnh tạo mỗi ngày; Plus tăng lên 100 cảnh.')}
         />
         <BenefitRow
           title={t('More fresh narration', 'Nhiều giọng kể mới hơn')}
@@ -131,6 +165,24 @@ export default function PlusScreen() {
           title={t('Plus follows your account', 'Quyền Plus đi cùng tài khoản')}
           detail={t('Signed-in access can be restored and refreshed across supported devices.', 'Khi đăng nhập, quyền mua có thể được khôi phục và đồng bộ trên các thiết bị được hỗ trợ.')}
         />
+      </View>
+
+      <View style={styles.referralCard}>
+        <View style={styles.referralHeader}>
+          <View style={styles.referralCopy}>
+            <Eyebrow>{t('INVITE REWARD', 'THƯỞNG GIỚI THIỆU')}</Eyebrow>
+            <Text style={styles.referralTitle}>{t('Invite someone to Plus. Earn 50 voice credits after activation.', 'Mời một người dùng Plus. Nhận 50 lượt giọng sau khi họ kích hoạt.')}</Text>
+          </View>
+          {referral ? <Pill tone="accent">+{referral.bonusVoiceCredits}</Pill> : null}
+        </View>
+        <Text style={styles.referralDetail}>{t('When someone uses your invite and their account activates Plus, your account receives 50 persistent cloud narration credits. The reward is granted by the backend, not by the share tap.', 'Khi người khác dùng lời mời của bạn và tài khoản của họ kích hoạt Plus, tài khoản của bạn nhận 50 lượt giọng cloud dùng lâu dài. Phần thưởng do backend xác nhận, không phát chỉ vì bấm chia sẻ.')}</Text>
+        {referral ? (
+          <Text style={styles.referralMeta}>{t('CODE', 'MÃ')} · {referral.code}   ·   {t('SUCCESSFUL', 'THÀNH CÔNG')} · {referral.successfulReferrals}</Text>
+        ) : null}
+        <View style={styles.referralActions}>
+          <ActionButton label={t('Share my invite', 'Chia sẻ lời mời')} variant="secondary" busy={referralBusy} onPress={() => void shareInvite()} style={styles.referralAction} />
+          <ActionButton label={t('Enter invite code', 'Nhập mã giới thiệu')} variant="ghost" onPress={() => router.push('/referral')} style={styles.referralAction} />
+        </View>
       </View>
 
       {!session ? (
@@ -235,6 +287,14 @@ const styles = StyleSheet.create({
   benefitCopy: { flex: 1, gap: 3 },
   benefitTitle: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '800' },
   benefitDetail: { color: colors.inkMuted, fontSize: 12, lineHeight: 18 },
+  referralCard: { gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.accentSoft, backgroundColor: colors.surfaceWarmDeep },
+  referralHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  referralCopy: { flex: 1, minWidth: 220, gap: spacing.xs },
+  referralTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 22, lineHeight: 27, fontWeight: '700' },
+  referralDetail: { color: colors.inkMuted, fontSize: 12, lineHeight: 19 },
+  referralMeta: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 15, fontWeight: '900', letterSpacing: 0.7 },
+  referralActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  referralAction: { minWidth: 150, flexGrow: 1 },
   primaryAction: { gap: spacing.sm },
   utilityBar: { gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
   utilityCopy: { gap: spacing.xs },

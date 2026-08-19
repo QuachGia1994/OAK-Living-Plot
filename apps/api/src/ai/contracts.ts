@@ -28,6 +28,15 @@ export interface SceneGenerationInput {
   }>;
   activeFacts: Array<{ key: string; text: string }>;
   openThreads: Array<{ key: string; title: string; urgency: number }>;
+  recentHistory: Array<{
+    sceneNumber: number;
+    title: string;
+    summary: string;
+    committedChoice: string | null;
+    choiceIntent: string | null;
+    consequence: string | null;
+    choiceLabels: string[];
+  }>;
   previous: null | {
     sceneSummary: string;
     chosenAction: string;

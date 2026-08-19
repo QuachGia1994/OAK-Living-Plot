@@ -39,6 +39,7 @@ export interface QuotaDisplay {
   textLimit: number;
   voiceRemaining: number;
   voiceLimit: number;
+  voiceBonusCredits: number;
   resetLabel: string;
 }
 

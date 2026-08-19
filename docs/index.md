@@ -1,16 +1,18 @@
 # Living Plot docs
 
-- [Product baseline](biz/product.md) — audience, value proposition, monetization guardrails, and Phase 1 exclusions.
+- [Product baseline](biz/product.md) — audience, branching value proposition, current Free/Plus quota, referral economics, and exclusions.
+- [Mirror concept gap audit](biz/concept-gap-audit.md) — Adopt/Defer/Reject decisions for the supplied product concept against the current repo.
 - [Canonical drama runtime ownership](arch/drama-runtime.md) — current end-to-end owner map for Drama/Scene/Branch/generation/media/playback/locale/failure state. Start here for implementation work.
 - [Phase 1 foundation architecture](arch/foundation.md) — workspace/runtime boundaries and deferred infrastructure.
 - [Phase 1 D1 data model](arch/data-model.md) — persistence schema invariants and local migration workflow; D1 `plots/episodes` names are storage vocabulary, not application terminology.
 - [Phase 1 auth and ownership boundary](arch/auth-security.md) — Clerk session verification, internal-user mapping, and owner-scoped access rules.
-- [Phase 1 scene-generation boundary](arch/scene-generation.md) — provider-neutral `SceneGenerator`, bounded prompt context, Gemini adapter, strict normalization, controlled retry, and provider isolation.
+- [Scene-generation boundary](arch/scene-generation.md) — provider-neutral `SceneGenerator`, bounded canonical + recent novelty context, deterministic repetition guard, controlled retry, and provider isolation.
 - [Phase 1 episode publication boundary](arch/episode-publication.md) — atomic D1 publish, generation-key idempotency, and optimistic version guards.
 - [Phase 1 branch / choice-commit boundary](arch/choice-commit.md) — `DramaState`, exactly-one canonical branch, idempotency, state application, and commit concurrency.
-- [Phase 1 quota ledger](arch/quota-ledger.md) — UTC daily limits, atomic reservations, terminal transitions, and reconciliation.
+- [Quota ledger](arch/quota-ledger.md) — Free/Plus UTC limits, atomic daily reservations, referral voice-credit fallback, terminal transitions, and reconciliation.
 - [Phase 1 mobile core loop](arch/mobile-core-loop.md) — Expo localized first-run, scene playback, exactly-three-choice branch, consequence, continuation, and resume UI boundary.
-- [Phase 1 TTS and private audio](arch/tts-audio.md) — Google OAuth/TTS, Queue/DLQ processing, voice quota, and private R2 delivery.
+- [TTS and private audio](arch/tts-audio.md) — provider-neutral narration, Queue/DLQ processing, daily/referral voice quota, device fallback, and private R2 delivery.
+- [Derived character portraits](arch/character-portraits.md) — story fingerprints, identity-reference regeneration, private R2 delivery, and non-canonical media ownership.
 - [Phase 1 RevenueCat entitlements](arch/revenuecat-entitlements.md) — verified webhook/provider sync, D1 Free/Plus authority, and mobile paywall/restore trust boundary.
 - [Phase 1 analytics and AI cost telemetry](arch/analytics-cost.md) — privacy-safe Analytics Engine schema, fail-open semantics, retry-aware Gemini token usage, and exact nano-USD rate-card arithmetic.
 - [Phase 1 narrative quality evaluations](arch/narrative-evals.md) — deterministic continuity/thread/branch/consequence/repetition/protagonist/locale/progression fixtures and adversarial regression thresholds.

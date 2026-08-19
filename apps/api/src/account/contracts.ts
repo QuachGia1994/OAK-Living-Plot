@@ -3,11 +3,17 @@ import type { UserPreferences } from '../preferences/contracts';
 export const ACCOUNT_DELETE_CONFIRMATION = 'DELETE MY LIVING PLOT DATA';
 
 export interface AccountExportSnapshot {
-  schemaVersion: 2;
+  schemaVersion: 3;
   exportedAt: string;
   preferences: UserPreferences;
   entitlement: { tier: 'free' | 'plus'; expiresAt: string | null; syncedAt: string | null };
   usage: Array<{ utcDay: string; generatedScenes: number; voicedScenes: number }>;
+  referral: {
+    code: string | null;
+    claimedCode: string | null;
+    successfulReferrals: number;
+    voiceCredits: { available: number; earned: number; spent: number };
+  };
   dramas: AccountExportDrama[];
 }
 
@@ -19,6 +25,7 @@ export interface AccountExportDrama {
   mood: string;
   summary: string;
   characters: Array<{ name: string; role: string; traits: Record<string, unknown> }>;
+  portraits: Array<{ status: string; attempts: number; createdAt: string; readyAt: string | null }>;
   scenes: AccountExportScene[];
 }
 

@@ -33,6 +33,7 @@ export interface DramaQuotaDisplay {
   textLimit: number;
   voiceRemaining: number;
   voiceLimit: number;
+  voiceBonusCredits: number;
   resetAt: string;
 }
 

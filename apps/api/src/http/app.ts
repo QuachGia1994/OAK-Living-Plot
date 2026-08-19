@@ -13,7 +13,9 @@ import type { DramaMood } from '../domain/drama';
 import type { DramaError } from '../drama-runtime/contracts';
 import { DramaService } from '../drama-runtime/drama-service';
 import { D1UserRepository } from '../persistence/d1-user-repository';
+import { D1CharacterPortraitService } from '../portrait/d1-character-portrait-service';
 import { isDramaLocale, isNarratorVariant, isUiLocale } from '../preferences/contracts';
+import { D1ReferralService } from '../referrals/d1-referral-service';
 import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences';
 import { CloudflareProductTelemetrySink } from '../telemetry/cloudflare-product-telemetry';
 import type { ProductTelemetrySink } from '../telemetry/product-events';
@@ -70,11 +72,16 @@ export async function handleRequest(
 
   if (route.kind === 'me') return json({ user: { id: user.id } });
   if (route.kind === 'preferences') return handlePreferences(request, env.DB, user.id);
+  if (route.kind === 'referral') return handleReferral(request, env.DB, user.id);
+  if (route.kind === 'referral_claim') return handleReferralClaim(request, env.DB, user.id);
   if (route.kind === 'account_export') {
     const account = new D1AccountService(env.DB, env.AUDIO_BUCKET, dependencies.dramaClock);
-    return json({ export: await account.export(user.id) });
+    const snapshot = await account.export(user.id);
+    return json({ export: url.searchParams.get('schema') === '3' ? snapshot : legacyAccountExportV2(snapshot) });
   }
   if (route.kind === 'account_delete') return handleAccountDelete(request, env, user.id, dependencies.dramaClock);
+  if (route.kind === 'drama_portrait_status') return handlePortraitStatus(env, user.id, route.dramaId);
+  if (route.kind === 'drama_portrait') return handlePortrait(request, env, user.id, route.dramaId);
   if (isDramaRoute(route)) return handleDramaRoute(request, env, user.id, route, dependencies);
 
   const entitlements = new D1EntitlementRepository(env.DB);
@@ -107,22 +114,33 @@ type ProtectedRoute =
   | { kind: 'me' }
   | { kind: 'entitlement' }
   | { kind: 'preferences' }
+  | { kind: 'referral' }
+  | { kind: 'referral_claim' }
   | { kind: 'account_export' }
   | { kind: 'account_delete' }
   | { kind: 'scene_voice'; sceneId: string }
   | { kind: 'media_status'; assetId: string }
   | { kind: 'media'; assetId: string }
+  | { kind: 'drama_portrait_status'; dramaId: string }
+  | { kind: 'drama_portrait'; dramaId: string }
   | DramaRoute;
 
 function matchProtectedRoute(pathname: string): ProtectedRoute | null {
   if (pathname === '/v1/me') return { kind: 'me' };
   if (pathname === '/v1/entitlement') return { kind: 'entitlement' };
   if (pathname === '/v1/preferences') return { kind: 'preferences' };
+  if (pathname === '/v1/referrals/me') return { kind: 'referral' };
+  if (pathname === '/v1/referrals/claim') return { kind: 'referral_claim' };
   if (pathname === '/v1/account/export') return { kind: 'account_export' };
   if (pathname === '/v1/account/delete') return { kind: 'account_delete' };
   if (pathname === '/v1/dramas/home') return { kind: 'drama_home' };
   if (pathname === '/v1/dramas/library') return { kind: 'drama_library' };
   if (pathname === '/v1/dramas') return { kind: 'drama_collection' };
+
+  const portraitStatus = matchId(pathname, /^\/v1\/dramas\/([^/]+)\/portrait\/status$/);
+  if (portraitStatus) return { kind: 'drama_portrait_status', dramaId: portraitStatus };
+  const portrait = matchId(pathname, /^\/v1\/dramas\/([^/]+)\/portrait$/);
+  if (portrait) return { kind: 'drama_portrait', dramaId: portrait };
 
   const dramaChoice = matchIds(pathname, /^\/v1\/dramas\/([^/]+)\/scenes\/([^/]+)\/choices\/([^/]+)$/);
   if (dramaChoice) return { kind: 'drama_choice', dramaId: dramaChoice[0], sceneId: dramaChoice[1], choiceId: dramaChoice[2] };
@@ -169,6 +187,10 @@ function matchIds(pathname: string, pattern: RegExp): [string, string, string] |
 
 function methodAllowed(route: ProtectedRoute, method: string): boolean {
   if (route.kind === 'preferences') return method === 'GET' || method === 'POST';
+  if (route.kind === 'referral') return method === 'GET';
+  if (route.kind === 'referral_claim') return method === 'POST';
+  if (route.kind === 'drama_portrait_status') return method === 'GET';
+  if (route.kind === 'drama_portrait') return method === 'GET' || method === 'POST';
   if (
     route.kind === 'scene_voice' || route.kind === 'drama_collection' || route.kind === 'drama_generate' ||
     route.kind === 'drama_choice' || route.kind === 'drama_archive' || route.kind === 'drama_restore' ||
@@ -180,7 +202,9 @@ function methodAllowed(route: ProtectedRoute, method: string): boolean {
 }
 
 function isDramaRoute(route: ProtectedRoute): route is DramaRoute {
-  return route.kind === 'drama' || route.kind.startsWith('drama_');
+  return route.kind === 'drama' || route.kind === 'drama_home' || route.kind === 'drama_library' ||
+    route.kind === 'drama_collection' || route.kind === 'drama_history' || route.kind === 'drama_archive' ||
+    route.kind === 'drama_restore' || route.kind === 'drama_generate' || route.kind === 'drama_choice';
 }
 
 async function handleDramaRoute(
@@ -280,6 +304,71 @@ function dramaErrorResponse(error: DramaError): Response {
     currentStateVersion: error.currentStateVersion,
     committedChoiceId: error.committedChoiceId,
   }, 409);
+}
+
+async function handlePortraitStatus(env: AppEnv, userId: string, dramaId: string): Promise<Response> {
+  const result = await new D1CharacterPortraitService(env.DB, env.AUDIO_BUCKET, env.AI).status(userId, dramaId);
+  if (!result.ok) return result.error.code === 'not_found' ? json({ error: 'not_found' }, 404) : json({ error: 'internal_error' }, 500);
+  return json({ portrait: clientPortrait(result.value) });
+}
+
+async function handlePortrait(request: Request, env: AppEnv, userId: string, dramaId: string): Promise<Response> {
+  const service = new D1CharacterPortraitService(env.DB, env.AUDIO_BUCKET, env.AI);
+  if (request.method === 'POST') {
+    const generated = await service.generate(userId, dramaId);
+    if (!generated.ok) {
+      if (generated.error.code === 'not_found') return json({ error: 'not_found' }, 404);
+      if (generated.error.code === 'provider_unavailable') return json({ error: 'provider_unavailable' }, 503);
+      if (generated.error.code === 'invalid_response') return json({ error: 'invalid_generation' }, 502);
+      return json({ error: 'internal_error' }, 500);
+    }
+    return json({ portrait: clientPortrait(generated.value), replayed: generated.replayed ?? false });
+  }
+
+  const delivery = await service.delivery(userId, dramaId);
+  if (!delivery.ok) return delivery.error.code === 'not_found' ? json({ error: 'not_found' }, 404) : json({ error: 'internal_error' }, 500);
+  if (!delivery.value.objectKey) return json({ portrait: clientPortrait(delivery.value.snapshot) }, 202);
+  const object = await env.AUDIO_BUCKET.get(delivery.value.objectKey);
+  if (!object) return json({ error: 'portrait_unavailable' }, 503);
+  const headers = new Headers({
+    'Cache-Control': 'private, max-age=3600',
+    'Content-Type': object.httpMetadata?.contentType ?? 'image/jpeg',
+  });
+  if (object.httpEtag) headers.set('ETag', object.httpEtag);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  return new Response(object.body, { status: 200, headers });
+}
+
+function clientPortrait(value: { status: string; current: boolean; attempts: number; updatedAt: number | null; readyAt: number | null }) {
+  return {
+    status: value.status,
+    current: value.current,
+    attempts: value.attempts,
+    updatedAt: value.updatedAt === null ? null : new Date(value.updatedAt).toISOString(),
+    readyAt: value.readyAt === null ? null : new Date(value.readyAt).toISOString(),
+  };
+}
+
+async function handleReferral(request: Request, db: D1Database, userId: string): Promise<Response> {
+  if (request.method !== 'GET') return json({ error: 'method_not_allowed' }, 405);
+  try {
+    return json({ referral: await new D1ReferralService(db).snapshot(userId) });
+  } catch {
+    return json({ error: 'internal_error' }, 500);
+  }
+}
+
+async function handleReferralClaim(request: Request, db: D1Database, userId: string): Promise<Response> {
+  const body = await parseJsonObject(request);
+  if (!body || typeof body.code !== 'string') return json({ error: 'invalid_request' }, 400);
+  const entitlement = await new D1EntitlementRepository(db).getEntitlement(userId);
+  if (entitlement.tier === 'plus') return json({ error: 'plus_already_active' }, 409);
+  const result = await new D1ReferralService(db).claim(userId, body.code);
+  if (result.ok) return json({ referral: result.value, replayed: result.replayed });
+  if (result.error.code === 'invalid_input' || result.error.code === 'self_referral') return json({ error: result.error.code }, 400);
+  if (result.error.code === 'not_found') return json({ error: result.error.code }, 404);
+  if (result.error.code === 'already_claimed') return json({ error: result.error.code }, 409);
+  return json({ error: 'internal_error' }, 500);
 }
 
 async function handlePreferences(request: Request, db: D1Database, userId: string): Promise<Response> {
@@ -387,6 +476,26 @@ async function handleMediaRead(
   });
   if (object.httpEtag) headers.set('ETag', object.httpEtag);
   return new Response(object.body, { status: 200, headers });
+}
+
+function legacyAccountExportV2(snapshot: Awaited<ReturnType<D1AccountService['export']>>) {
+  return {
+    schemaVersion: 2 as const,
+    exportedAt: snapshot.exportedAt,
+    preferences: snapshot.preferences,
+    entitlement: snapshot.entitlement,
+    usage: snapshot.usage,
+    dramas: snapshot.dramas.map((drama) => ({
+      title: drama.title,
+      premise: drama.premise,
+      status: drama.status,
+      locale: drama.locale,
+      mood: drama.mood,
+      summary: drama.summary,
+      characters: drama.characters,
+      scenes: drama.scenes,
+    })),
+  };
 }
 
 function clientEntitlement(entitlement: EntitlementSnapshot) {

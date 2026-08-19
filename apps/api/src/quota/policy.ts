@@ -2,11 +2,11 @@ import type { QuotaPolicy, QuotaResource, QuotaTier } from './contracts';
 
 const POLICIES: Record<QuotaTier, QuotaPolicy> = {
   free: {
-    textEpisodesPerUtcDay: 3,
+    textEpisodesPerUtcDay: 50,
     voiceEpisodesPerUtcDay: 1,
   },
   plus: {
-    textEpisodesPerUtcDay: 20,
+    textEpisodesPerUtcDay: 100,
     voiceEpisodesPerUtcDay: 10,
   },
 };

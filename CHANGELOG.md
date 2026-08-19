@@ -5,6 +5,9 @@ All notable changes to Living Plot will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- Raised owner-data export to schema v3 so referral/bonus-credit state and privacy-safe portrait metadata travel with account export while internal IDs, reward events, reservation keys, portrait fingerprints, private R2 keys, and generated media bytes remain excluded.
+- Raised server-owned daily Scene generation limits to Free 50 / Plus 100 while keeping fresh cloud narration at Free 1 / Plus 10; referral voice credits are persistent bonus inventory rather than a client-selected tier.
+- Strengthened continuation novelty with a bounded 12-Scene history blocklist plus deterministic rejection of materially recycled titles, summaries, branch labels, choice intents, and consequences; A/B/C actions, intents, and consequences must also be materially distinct inside each Scene before canonical publication.
 - Switched the Worker Clerk boundary to direct networkless `verifyToken()` validation with the configured JWT public key and authorized parties; the backend no longer requires a Clerk publishable key while mobile keeps its public Expo key.
 - Migrated live Beta RC narration from Google Cloud Text-to-Speech service-account auth to server-side Gemini TTS using the existing `GEMINI_API_KEY`, preserving provider-neutral Queue/R2/media ownership and private MP3 delivery without a Google Cloud billing dependency.
 - Production RC freeze: documented SSOT/state ownership, strengthened playback domain tests for selected≠locked and in-flight commit gating; UI surfaces feature-frozen for beta.
@@ -16,6 +19,9 @@ All notable changes to Living Plot will be documented in this file.
 - Professional app shell pass: shared `SectionHeader`/`SettingsRow` primitives without changing business logic.
 
 ### Added
+- Referral growth loop with server-generated codes, one claim per referred account, RevenueCat-verified Plus activation reward, and 50 replay-safe persistent cloud-narration bonus credits for the inviter.
+- Private story-aware character portraits using a story fingerprint that includes the current committed branch consequence, explicit regeneration, prior ready portrait identity reference, owner-scoped R2 delivery, and account-erasure cleanup without making portrait media canonical story state.
+- Mirror-concept gap audit with Adopt/Defer/Reject product decisions so public Explore/social/notification surfaces do not displace the branching-retention core.
 - Canonical drama runtime ownership map covering `Drama`, `Scene`, `Character`, `Choice`, `Branch`, `GenerationJob`, `MediaAsset`, `PlaybackState`, locale ownership, failure paths, and the verification tests that prove each transition.
 - Provider-neutral `SceneGenerator`/`SceneProposal` boundary with strict scene normalization, bounded prompt context, controlled invalid-response retry, and Gemini isolated as the current adapter.
 - Explicit mobile playback orchestration owner (`useDramaPlayback` + `PlaybackState`) and bounded product-level voice media lifecycle independent from scene readiness.

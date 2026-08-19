@@ -4,6 +4,7 @@ import migrationOne from '../migrations/0001_initial.sql?raw';
 import migrationFour from '../migrations/0004_quota_ledger.sql?raw';
 import migrationFive from '../migrations/0005_tts_audio.sql?raw';
 import migrationSix from '../migrations/0006_revenuecat_entitlements.sql?raw';
+import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import { AudioProcessor } from '../src/audio/audio-processor';
 import type { AudioJob, AudioQueue } from '../src/audio/contracts';
 import type { SessionVerifier } from '../src/auth/session-verifier';
@@ -32,6 +33,7 @@ beforeAll(async () => {
   await applySqlMigration(db, migrationFour);
   await applySqlMigration(db, migrationFive);
   await applySqlMigration(db, migrationSix);
+  await applySqlMigration(db, migrationTen);
 });
 
 beforeEach(async () => {

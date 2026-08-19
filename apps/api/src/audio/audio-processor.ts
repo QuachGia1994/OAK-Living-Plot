@@ -1,4 +1,4 @@
-import { D1QuotaLedger } from '../quota/d1-quota-ledger';
+import { D1VoiceQuota, type VoiceQuota } from '../quota/voice-quota';
 import type { SpeechSynthesizer } from '../tts/contracts';
 import type { AudioJob, AudioProcessResult, AudioAssetStatus } from './contracts';
 
@@ -31,7 +31,7 @@ export class AudioProcessor {
     private readonly db: D1Database,
     private readonly bucket: R2Bucket,
     private readonly synthesizer: SpeechSynthesizer,
-    private readonly quota: D1QuotaLedger = new D1QuotaLedger(db),
+    private readonly quota: VoiceQuota = new D1VoiceQuota(db),
     private readonly clock: Clock = Date.now,
   ) {}
 
@@ -116,7 +116,7 @@ export class AudioProcessor {
       const finalized = await this.finalizeStaged(work);
       if (finalized.action === 'ack') return finalized;
 
-      const quotaStatus = await this.loadQuotaStatus(work.user_id, work.reservation_key);
+      const quotaStatus = await this.quota.status(work.user_id, work.reservation_key);
       if (quotaStatus === 'consumed') {
         await this.db
           .prepare(
@@ -128,9 +128,7 @@ export class AudioProcessor {
         return { action: 'ack', assetId: work.id };
       }
       if (work.object_key && !(await this.deletePrivateObject(work.id, work.object_key))) return retry(work.id);
-      if (quotaStatus === 'reserved') {
-        await this.quota.release({ userId: work.user_id, reservationKey: work.reservation_key });
-      }
+      if (quotaStatus === 'reserved') await this.quota.release({ userId: work.user_id, reservationKey: work.reservation_key });
       await this.db
         .prepare(
           `UPDATE audio_assets
@@ -224,14 +222,6 @@ export class AudioProcessor {
       )
       .bind(assetId)
       .first<WorkRow>();
-  }
-
-  private async loadQuotaStatus(userId: string, reservationKey: string): Promise<'reserved' | 'released' | 'consumed' | null> {
-    const row = await this.db
-      .prepare('SELECT status FROM quota_reservations WHERE user_id = ? AND reservation_key = ?')
-      .bind(userId, reservationKey)
-      .first<{ status: 'reserved' | 'released' | 'consumed' }>();
-    return row?.status ?? null;
   }
 
   private async deletePrivateObject(assetId: string, objectKey: string): Promise<boolean> {

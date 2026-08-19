@@ -10,7 +10,7 @@ export class HttpAccountDataClient implements AccountDataClient {
   }
 
   async loadExport(): Promise<AccountExportSnapshot> {
-    const response = await this.transport.request('/v1/account/export', 'GET');
+    const response = await this.transport.request('/v1/account/export?schema=3', 'GET');
     if (!response.ok || !response.jsonValid || !isRecord(response.payload) || !isRecord(response.payload.export)) {
       throw new Error('Account export is unavailable.');
     }
@@ -33,15 +33,17 @@ export class UnavailableAccountDataClient implements AccountDataClient {
 
 function parseExport(value: Record<string, unknown>): AccountExportSnapshot {
   if (
-    value.schemaVersion !== 2 || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)) ||
-    !isRecord(value.preferences) || !isRecord(value.entitlement) || !Array.isArray(value.usage) || !Array.isArray(value.dramas)
+    value.schemaVersion !== 3 || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)) ||
+    !isRecord(value.preferences) || !isRecord(value.entitlement) || !Array.isArray(value.usage) ||
+    !isRecord(value.referral) || !Array.isArray(value.dramas)
   ) throw new Error('Account export response is invalid.');
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     exportedAt: value.exportedAt,
     preferences: value.preferences,
     entitlement: value.entitlement,
     usage: value.usage,
+    referral: value.referral,
     dramas: value.dramas,
   };
 }
@@ -49,7 +51,7 @@ function parseExport(value: Record<string, unknown>): AccountExportSnapshot {
 function deleteErrorMessage(status: number, payload: unknown): string {
   const code = isRecord(payload) && typeof payload.error === 'string' ? payload.error : '';
   if (status === 400 && code === 'invalid_confirmation') return 'The deletion confirmation phrase did not match.';
-  if (status === 503 && code === 'audio_cleanup_failed') return 'Private audio cleanup could not finish, so account data was kept for a safe retry.';
+  if (status === 503 && code === 'audio_cleanup_failed') return 'Private media cleanup could not finish, so account data was kept for a safe retry.';
   return 'Account data could not be deleted.';
 }
 

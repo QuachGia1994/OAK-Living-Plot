@@ -28,48 +28,37 @@ beforeEach(async () => {
 });
 
 describe('quota policy', () => {
-  it('locks the Phase 1 Free and Plus limits', () => {
-    expect(quotaPolicyFor('free')).toEqual({ textEpisodesPerUtcDay: 3, voiceEpisodesPerUtcDay: 1 });
-    expect(quotaPolicyFor('plus')).toEqual({ textEpisodesPerUtcDay: 20, voiceEpisodesPerUtcDay: 10 });
+  it('locks the current Free and Plus limits', () => {
+    expect(quotaPolicyFor('free')).toEqual({ textEpisodesPerUtcDay: 50, voiceEpisodesPerUtcDay: 1 });
+    expect(quotaPolicyFor('plus')).toEqual({ textEpisodesPerUtcDay: 100, voiceEpisodesPerUtcDay: 10 });
   });
 });
 
 describe('D1QuotaLedger', () => {
-  it('atomically caps concurrent Free text reservations at three', async () => {
+  it('atomically caps concurrent Free text reservations at fifty', async () => {
+    await db.prepare(`INSERT INTO daily_usage (user_id, usage_date, text_episodes, text_reserved) VALUES ('user-1', '2026-08-16', 49, 0)`).run();
     const ledger = quotaLedger();
-    const results = await Promise.all(
-      Array.from({ length: 8 }, (_, index) =>
-        ledger.reserve({
-          userId: 'user-1',
-          reservationKey: `free-text-${index + 1}`,
-          resourceType: 'text_episode',
-          tier: 'free',
-        }),
-      ),
-    );
+    const results = await Promise.all([
+      ledger.reserve({ userId: 'user-1', reservationKey: 'free-boundary-left', resourceType: 'text_episode', tier: 'free' }),
+      ledger.reserve({ userId: 'user-1', reservationKey: 'free-boundary-right', resourceType: 'text_episode', tier: 'free' }),
+    ]);
 
-    expect(results.filter((result) => result.ok)).toHaveLength(3);
-    expect(results.filter((result) => !result.ok && result.error.code === 'quota_exceeded')).toHaveLength(5);
-    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textReserved: 3, textConsumed: 0 });
-    expect((await ledger.reconcileDay('user-1', '2026-08-16')).reconciled).toBe(true);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect(results.filter((result) => !result.ok && result.error.code === 'quota_exceeded')).toHaveLength(1);
+    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textReserved: 1, textConsumed: 49 });
   });
 
-  it('enforces the Plus text limit at twenty under contention', async () => {
+  it('enforces the Plus text limit at one hundred under contention', async () => {
+    await db.prepare(`INSERT INTO daily_usage (user_id, usage_date, text_episodes, text_reserved) VALUES ('user-1', '2026-08-16', 99, 0)`).run();
     const ledger = quotaLedger();
-    const results = await Promise.all(
-      Array.from({ length: 21 }, (_, index) =>
-        ledger.reserve({
-          userId: 'user-1',
-          reservationKey: `plus-text-${index + 1}`,
-          resourceType: 'text_episode',
-          tier: 'plus',
-        }),
-      ),
-    );
+    const results = await Promise.all([
+      ledger.reserve({ userId: 'user-1', reservationKey: 'plus-boundary-left', resourceType: 'text_episode', tier: 'plus' }),
+      ledger.reserve({ userId: 'user-1', reservationKey: 'plus-boundary-right', resourceType: 'text_episode', tier: 'plus' }),
+    ]);
 
-    expect(results.filter((result) => result.ok)).toHaveLength(20);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
     expect(results.filter((result) => !result.ok && result.error.code === 'quota_exceeded')).toHaveLength(1);
-    expect((await ledger.reconcileDay('user-1', '2026-08-16')).reconciled).toBe(true);
+    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textReserved: 1, textConsumed: 99 });
   });
 
   it('allows voice consumption independently of same-day text consumption', async () => {

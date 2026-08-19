@@ -1,4 +1,4 @@
-import { D1QuotaLedger } from '../quota/d1-quota-ledger';
+import { D1VoiceQuota, type VoiceQuota } from '../quota/voice-quota';
 import { NOOP_PRODUCT_TELEMETRY, type ProductTelemetrySink } from '../telemetry/product-events';
 import { approvedVoice } from '../tts/voice-registry';
 import type {
@@ -30,7 +30,7 @@ export class D1AudioService {
   constructor(
     private readonly db: D1Database,
     private readonly queue: AudioQueue,
-    private readonly quota: D1QuotaLedger = new D1QuotaLedger(db),
+    private readonly quota: VoiceQuota = new D1VoiceQuota(db),
     private readonly productTelemetry: ProductTelemetrySink = NOOP_PRODUCT_TELEMETRY,
   ) {}
 
@@ -100,7 +100,6 @@ export class D1AudioService {
     const reserved = await this.quota.reserve({
       userId: input.userId,
       reservationKey: input.reservationKey,
-      resourceType: 'voice_episode',
       tier: input.tier,
     });
     if (!reserved.ok) {

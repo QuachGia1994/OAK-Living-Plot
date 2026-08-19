@@ -11,6 +11,7 @@ import { D1QuotaLedger } from '../quota/d1-quota-ledger';
 import type { QuotaError } from '../quota/contracts';
 import { quotaPolicyFor } from '../quota/policy';
 import { buildRetentionSnapshot } from '../retention/retention';
+import { D1VoiceBonusLedger } from '../referrals/d1-voice-bonus-ledger';
 import type { ProductEventTelemetry, ProductTelemetrySink } from '../telemetry/product-events';
 import { NOOP_PRODUCT_TELEMETRY } from '../telemetry/product-events';
 import type {
@@ -56,10 +57,11 @@ export class DramaService {
     const policy = quotaPolicyFor(entitlement.tier);
     const utcDay = utcDayFromMillis(this.clock());
     const usage = await this.quota.getDailyUsage(userId, utcDay);
-    const [recentDramas, activity, preferences] = await Promise.all([
+    const [recentDramas, activity, preferences, voiceBonusCredits] = await Promise.all([
       this.dramas.listOwnedDramas(userId),
       this.dramas.loadRetentionActivity(userId),
       this.preferences.get(userId),
+      new D1VoiceBonusLedger(this.db, this.clock).balance(userId),
     ]);
     return {
       ok: true,
@@ -70,6 +72,7 @@ export class DramaService {
           textLimit: policy.textEpisodesPerUtcDay,
           voiceRemaining: remaining(policy.voiceEpisodesPerUtcDay, usage.voiceConsumed, usage.voiceReserved),
           voiceLimit: policy.voiceEpisodesPerUtcDay,
+          voiceBonusCredits,
           resetAt: nextUtcReset(utcDay),
         },
         retention: buildRetentionSnapshot(activity, recentDramas.length, this.clock(), preferences.uiLocale),
