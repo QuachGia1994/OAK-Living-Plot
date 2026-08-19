@@ -3,6 +3,11 @@ import { CloudflareProductTelemetrySink } from '../src/telemetry/cloudflare-prod
 import { sceneDepthBucket } from '../src/telemetry/product-events';
 
 describe('CloudflareProductTelemetrySink', () => {
+  it('is a no-op when Analytics Engine is not provisioned', () => {
+    const sink = new CloudflareProductTelemetrySink();
+    expect(() => sink.recordProductEvent({ event: 'voice_requested', tier: 'free' })).not.toThrow();
+  });
+
   it('writes only bounded non-identifying product dimensions', () => {
     const points: AnalyticsEngineDataPoint[] = [];
     const sink = new CloudflareProductTelemetrySink({ writeDataPoint(point) { if (point) points.push(point); } });

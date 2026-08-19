@@ -5,6 +5,13 @@ import type { GenerationTelemetrySink } from '../src/telemetry/contracts';
 import { makeGenerationInput, makeValidProposal } from './drama-fixtures';
 
 describe('scene generation cost telemetry', () => {
+  it('is a no-op when Analytics Engine is not provisioned', () => {
+    const sink = new CloudflareGenerationTelemetrySink();
+    expect(() => sink.recordGenerationAttempt({
+      provider: 'gemini', model: SCENE_MODEL, attempt: 1, outcome: 'accepted', usage: { inputTokens: 1, outputTokens: 1 },
+    })).not.toThrow();
+  });
+
   it('writes only privacy-safe dimensions and exact token/cost values', () => {
     const writeDataPoint = vi.fn();
     const sink = new CloudflareGenerationTelemetrySink({ writeDataPoint });

@@ -5,7 +5,7 @@ export interface AppEnv {
   TTS_QUEUE: Queue<AudioJob>;
   TTS_DLQ_NAME: string;
   AUDIO_BUCKET: R2Bucket;
-  ANALYTICS: AnalyticsEngineDataset;
+  ANALYTICS?: AnalyticsEngineDataset;
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_JWT_KEY: string;
   CLERK_AUTHORIZED_PARTIES: string;

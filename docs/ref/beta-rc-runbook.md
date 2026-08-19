@@ -13,7 +13,7 @@ Provisioned in the non-production Cloudflare account:
 - D1 `living-plot-dev` — ID `bbd5a628-cf93-4ffa-a459-2368025b4067`, APAC; migrations `0001` through `0009` applied remotely, including retryable quota reservations.
 - Queue `living-plot-tts-dev`.
 - DLQ `living-plot-tts-dlq-dev`.
-- Development Analytics Engine binding remains `living_plot_events_dev` in Wrangler configuration.
+- Development Analytics Engine is optional observational telemetry; when the account service is not enabled, the development Worker omits the binding and uses no-op telemetry without affecting canonical Drama/voice behavior.
 - Private R2 bucket `living-plot-audio-dev` is provisioned and must remain non-public.
 
 R2 account enablement is complete. Private-audio proof still requires a deployed development Worker plus authenticated Queue → Gemini TTS → R2 → media playback convergence; bucket existence alone is not E2E proof.

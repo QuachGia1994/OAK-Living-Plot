@@ -1,9 +1,10 @@
 import { sceneDepthBucket, type ProductEventTelemetry, type ProductTelemetrySink } from './product-events';
 
 export class CloudflareProductTelemetrySink implements ProductTelemetrySink {
-  constructor(private readonly dataset: Pick<AnalyticsEngineDataset, 'writeDataPoint'>) {}
+  constructor(private readonly dataset?: Pick<AnalyticsEngineDataset, 'writeDataPoint'>) {}
 
   recordProductEvent(event: ProductEventTelemetry): void {
+    if (!this.dataset) return;
     this.dataset.writeDataPoint({
       indexes: [event.event],
       blobs: [

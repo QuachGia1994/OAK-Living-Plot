@@ -2,9 +2,10 @@ import { calculateAiCost } from './ai-cost';
 import type { GenerationAttemptTelemetry, GenerationTelemetrySink } from './contracts';
 
 export class CloudflareGenerationTelemetrySink implements GenerationTelemetrySink {
-  constructor(private readonly dataset: Pick<AnalyticsEngineDataset, 'writeDataPoint'>) {}
+  constructor(private readonly dataset?: Pick<AnalyticsEngineDataset, 'writeDataPoint'>) {}
 
   recordGenerationAttempt(event: GenerationAttemptTelemetry): void {
+    if (!this.dataset) return;
     const cost = calculateAiCost(event.model, event.usage);
     if (!cost) return;
 
