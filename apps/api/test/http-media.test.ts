@@ -22,8 +22,6 @@ const testEnv: AppEnv = {
   CLERK_JWT_KEY: 'unused',
   CLERK_AUTHORIZED_PARTIES: 'https://living-plot.test',
   GEMINI_API_KEY: 'unused',
-  GOOGLE_SERVICE_ACCOUNT_EMAIL: 'unused',
-  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: 'unused',
   REVENUECAT_SECRET_API_KEY: 'unused',
   REVENUECAT_PLUS_ENTITLEMENT_ID: 'plus',
   REVENUECAT_WEBHOOK_AUTHORIZATION: 'Bearer unused',

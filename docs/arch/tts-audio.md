@@ -6,7 +6,7 @@
 Slice 9 adds derived voice generation without making audio part of canonical story state. Text episodes remain canonical and usable when voice is queued, retrying, failed, or unavailable.
 
 The boundary owns:
-- Google service-account OAuth access-token acquisition;
+- server-side Gemini API-key authentication at the speech-provider edge;
 - provider-neutral speech synthesis;
 - fresh-voice quota reservation/consumption/release;
 - asynchronous Queue processing and DLQ cleanup;
@@ -15,25 +15,17 @@ The boundary owns:
 
 RevenueCat entitlement materialization and analytics/cost accounting remain separate authority domains. Mobile playback now consumes this boundary without making audio canonical.
 
-## Google authentication
-`GoogleAccessTokenProvider` performs the explicit server-to-server flow required by the architecture:
-
-1. construct a JWT with `alg=RS256`, service-account email as `iss`, `https://www.googleapis.com/auth/cloud-platform` as `scope`, Google OAuth token endpoint as `aud`, and a one-hour `iat/exp` window;
-2. import the PKCS#8 private key with Worker Web Crypto;
-3. sign with `RSASSA-PKCS1-v1_5` + SHA-256;
-4. exchange the JWT assertion at `https://oauth2.googleapis.com/token`;
-5. reuse the returned access token until 60 seconds before expiry.
-
-The service-account email/private key exist only in Worker environment secrets. No credential or assertion reaches the mobile client or D1.
+## Gemini authentication
+The live Beta RC speech adapter uses the same server-side `GEMINI_API_KEY` trust boundary as scene generation. `GeminiTtsSynthesizer` sends the key only as the Gemini API `x-goog-api-key` header from the Worker; it never enters D1, mobile configuration, public DTOs, or R2 metadata. Google Cloud service-account credentials are not required by the current narration runtime.
 
 ## Speech provider
-`SpeechSynthesizer` is provider-neutral. `GoogleTtsSynthesizer` currently calls Google Cloud Text-to-Speech v1 `text:synthesize` with MP3 output and returns only audio bytes, content type, and input-character count.
+`SpeechSynthesizer` remains provider-neutral. The current live adapter is `GeminiTtsSynthesizer` using `gemini-2.5-flash-preview-tts` through the Gemini Interactions API. It requests inline MP3 output, validates the returned MIME/container, and exposes only normalized MP3 bytes, `audio/mpeg`, and input-character count to `AudioProcessor`.
 
-Approved Phase 1 variants are explicit and reversible:
-- `vi-narrator-female` → `vi-VN-Wavenet-A`;
-- `en-narrator-female` → `en-US-Wavenet-F`.
+Approved Phase 1 product variants remain stable and map internally to Gemini voice `Aoede`:
+- `vi-narrator-female` → `vi-VN` product locale → `Aoede`;
+- `en-narrator-female` → `en-US` product locale → `Aoede`.
 
-Clients send only the approved variant name; they cannot supply arbitrary provider voice IDs.
+Gemini TTS detects input language automatically; both Vietnamese and English are supported by the provider. Clients send only the approved product variant and cannot supply arbitrary provider voice IDs. The older Google Cloud TTS adapter remains isolated legacy code and is not instantiated by the live factory or required by readiness checks.
 
 ## Canonical audio lifecycle
 Migration `0005_tts_audio.sql` adds `audio_assets`. One `(episode_id, voice_variant)` owns one logical derived audio asset.
@@ -47,7 +39,7 @@ Terminal failure is `failed`.
 - `reserving`: unique asset claim exists before quota reservation. Concurrent requests for the same episode/voice converge here, so losers never reserve extra quota.
 - `queued`: voice quota is reserved and the Queue message was accepted.
 - `processing`: a consumer lease/token owns the current synthesis attempt.
-- `staged`: MP3 already exists in private R2, but quota finalization/ready transition has not completed. Retries from this state never call Google again.
+- `staged`: MP3 already exists in private R2, but quota finalization/ready transition has not completed. Retries from this state never call Gemini TTS again.
 - `ready`: quota is consumed, the object key exists, and authenticated playback may stream it.
 - `failed`: terminal provider/configuration/queue/DLQ failure; held quota is released where applicable.
 
@@ -76,7 +68,7 @@ Wrangler declares:
 
 The queue payload contains only `assetId`. It contains no story state, text, provider token, service-account credential, or R2 key.
 
-Retryable Google/network/R2 failures reset the asset to `queued` and call message retry. Non-retryable provider failures release quota and end as `failed`. After primary retries are exhausted, the DLQ consumer marks unfinished work failed and releases held quota. A `staged` item first attempts quota/ready recovery so a successful provider call is not discarded merely because finalization was delayed.
+Retryable Gemini/network/R2 failures reset the asset to `queued` and call message retry. Gemini HTTP 408/429/5xx and transport timeouts are retryable; authentication/configuration failures and ordinary invalid requests are terminal. Non-retryable provider failures release quota and end as `failed`. After primary retries are exhausted, the DLQ consumer marks unfinished work failed and releases held quota. A `staged` item first attempts quota/ready recovery so a successful provider call is not discarded merely because finalization was delayed.
 
 ## Private R2 storage
 Wrangler binds `AUDIO_BUCKET` to `living-plot-audio`. The bucket is not exposed through a public URL in application code.
@@ -100,4 +92,4 @@ The Expo client requests one approved narrator variant, polls the status route w
 - R2 remains private even if D1 finalization fails.
 
 ## External environment gate
-Live Google credential/network synthesis and remote development Queue/R2 provisioning remain external gates until the required credentials/resources and public mobile API/Clerk values exist. Preview-safe APK/IPA artifacts therefore keep text scenes functional and expose voice as unavailable rather than substituting fixture audio. Production deployment and store submission are not part of the current Phase 1 development gate.
+Live narration requires the Worker-side Gemini key, development Queue/DLQ, private R2 bucket, and authenticated Clerk/mobile API configuration. It does not require Google Cloud billing or service-account activation. Preview-safe APK/IPA artifacts keep text scenes functional when live public configuration is absent and never substitute fixture audio. Production deployment and store submission are not part of the current Phase 1 development gate.

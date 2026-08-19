@@ -10,41 +10,38 @@ This definition does not fabricate live-provider proof. A preview-safe RC may be
 ## Current development infrastructure
 Provisioned in the non-production Cloudflare account:
 
-- D1 `living-plot-dev` — ID `bbd5a628-cf93-4ffa-a459-2368025b4067`, APAC; migrations `0001` through `0008` applied remotely.
+- D1 `living-plot-dev` — ID `bbd5a628-cf93-4ffa-a459-2368025b4067`, APAC; migrations `0001` through `0009` applied remotely, including retryable quota reservations.
 - Queue `living-plot-tts-dev`.
 - DLQ `living-plot-tts-dlq-dev`.
 - Development Analytics Engine binding remains `living_plot_events_dev` in Wrangler configuration.
-- Intended private R2 bucket is `living-plot-audio-dev`.
+- Private R2 bucket `living-plot-audio-dev` is provisioned and must remain non-public.
 
-R2 is currently BLOCKED before bucket creation: Wrangler returns Cloudflare API code `10042` and requires R2 to be enabled in the Cloudflare Dashboard. Do not deploy the development Worker or claim private-audio E2E until that service is enabled and the bucket is created.
+R2 account enablement is complete. Private-audio proof still requires a deployed development Worker plus authenticated Queue → Gemini TTS → R2 → media playback convergence; bucket existence alone is not E2E proof.
 
 ## Current provider gate
-`npm run live:check:preview` currently reports `0/12` required live values ready. No local `apps/api/.dev.vars`, no local `apps/mobile/.env`, and no repository Actions variables/secrets are configured for the live stack.
+As verified on 2026-08-19, the development Worker secret store contains Clerk verification configuration and `GEMINI_API_KEY`; GitHub already contains the mobile Clerk publishable variable. The strict repository readiness checker intentionally still includes RevenueCat and mobile API configuration, while Google service-account credentials are no longer required after the narration provider migration.
 
-Required before authenticated provider E2E:
+Required before authenticated private-voice E2E:
 
-- Clerk publishable key, JWT verification key, and authorized party.
-- Gemini API key.
-- Google service-account email/private key.
-- RevenueCat server key, Plus entitlement ID, webhook authorization/signing secret.
+- Clerk publishable key, JWT verification key, and authorized party on the Worker.
+- Gemini API key on the Worker for both scene generation and Gemini TTS.
 - Mobile HTTPS development API URL and Clerk publishable key.
-- Optional RevenueCat Test Store/public SDK key for purchase flow proof.
+
+RevenueCat server values and mobile store keys remain separate billing/store gates and do not block proving one Free fresh narration.
 
 Worker secrets must stay Worker-only. Never copy provider/server secrets into `EXPO_PUBLIC_*` values or GitHub public variables.
 
 ## Live bring-up sequence
-After R2 and credentials are available:
+Current live bring-up sequence:
 
-1. Create `living-plot-audio-dev` and confirm D1/Queue/DLQ names still match `apps/api/wrangler.jsonc`.
-2. Put Worker secrets into the development Worker secret store; put only public mobile values in ignored `apps/mobile/.env` / repository variables.
-3. Re-run `npm run live:check` and require 12/12 required values ready.
-4. Re-run `npm --workspace @living-plot/api run db:migrate:development` and require no pending migrations.
-5. Deploy only the `development` Worker environment.
-6. Run `npm run live:smoke:health`.
-7. Obtain a short-lived Clerk bearer token and run `npm run live:smoke:core`.
-8. Run `npm run live:smoke:voice` only after Queue/TTS/R2 are live.
-9. Configure RevenueCat Test Store + webhook and run `npm run live:smoke:billing`; Plus is proven only when D1 entitlement converges with a provider sync timestamp.
-10. Run `npm run live:smoke:all` as the final live-provider gate.
+1. Confirm `living-plot-audio-dev`, D1, Queue, and DLQ still match `apps/api/wrangler.jsonc`.
+2. Keep Worker-only Clerk/Gemini credentials in the development Worker secret store; put only public mobile values in ignored `apps/mobile/.env` / repository variables.
+3. Re-run remote D1 migrations and require no pending migrations.
+4. Deploy only the `development` Worker environment and verify `/health`.
+5. Set the public mobile API URL to the deployed development Worker HTTPS URL.
+6. Obtain a short-lived Clerk bearer token and run authenticated core smoke.
+7. Run private voice smoke and require Queue → Gemini TTS → private R2 → ready media → authenticated bytes.
+8. Treat RevenueCat Test Store/webhook/Plus purchase proof as a separate billing closure gate.
 
 ## Abuse, cost, and failure guardrails
 - Text and fresh-voice generation are protected by backend D1 daily quotas; client tier flags never authorize extra spend.

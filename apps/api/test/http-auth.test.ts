@@ -18,8 +18,6 @@ const testEnv: AppEnv = {
   CLERK_JWT_KEY: 'unused-in-injected-tests',
   CLERK_AUTHORIZED_PARTIES: 'https://living-plot.test',
   GEMINI_API_KEY: 'unused-in-auth-tests',
-  GOOGLE_SERVICE_ACCOUNT_EMAIL: 'unused-in-auth-tests',
-  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: 'unused-in-auth-tests',
   REVENUECAT_SECRET_API_KEY: 'unused-in-auth-tests',
   REVENUECAT_PLUS_ENTITLEMENT_ID: 'plus',
   REVENUECAT_WEBHOOK_AUTHORIZATION: 'Bearer unused-in-auth-tests',

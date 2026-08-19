@@ -38,4 +38,4 @@ Frozen surfaces: Home, Create, Playback A/B/C, Library, Settings, Plus, LP brand
 - iOS: NativeTabs + `minimizeBehavior="onScrollDown"` retained.
 
 ## External live gate
-Preview-safe APK/IPA builds remain valid RC artifacts when public live configuration is absent. Private narration becomes live only after the mobile API/Clerk values and backend Queue/TTS/R2 credentials/resources are provisioned; the client must report that state honestly and never fall back to fixture audio.
+Preview-safe APK/IPA builds remain valid RC artifacts when public live configuration is absent. Private narration becomes live only after the mobile API/Clerk values and backend Queue/Gemini TTS/private R2 resources are provisioned; the current narration path uses the server-side `GEMINI_API_KEY` and has no Google Cloud billing/service-account dependency. The client must report live state honestly and never fall back to fixture audio.

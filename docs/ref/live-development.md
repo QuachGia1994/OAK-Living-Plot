@@ -31,13 +31,13 @@ When the Test Store key is present, it intentionally takes priority over platfor
 
 ## Worker development secrets
 
-Copy `apps/api/.dev.vars.example` to ignored `apps/api/.dev.vars` for local work. Clerk, Gemini, Google TTS, and RevenueCat server values remain Worker-only.
+Copy `apps/api/.dev.vars.example` to ignored `apps/api/.dev.vars` for local work. Clerk, Gemini, and RevenueCat server values remain Worker-only. Gemini scene generation and Gemini TTS share the same server-side `GEMINI_API_KEY`; narration no longer requires Google Cloud service-account credentials.
 
 ## Cloudflare named development environment
 
 `apps/api/wrangler.jsonc` defines the non-production `development` environment as `living-plot-api-dev`, with separate development D1, R2, Queue/DLQ, and Analytics Engine bindings.
 
-As of 2026-08-17, D1 `living-plot-dev` and the `living-plot-tts-dev` / `living-plot-tts-dlq-dev` queues are provisioned, and migrations `0001`–`0008` are applied remotely. The intended R2 bucket is `living-plot-audio-dev`, but Cloudflare currently rejects bucket creation with API code `10042` until R2 is enabled in the account dashboard. Do not claim voice E2E or deploy the development Worker while that binding is unavailable.
+As of 2026-08-19, D1 `living-plot-dev`, `living-plot-tts-dev`, `living-plot-tts-dlq-dev`, and private R2 bucket `living-plot-audio-dev` are provisioned; remote D1 migrations `0001`–`0009` are current. The development Worker uses `GEMINI_API_KEY` for both scene generation and Gemini TTS. The R2 bucket has no public application URL and remains owner-served only through authenticated Worker media routes.
 
 Useful commands:
 

@@ -1,6 +1,6 @@
 # Canonical drama runtime ownership
 
-> updated 2026-08-18 · current application contract
+> updated 2026-08-19 · current application contract
 
 Living Plot has one product vocabulary above persistence: **Drama → Scene → Choice → Branch → next Scene**. The existing D1 schema still stores historical table/column names such as `plots`, `episodes`, `plot_id`, `episode_id`, and `story_locale`. Those names are storage details and must not be projected into new mobile or HTTP contracts.
 
@@ -81,7 +81,7 @@ Internal D1/TTS lifecycle may use `reserving`, `queued`, `processing`, `staged`,
 - `ready`
 - `failed`
 
-`D1AudioService` normalizes internal storage state to the public `MediaAsset`. `objectKey`, provider voice ID, service-account details, and staging state never cross the HTTP boundary. Binary playback uses an authenticated owner-scoped endpoint. Automatic status polling is bounded; after the poll budget is exhausted, the UI requires an explicit status refresh instead of polling forever. If private R2 cleanup fails during a terminal media transition, the processor keeps the staged object key, records `r2_cleanup_failed`, and retries instead of deleting the only reconciliation pointer.
+`D1AudioService` normalizes internal storage state to the public `MediaAsset`. `objectKey`, provider voice ID, provider credentials, and staging state never cross the HTTP boundary. Binary playback uses an authenticated owner-scoped endpoint. Automatic status polling is bounded; after the poll budget is exhausted, the UI requires an explicit status refresh instead of polling forever. If private R2 cleanup fails during a terminal media transition, the processor keeps the staged object key, records `r2_cleanup_failed`, and retries instead of deleting the only reconciliation pointer.
 
 Script readiness therefore does **not** imply voice readiness.
 
@@ -127,7 +127,7 @@ Behavioral proof is intentionally attached to business transitions:
 - `apps/api/test/http-drama.test.ts` — create, persisted restore, owner isolation, branch commit/conflict, next-scene consequence, idempotent retry, generation failure/quota release.
 - `apps/api/test/scene-schema.test.ts` — provider normalization and invalid references/shape rejection.
 - `apps/api/test/gemini-scene-generator.test.ts` — provider adapter, controlled validation retry, normalized failures.
-- `apps/api/test/audio-service.test.ts` + `audio-processor.test.ts` + `http-media.test.ts` — media ownership, quota/idempotency, internal/partial/ready/failure states, private delivery.
+- `apps/api/test/gemini-tts-synthesizer.test.ts` + `audio-service.test.ts` + `audio-processor.test.ts` + `http-media.test.ts` — Gemini TTS normalization plus media ownership, quota/idempotency, internal/partial/ready/failure states, private delivery.
 - `apps/mobile/test/http-drama-client.test.ts` — HTTP normalization, conflict resync, stable continuation key, malformed branch rejection.
 - `apps/mobile/test/drama-domain.test.ts` — player phase transitions.
 - `apps/mobile/test/drama-preview-client.test.ts` — branch rules, continuation, restore, locale integrity.

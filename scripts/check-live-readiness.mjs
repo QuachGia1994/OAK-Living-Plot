@@ -11,8 +11,6 @@ const checks = [
   check('api', 'CLERK_JWT_KEY', apiValues, (value) => value.includes('BEGIN PUBLIC KEY') && nonPlaceholder(value)),
   check('api', 'CLERK_AUTHORIZED_PARTIES', apiValues, looksLikeHttpsList),
   check('api', 'GEMINI_API_KEY', apiValues, nonPlaceholder),
-  check('api', 'GOOGLE_SERVICE_ACCOUNT_EMAIL', apiValues, (value) => value.includes('@') && value.endsWith('.iam.gserviceaccount.com') && nonPlaceholder(value)),
-  check('api', 'GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY', apiValues, (value) => value.includes('BEGIN PRIVATE KEY') && nonPlaceholder(value)),
   check('api', 'REVENUECAT_SECRET_API_KEY', apiValues, nonPlaceholder),
   check('api', 'REVENUECAT_PLUS_ENTITLEMENT_ID', apiValues, (value) => value === 'plus'),
   check('api', 'REVENUECAT_WEBHOOK_AUTHORIZATION', apiValues, (value) => value.startsWith('Bearer ') && value.length > 20 && nonPlaceholder(value)),

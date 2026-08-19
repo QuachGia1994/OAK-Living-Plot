@@ -53,7 +53,7 @@ export class D1AudioService {
         await this.db
           .prepare(
             `UPDATE audio_assets
-             SET reservation_key = ?, provider = 'google', provider_voice_id = ?, language_code = ?,
+             SET reservation_key = ?, provider = 'gemini', provider_voice_id = ?, language_code = ?,
                  status = 'reserving', object_key = NULL, input_characters = 0, processing_token = NULL,
                  processing_started_at = NULL, failure_code = NULL, ready_at = NULL, updated_at = unixepoch() * 1000
              WHERE id = ? AND status = 'failed'`,
@@ -65,7 +65,7 @@ export class D1AudioService {
           .prepare(
             `INSERT INTO audio_assets
                (id, episode_id, voice_variant, provider, provider_voice_id, language_code, reservation_key, status)
-             SELECT ?, e.id, ?, 'google', ?, ?, ?, 'reserving'
+             SELECT ?, e.id, ?, 'gemini', ?, ?, ?, 'reserving'
              FROM episodes e
              JOIN plots p ON p.id = e.plot_id
              WHERE e.id = ? AND p.user_id = ?

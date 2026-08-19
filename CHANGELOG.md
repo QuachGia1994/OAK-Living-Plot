@@ -5,6 +5,7 @@ All notable changes to Living Plot will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- Migrated live Beta RC narration from Google Cloud Text-to-Speech service-account auth to server-side Gemini TTS using the existing `GEMINI_API_KEY`, preserving provider-neutral Queue/R2/media ownership and private MP3 delivery without a Google Cloud billing dependency.
 - Production RC freeze: documented SSOT/state ownership, strengthened playback domain tests for selected≠locked and in-flight commit gating; UI surfaces feature-frozen for beta.
 - Final concept closure: Android launch-safe DynamicColorIOS guards, Library dense list rows + featured Now Playing cover, Plus benefits + “Nâng cấp Plus” copy, compact mood silhouettes, and smaller production Settings intro.
 - Concept parity close-out: Android NativeTabs dark/gold branding (`backgroundColor`/`indicatorColor`/`iconColor`/`rippleColor`), compact A/B/C choice rows + selective commit dock, responsive scene stage height, secondary voice control, and looser Mina crop presets.

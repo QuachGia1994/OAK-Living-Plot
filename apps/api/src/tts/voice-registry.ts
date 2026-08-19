@@ -8,12 +8,12 @@ const APPROVED_VOICES: Record<string, ApprovedVoice> = {
   'vi-narrator-female': {
     variant: 'vi-narrator-female',
     languageCode: 'vi-VN',
-    providerVoiceId: 'vi-VN-Wavenet-A',
+    providerVoiceId: 'Aoede',
   },
   'en-narrator-female': {
     variant: 'en-narrator-female',
     languageCode: 'en-US',
-    providerVoiceId: 'en-US-Wavenet-F',
+    providerVoiceId: 'Aoede',
   },
 };
 
