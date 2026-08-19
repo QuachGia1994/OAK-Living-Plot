@@ -11,6 +11,7 @@ const db = runtimeEnv.DB;
 const testEnv: AppEnv = {
   DB: db,
   TTS_QUEUE: runtimeEnv.TTS_QUEUE,
+  TTS_DLQ_NAME: 'living-plot-tts-dlq-test',
   AUDIO_BUCKET: runtimeEnv.AUDIO_BUCKET,
   ANALYTICS: runtimeEnv.ANALYTICS,
   CLERK_PUBLISHABLE_KEY: 'unused-in-injected-tests',

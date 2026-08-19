@@ -4,8 +4,6 @@ import { createSpeechSynthesizer } from '../tts/factory';
 import { AudioProcessor } from './audio-processor';
 import type { AudioJob } from './contracts';
 
-const TTS_DLQ_NAME = 'living-plot-tts-dlq';
-
 export interface AudioQueueDependencies {
   synthesizer?: SpeechSynthesizer;
 }
@@ -20,7 +18,7 @@ export async function handleAudioQueue(
     env.AUDIO_BUCKET,
     dependencies.synthesizer ?? createSpeechSynthesizer(env),
   );
-  const isDeadLetterBatch = batch.queue === TTS_DLQ_NAME;
+  const isDeadLetterBatch = batch.queue === env.TTS_DLQ_NAME;
 
   for (const message of batch.messages) {
     try {

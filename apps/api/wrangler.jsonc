@@ -3,6 +3,9 @@
   "name": "living-plot-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-16",
+  "vars": {
+    "TTS_DLQ_NAME": "living-plot-tts-dlq"
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -50,6 +53,9 @@
   "env": {
     "development": {
       "name": "living-plot-api-dev",
+      "vars": {
+        "TTS_DLQ_NAME": "living-plot-tts-dlq-dev"
+      },
       "d1_databases": [
         {
           "binding": "DB",

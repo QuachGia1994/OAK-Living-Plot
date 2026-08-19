@@ -69,10 +69,10 @@ The HTTP boundary resolves Free/Plus from the backend materialized RevenueCat en
 
 ## Queue and DLQ
 Wrangler declares:
-- producer binding `TTS_QUEUE` → `living-plot-tts`;
+- producer binding `TTS_QUEUE` → the environment's canonical TTS queue;
 - consumer batch size 5, three retries, 30-second retry delay;
-- DLQ `living-plot-tts-dlq`;
-- a second consumer for the DLQ.
+- `TTS_DLQ_NAME` as a nonsecret runtime var that exactly matches the environment's DLQ consumer name;
+- a second consumer for that DLQ. Development uses `living-plot-tts-dev` → `living-plot-tts-dlq-dev`; the default environment uses `living-plot-tts` → `living-plot-tts-dlq`.
 
 The queue payload contains only `assetId`. It contains no story state, text, provider token, service-account credential, or R2 key.
 

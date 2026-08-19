@@ -3,6 +3,7 @@ import type { AudioJob } from './audio/contracts';
 export interface AppEnv {
   DB: D1Database;
   TTS_QUEUE: Queue<AudioJob>;
+  TTS_DLQ_NAME: string;
   AUDIO_BUCKET: R2Bucket;
   ANALYTICS: AnalyticsEngineDataset;
   CLERK_PUBLISHABLE_KEY: string;

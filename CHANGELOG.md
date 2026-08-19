@@ -87,6 +87,7 @@ All notable changes to Living Plot will be documented in this file.
 - Narrative prompt guidance now keeps the canonical protagonist visible, requires durable scene progress, and keeps narrative/branch output in the requested locale.
 
 ### Fixed
+- Fixed development DLQ routing so Queue batches use the environment-configured dead-letter queue name; `living-plot-tts-dlq-dev` now reaches terminal cleanup instead of being mistaken for the primary TTS queue.
 - Closed the same-render double-action race in Drama playback: commit/continue now acquire a synchronous action lock before React rerenders, so rapid taps cannot start parallel canonical mutations.
 - Closed RC session ownership leakage: sign-out, auth loading transitions, and Clerk account changes now remount the session-owned runtime so stale canonical Drama state and already-loaded private narration cannot survive across principals; added ownership regression coverage.
 - Repaired the live beta smoke runner after Drama/Scene/Media canonicalization: it now exercises `/v1/dramas`, `/v1/scenes/:sceneId/voice`, and `/v1/media/:assetId` DTOs instead of removed Story/Plot/Episode/audio routes.
