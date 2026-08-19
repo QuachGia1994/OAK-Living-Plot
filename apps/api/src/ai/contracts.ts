@@ -36,12 +36,46 @@ export interface SceneGenerationInput {
     choiceIntent: string | null;
     consequence: string | null;
     choiceLabels: string[];
+    beat?: string | null;
+    motifSignature?: {
+      beat: string;
+      threadCategory: string;
+      dominantRelation: string;
+      intentFamily: string;
+      consequenceFamily: string;
+    } | null;
+    committedRelationshipDeltas?: Array<{
+      fromKey: string;
+      toKey: string;
+      affinityDelta: number;
+      trustDelta: number;
+      tensionDelta: number;
+      statusText: string;
+    }>;
   }>;
   previous: null | {
     sceneSummary: string;
     chosenAction: string;
     choiceIntent: string;
     consequence: string;
+  };
+  /** Compact long-run novelty constraints derived server-side before generation. */
+  novelty?: {
+    excludedBeats: string[];
+    trajectoryConstraints: Array<{
+      fromKey: string;
+      toKey: string;
+      dimension: 'affinity' | 'trust' | 'tension';
+      direction: 'up' | 'down';
+      streak: number;
+    }>;
+    motifHistory: Array<{
+      beat: string;
+      threadCategory: string;
+      dominantRelation: string;
+      intentFamily: string;
+      consequenceFamily: string;
+    }>;
   };
 }
 
@@ -80,6 +114,8 @@ export interface SceneProposal {
   title: string;
   script: string;
   summary: string;
+  /** Phase-1 structural narrative beat (required for novelty publication gate). */
+  beat?: string;
   establishedFacts: string[];
   threadChanges: {
     open: ThreadProposal[];

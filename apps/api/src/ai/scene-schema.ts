@@ -53,7 +53,7 @@ export function parseAndValidateSceneProposal(
 }
 
 function parseProposal(value: unknown): Result<SceneProposal, string[]> {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['title', 'script', 'summary', 'establishedFacts', 'threadChanges', 'choices'])) {
+  if (!isRecord(value) || !hasOnlyKeys(value, ['title', 'script', 'summary', 'establishedFacts', 'threadChanges', 'choices'], ['beat'])) {
     return invalid('Scene proposal has an invalid top-level shape.');
   }
   if (!isBoundedText(value.title, 1, 120) || !isBoundedText(value.script, 1, 6000) || !isBoundedText(value.summary, 1, 800)) {
@@ -81,6 +81,7 @@ function parseProposal(value: unknown): Result<SceneProposal, string[]> {
       title: value.title,
       script: value.script,
       summary: value.summary,
+      ...(typeof value.beat === 'string' ? { beat: value.beat } : {}),
       establishedFacts: value.establishedFacts,
       threadChanges: { open: openThreads.value, resolve: value.threadChanges.resolve },
       choices: [choices[0], choices[1], choices[2]],
@@ -339,9 +340,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function hasOnlyKeys(value: Record<string, unknown>, expected: string[]): boolean {
+function hasOnlyKeys(value: Record<string, unknown>, expected: string[], optional: string[] = []): boolean {
   const actual = Object.keys(value);
-  return actual.length === expected.length && actual.every((key) => expected.includes(key));
+  const allowed = new Set([...expected, ...optional]);
+  if (!expected.every((key) => actual.includes(key))) return false;
+  return actual.every((key) => allowed.has(key));
 }
 
 function isBoundedText(value: unknown, min: number, max: number): value is string {

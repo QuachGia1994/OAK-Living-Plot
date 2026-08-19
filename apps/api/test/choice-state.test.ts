@@ -21,20 +21,20 @@ describe('applyCommittedChoiceState', () => {
     expect(result.value.relationships).toContainEqual({
       fromKey: 'hero',
       toKey: 'linh',
-      affinity: 35,
-      trust: 40,
-      tension: 55,
-      status: 'relationship shifts',
+      affinity: 43,
+      trust: 43,
+      tension: 57,
+      status: 'defiant',
     });
     expect(result.value.facts).toEqual([
-      { key: 'scene:episode-1:fact:1', text: 'Linh knows An intentionally hid the message.' },
+      { key: 'scene:episode-1:fact:1', text: 'Người gửi tin nặc danh biết vị trí hiện tại của An và Linh.' },
       { key: 'choice:choice-a:fact:1', text: 'Linh notices An is still withholding something.' },
     ]);
     expect(result.value.openThreads).toEqual([
       { key: 'scene:episode-1:thread:1', title: 'A new suspicion appears.', urgency: 70 },
       { key: 'choice:choice-a:thread:1', title: 'Linh tests An’s honesty.', urgency: 85 },
     ]);
-    expect(result.value.tone).toBe('raw');
+    expect(result.value.tone).toBe('defiant');
   });
 
   it('deduplicates semantically identical facts and open threads across scenes and choices', () => {
@@ -50,8 +50,9 @@ describe('applyCommittedChoiceState', () => {
     if (!result.ok) return;
     expect(result.value.facts).toHaveLength(1);
     expect(result.value.facts[0]).toEqual({ key: 'fact-hidden-message', text: 'An hid a message from Linh.' });
+    // Default fixture resolves thread-trust; scene open is kept (deduped against choice open of same semantic title).
     expect(result.value.openThreads).toHaveLength(1);
-    expect(result.value.openThreads[0]).toEqual({ key: 'thread-trust', title: 'Linh questions An’s honesty.', urgency: 80 });
+    expect(result.value.openThreads[0]?.title).toBe('LINH QUESTIONS AN’S HONESTY.');
   });
 
   it('rejects resolving an unknown canonical key', () => {

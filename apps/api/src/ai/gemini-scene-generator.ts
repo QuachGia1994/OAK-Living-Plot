@@ -8,6 +8,7 @@ import type {
 } from './contracts';
 import { sceneResponseSchema, parseAndValidateSceneProposal } from './scene-schema';
 import { buildScenePrompt, validateSceneGenerationInput } from './scene-prompt';
+import { evaluateNarrative } from '../evals/narrative-evaluator';
 import {
   NOOP_GENERATION_TELEMETRY,
   type GenerationAttemptOutcome,
@@ -57,15 +58,31 @@ export class GeminiSceneGenerator implements SceneGenerator {
       usage.inputTokens += provider.value.usage.inputTokens;
       usage.outputTokens += provider.value.usage.outputTokens;
       const validated = parseAndValidateSceneProposal(provider.value.text, input);
-      this.recordAttempt(attempt as 1 | 2, validated.ok ? 'accepted' : 'rejected', provider.value.usage);
-      if (validated.ok) {
-        return {
-          ok: true,
-          value: { proposal: validated.value, usage, attempts: attempt, provider: 'gemini', model: SCENE_MODEL },
-        };
+      if (!validated.ok) {
+        this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
+        validationErrors = validated.error;
+      } else {
+        const narrative = evaluateNarrative(input, validated.value);
+        const noveltyFailures = narrative.findings.filter((finding) =>
+          finding.dimension === 'trajectoryDiversity'
+          || finding.dimension === 'structuralVariety'
+          || finding.dimension === 'longRangeNovelty'
+          || finding.code === 'STRUCTURAL_OR_CANONICAL_FAILURE');
+        if (!narrative.passed && noveltyFailures.length > 0) {
+          this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
+          validationErrors = noveltyFailures.map((finding) => `${finding.code}: ${finding.message}`);
+        } else if (!narrative.passed) {
+          this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
+          validationErrors = narrative.findings.map((finding) => `${finding.code}: ${finding.message}`);
+        } else {
+          this.recordAttempt(attempt as 1 | 2, 'accepted', provider.value.usage);
+          return {
+            ok: true,
+            value: { proposal: validated.value, usage, attempts: attempt, provider: 'gemini', model: SCENE_MODEL },
+          };
+        }
       }
 
-      validationErrors = validated.error;
       if (attempt === 2) {
         return {
           ok: false,

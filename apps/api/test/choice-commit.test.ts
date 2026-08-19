@@ -44,16 +44,16 @@ describe('D1ChoiceCommitter', () => {
     expect(result.value.state.relationships).toContainEqual({
       fromKey: 'hero',
       toKey: 'linh',
-      affinity: 35,
-      trust: 40,
-      tension: 55,
-      status: 'relationship shifts',
+      affinity: 43,
+      trust: 43,
+      tension: 57,
+      status: 'defiant',
     });
     expect(result.value.state.facts).toContainEqual({
       key: `scene:${episode.id}:fact:1`,
-      text: 'Linh knows An intentionally hid the message.',
+      text: 'Người gửi tin nặc danh biết vị trí hiện tại của An và Linh.',
     });
-    expect(result.value.state.tone).toBe('raw');
+    expect(result.value.state.tone).toBe('defiant');
 
     const plot = await loadPlot('plot-1');
     expect(plot?.version).toBe(2);

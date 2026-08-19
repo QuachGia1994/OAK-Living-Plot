@@ -5,6 +5,7 @@ All notable changes to Living Plot will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- Phase 1 long-run narrative novelty: trajectory diversity, structural beat rotation (`BEAT_COOLDOWN_SCENES`), long-range motif signatures, evaluator dimensions, and Gemini publication reject/retry gate without Vector DB.
 - Raised owner-data export to schema v3 so referral/bonus-credit state and privacy-safe portrait metadata travel with account export while internal IDs, reward events, reservation keys, portrait fingerprints, private R2 keys, and generated media bytes remain excluded.
 - Raised server-owned daily Scene generation limits to Free 50 / Plus 100 while keeping fresh cloud narration at Free 1 / Plus 10; referral voice credits are persistent bonus inventory rather than a client-selected tier.
 - Strengthened continuation novelty with a bounded 12-Scene history blocklist plus deterministic rejection of materially recycled titles, summaries, branch labels, choice intents, and consequences; A/B/C actions, intents, and consequences must also be materially distinct inside each Scene before canonical publication.

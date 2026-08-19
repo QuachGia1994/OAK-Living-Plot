@@ -1,46 +1,88 @@
 import type { SceneGenerationInput, SceneProposal } from '../src/ai/contracts';
 
+/** Shared fixtures for generator/schema tests. Must pass evaluateNarrative when history is empty. */
 export function makeGenerationInput(): SceneGenerationInput {
   return {
     locale: 'vi-VN',
     targetSpokenSeconds: 75,
     contentRating: 'teen',
     drama: {
-      premise: 'Linh discovers a hidden message that changes a close friendship.',
+      premise: 'An giấu một tin nhắn khiến tình bạn với Linh rạn nứt.',
       mood: 'tense',
-      summary: 'Linh suspects the protagonist hid something important.',
-      stateVersion: 3,
+      summary: 'Linh đã phát hiện tin nhắn và buộc An phải đối diện với sự thật.',
+      stateVersion: 4,
     },
     characters: [
-      { key: 'hero', name: 'An', role: 'protagonist', traits: 'careful', goal: 'protect Linh', secret: 'hid the message' },
-      { key: 'linh', name: 'Linh', role: 'best friend', traits: 'observant', goal: 'learn the truth', secret: '' },
+      { key: 'hero', name: 'An', role: 'protagonist', traits: 'thận trọng', goal: 'giữ Linh an toàn', secret: 'đã giấu tin nhắn' },
+      { key: 'linh', name: 'Linh', role: 'best friend', traits: 'tinh ý', goal: 'biết toàn bộ sự thật', secret: '' },
     ],
     relationships: [
       { fromKey: 'hero', toKey: 'linh', affinity: 40, trust: 35, tension: 45, status: 'strained' },
     ],
-    activeFacts: [{ key: 'fact-hidden-message', text: 'An hid a message from Linh.' }],
-    openThreads: [{ key: 'thread-trust', title: 'Linh questions An’s honesty.', urgency: 80 }],
+    activeFacts: [{ key: 'fact-hidden-message', text: 'An cố tình giấu một tin nhắn khỏi Linh.' }],
+    openThreads: [{ key: 'thread-trust', title: 'Linh nghi ngờ sự thành thật của An.', urgency: 85 }],
     recentHistory: [],
     previous: {
-      sceneSummary: 'Linh found the hidden message.',
-      chosenAction: 'An admits hiding it.',
-      choiceIntent: 'confess partially',
-      consequence: 'Linh demands the whole truth immediately.',
+      sceneSummary: 'Linh tìm thấy tin nhắn đã bị giấu.',
+      chosenAction: 'An thừa nhận đã giấu tin nhắn.',
+      choiceIntent: 'thú nhận một phần',
+      consequence: 'Linh yêu cầu An nói toàn bộ sự thật ngay lập tức.',
     },
   };
 }
 
 export function makeValidProposal(): SceneProposal {
   return {
-    title: 'The Rest of the Truth',
-    script: Array.from({ length: 140 }, (_, index) => `word${index}`).join(' '),
-    summary: 'An gives Linh part of the truth while the friendship becomes more fragile.',
-    establishedFacts: ['Linh knows An intentionally hid the message.'],
-    threadChanges: { open: [], resolve: [] },
+    title: 'Phần Còn Lại',
+    beat: 'revelation',
+    script: [
+      'Linh yêu cầu An nói toàn bộ sự thật ngay lập tức, và An thừa nhận đã giấu tin nhắn vì sợ cô bị kéo vào chuyện nguy hiểm.',
+      'Không khí trong căn bếp chật hẹp nặng đến mức tiếng mưa ngoài cửa sổ nghe như một chiếc đồng hồ đếm ngược.',
+      'Linh không nổi giận ngay; cô hỏi chính xác ai đã gửi tin và vì sao An nghĩ mình có quyền quyết định thay cô.',
+      'An kể về cuộc gọi nặc danh tối qua, về lời cảnh báo nhắc đúng tên Linh, rồi đặt điện thoại lên bàn để cô tự đọc mọi thứ.',
+      'Sự im lặng sau đó không còn là né tránh mà là khoảng trống của hai người đang tính lại mức độ họ còn có thể tin nhau.',
+      'Linh chỉ ra rằng việc bảo vệ cô bằng cách nói dối vẫn là một cách tước lựa chọn khỏi cô.',
+      'An nhận lỗi, nhưng cũng cảnh báo người gửi tin có thể đang theo dõi phản ứng của họ.',
+      'Một chiếc xe đỗ đối diện bật đèn rồi tắt ngay khi Linh nhìn ra cửa sổ.',
+      'Linh kéo rèm lại và nói vấn đề giữa họ chưa được giải quyết, nhưng mối đe dọa bên ngoài đã trở nên thật hơn.',
+      'An đề nghị họ quyết định bước tiếp theo cùng nhau thay vì tiếp tục tự hành động.',
+      'Linh đồng ý với một điều kiện: từ giờ mọi thông tin liên quan đến cô phải được chia sẻ ngay khi xuất hiện.',
+      'Cả hai nhìn màn hình điện thoại khi một tin nhắn mới hiện lên, cho thấy người lạ biết họ đang ở cùng nhau.',
+    ].join(' '),
+    summary: 'An thừa nhận đã giấu tin nhắn để bảo vệ Linh; Linh đặt điều kiện mới cho lòng tin khi mối đe dọa bên ngoài trở nên rõ ràng.',
+    establishedFacts: ['Người gửi tin nặc danh biết vị trí hiện tại của An và Linh.'],
+    threadChanges: { open: [{ title: 'Ai đang theo dõi An và Linh?', urgency: 92 }], resolve: ['thread-trust'] },
     choices: [
-      makeChoice('A', 'Tell Linh everything now', 'full confession', -5, 5, 10),
-      makeChoice('B', 'Ask Linh for one night', 'delay with consent', -2, -3, 5),
-      makeChoice('C', 'Protect the final secret', 'continue concealment', -8, -10, 15),
+      makeChoice(
+        'A',
+        'Cùng Linh đối chất người gửi tin',
+        'đối diện mối đe dọa như đồng minh',
+        'Linh thấy An giữ lời chia sẻ quyền quyết định, nhưng cả hai tự đặt mình gần nguy hiểm hơn.',
+        3,
+        8,
+        12,
+        'defiant',
+      ),
+      makeChoice(
+        'B',
+        'Đưa điện thoại cho cảnh sát',
+        'chuyển quyền xử lý cho người có thẩm quyền',
+        'Linh cảm thấy an toàn hơn, nhưng người gửi tin có thể biến mất trước khi họ biết động cơ thật sự.',
+        1,
+        5,
+        -5,
+        'cautious',
+      ),
+      makeChoice(
+        'C',
+        'Tắt máy và rời khỏi căn hộ',
+        'ưu tiên thoát khỏi theo dõi trước khi điều tra',
+        'Linh chấp nhận rút lui tạm thời, nhưng nghi ngờ An vẫn đang giữ lại một phần thông tin.',
+        -2,
+        -4,
+        6,
+        'uneasy',
+      ),
     ],
   };
 }
@@ -49,19 +91,17 @@ function makeChoice(
   key: 'A' | 'B' | 'C',
   label: string,
   intent: string,
+  consequence: string,
   affinityDelta: number,
   trustDelta: number,
   tensionDelta: number,
+  nextTone: string,
 ) {
   return {
     key,
     label,
     intent,
-    consequence: key === 'A'
-      ? 'Linh hears the full confession and demands proof before trusting An again.'
-      : key === 'B'
-        ? 'Linh agrees to wait one night but sets a deadline that raises the pressure on An.'
-        : 'An keeps the final secret, protecting one fact while damaging Linh’s trust further.',
+    consequence,
     stateDelta: {
       relationships: [
         {
@@ -70,14 +110,14 @@ function makeChoice(
           affinityDelta,
           trustDelta,
           tensionDelta,
-          statusText: 'relationship shifts',
+          statusText: nextTone,
         },
       ],
-      factsToAdd: [],
+      factsToAdd: [`Branch ${key} creates a distinct immediate consequence.`],
       factKeysToResolve: [],
       threadsToOpen: [],
       threadKeysToResolve: [],
-      nextTone: key === 'A' ? 'raw' : key === 'B' ? 'uncertain' : 'dangerous',
+      nextTone,
     },
   };
 }

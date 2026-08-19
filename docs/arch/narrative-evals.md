@@ -19,7 +19,7 @@ Each fixture contains bounded canonical `EpisodeGenerationInput` plus a provider
 ## Deterministic dimensions
 `evaluateNarrative()` first passes the proposal through the same structural/canonical validator used by production. A structural failure receives score zero.
 
-Valid proposals are then scored from 0–100 on eight dimensions:
+Valid proposals are then scored from 0–100 on eleven dimensions:
 
 1. `continuity` — a previous committed consequence must be materially visible in the first third of the episode, and the chosen action must be reflected in the opening/summary.
 2. `threadMomentum` — at least one open thread must be resolved or materially reflected in the new narrative.
@@ -29,8 +29,14 @@ Valid proposals are then scored from 0–100 on eight dimensions:
 6. `characterConsistency` — the canonical protagonist must remain visibly anchored in the scene/summary/branches instead of disappearing behind a replacement lead.
 7. `localeAlignment` — supported English/Vietnamese requests must produce visible language signal matching the requested locale across the narrative and branches.
 8. `sceneProgression` — the episode must establish a durable fact or open/resolve a canonical thread before branching, preventing structurally valid scene resets.
+9. `trajectoryDiversity` — after ≥3 material same-direction relationship moves on one pair/dimension, not all three choices may continue that trajectory; at least one must reverse materiality or open independent fact/thread progression.
+10. `structuralVariety` — proposals declare a finite narrative beat; beats inside the shared cooldown (`BEAT_COOLDOWN_SCENES = 3`) are rejected.
+11. `longRangeNovelty` — compact per-scene motif signatures detect recycled structure beyond the bounded recent prompt window without Vector DB.
 
-A fixture passes only when the average score is at least 80 and every dimension is at least 60. These metrics are regression heuristics, not claims of objective literary quality.
+A fixture passes only when the average score is at least 80 and every dimension is at least 60 (novelty dimensions share the same floor). These metrics are regression heuristics, not claims of objective literary quality.
+
+### Anti-repeat stack
+Bounded prompt memory + trajectory diversity + beat rotation + long-range motif signatures + deterministic publication validation in the Gemini adapter (reject → controlled retry → no publish). Shadow LLM predictability judges remain **deferred** (YAGNI).
 
 ## Adversarial coverage
 The suite explicitly proves failure for:

@@ -1,5 +1,16 @@
 import type { SceneGenerationInput, SceneProposal } from '../ai/contracts';
 import { parseAndValidateSceneProposal } from '../ai/scene-schema';
+import {
+  deriveTrajectoryConstraints,
+  excludedBeatsFromHistory,
+  isNarrativeBeat,
+  scoreLongRangeNovelty,
+  scoreStructuralVariety,
+  scoreTrajectoryDiversity,
+  type NarrativeBeat,
+  type SceneMotifSignature,
+  type TrajectoryConstraint,
+} from './narrative-novelty';
 
 export type NarrativeEvalDimension =
   | 'continuity'
@@ -9,7 +20,10 @@ export type NarrativeEvalDimension =
   | 'repetitionControl'
   | 'characterConsistency'
   | 'localeAlignment'
-  | 'sceneProgression';
+  | 'sceneProgression'
+  | 'trajectoryDiversity'
+  | 'structuralVariety'
+  | 'longRangeNovelty';
 
 export interface NarrativeEvalFinding {
   dimension: NarrativeEvalDimension | 'structure';
@@ -33,7 +47,13 @@ const DIMENSIONS: NarrativeEvalDimension[] = [
   'characterConsistency',
   'localeAlignment',
   'sceneProgression',
+  'trajectoryDiversity',
+  'structuralVariety',
+  'longRangeNovelty',
 ];
+
+/** Hard floors for novelty dimensions when novelty constraints are present. */
+const NOVELTY_HARD_MINIMUM = 60;
 
 export function evaluateNarrative(
   input: SceneGenerationInput,
@@ -54,6 +74,7 @@ export function evaluateNarrative(
   }
 
   const findings: NarrativeEvalFinding[] = [];
+  const novelty = resolveNoveltyConstraints(input);
   const dimensions = {
     continuity: scoreContinuity(input, proposal, findings),
     threadMomentum: scoreThreadMomentum(input, proposal, findings),
@@ -63,9 +84,16 @@ export function evaluateNarrative(
     characterConsistency: scoreCharacterConsistency(input, proposal, findings),
     localeAlignment: scoreLocaleAlignment(input, proposal, findings),
     sceneProgression: scoreSceneProgression(proposal, findings),
+    trajectoryDiversity: scoreTrajectoryDiversity(proposal, novelty.trajectoryConstraints, findings),
+    structuralVariety: scoreStructuralVariety(proposal, novelty.excludedBeats, findings, novelty.requireBeat),
+    longRangeNovelty: scoreLongRangeNovelty(proposal, novelty.motifHistory, findings),
   };
   const score = Math.round(DIMENSIONS.reduce((sum, key) => sum + dimensions[key], 0) / DIMENSIONS.length);
-  const passed = score >= 80 && DIMENSIONS.every((key) => dimensions[key] >= 60);
+  const passed = score >= 80
+    && DIMENSIONS.every((key) => dimensions[key] >= 60)
+    && dimensions.trajectoryDiversity >= NOVELTY_HARD_MINIMUM
+    && dimensions.structuralVariety >= NOVELTY_HARD_MINIMUM
+    && dimensions.longRangeNovelty >= NOVELTY_HARD_MINIMUM;
   return { passed, score, dimensions, findings };
 }
 
@@ -337,6 +365,58 @@ function stateDeltaSignature(delta: SceneProposal['choices'][number]['stateDelta
   });
 }
 
+function resolveNoveltyConstraints(input: SceneGenerationInput): {
+  excludedBeats: NarrativeBeat[];
+  trajectoryConstraints: TrajectoryConstraint[];
+  motifHistory: SceneMotifSignature[];
+  requireBeat: boolean;
+} {
+  if (input.novelty) {
+    return {
+      excludedBeats: input.novelty.excludedBeats.filter(isNarrativeBeat),
+      trajectoryConstraints: input.novelty.trajectoryConstraints,
+      motifHistory: input.novelty.motifHistory.map((item): SceneMotifSignature => ({
+        beat: isNarrativeBeat(item.beat) ? item.beat : 'unknown',
+        threadCategory: item.threadCategory as SceneMotifSignature['threadCategory'],
+        dominantRelation: item.dominantRelation,
+        intentFamily: item.intentFamily,
+        consequenceFamily: item.consequenceFamily,
+      })),
+      requireBeat: true,
+    };
+  }
+
+  const historyBeats = input.recentHistory
+    .map((scene) => scene.beat)
+    .filter((beat): beat is string => typeof beat === 'string');
+  const excludedBeats = excludedBeatsFromHistory(
+    historyBeats.map((beat) => (isNarrativeBeat(beat) ? beat : 'unknown')),
+  );
+  const trajectoryConstraints = deriveTrajectoryConstraints(
+    input.recentHistory
+      .filter((scene) => scene.committedRelationshipDeltas && scene.committedRelationshipDeltas.length > 0)
+      .map((scene) => ({ relationships: scene.committedRelationshipDeltas! })),
+  );
+  const motifHistory = input.recentHistory
+    .map((scene) => scene.motifSignature)
+    .filter((signature): signature is NonNullable<typeof signature> => Boolean(signature))
+    .map((item): SceneMotifSignature => ({
+      beat: isNarrativeBeat(item.beat) ? item.beat : 'unknown',
+      threadCategory: item.threadCategory as SceneMotifSignature['threadCategory'],
+      dominantRelation: item.dominantRelation,
+      intentFamily: item.intentFamily,
+      consequenceFamily: item.consequenceFamily,
+    }));
+
+  const hasAnyConstraint = excludedBeats.length > 0 || trajectoryConstraints.length > 0 || motifHistory.length > 0;
+  return {
+    excludedBeats,
+    trajectoryConstraints,
+    motifHistory,
+    requireBeat: hasAnyConstraint,
+  };
+}
+
 function emptyDimensions(): Record<NarrativeEvalDimension, number> {
   return {
     continuity: 0,
@@ -347,6 +427,9 @@ function emptyDimensions(): Record<NarrativeEvalDimension, number> {
     characterConsistency: 0,
     localeAlignment: 0,
     sceneProgression: 0,
+    trajectoryDiversity: 0,
+    structuralVariety: 0,
+    longRangeNovelty: 0,
   };
 }
 
