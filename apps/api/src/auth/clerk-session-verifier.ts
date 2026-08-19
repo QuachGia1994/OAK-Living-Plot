@@ -1,4 +1,5 @@
 import { verifyToken } from '@clerk/backend';
+import { decodeJwt } from '@clerk/backend/jwt';
 import type { AppEnv } from '../env';
 import type { AuthenticatedPrincipal, SessionVerifier } from './session-verifier';
 
@@ -16,8 +17,10 @@ export class ClerkSessionVerifier implements SessionVerifier {
     if (!token) return null;
 
     try {
+      const hasAuthorizedParty = tokenHasAuthorizedPartyClaim(token);
+      if (hasAuthorizedParty && this.authorizedParties.length === 0) return null;
       const payload = await verifyToken(token, {
-        authorizedParties: this.authorizedParties,
+        ...(hasAuthorizedParty ? { authorizedParties: this.authorizedParties } : {}),
         jwtKey: this.jwtKey,
       });
       const subject = typeof payload.sub === 'string' ? payload.sub.trim() : '';
@@ -34,15 +37,20 @@ function bearerToken(authorization: string | null): string | null {
   return token || null;
 }
 
+function tokenHasAuthorizedPartyClaim(token: string): boolean {
+  try {
+    const authorizedParty = decodeJwt(token).payload.azp;
+    return typeof authorizedParty === 'string' && authorizedParty.trim().length > 0;
+  } catch {
+    return true;
+  }
+}
+
 function parseAuthorizedParties(raw: string): string[] {
-  const parties = raw
+  return raw
     .split(',')
     .map((party) => party.trim())
     .filter(Boolean);
-  if (parties.length === 0) {
-    throw new Error('CLERK_AUTHORIZED_PARTIES must contain at least one allowed party.');
-  }
-  return parties;
 }
 
 function requirePublicKey(value: string): string {

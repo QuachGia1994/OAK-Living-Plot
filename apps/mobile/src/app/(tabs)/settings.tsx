@@ -5,6 +5,7 @@ import { Platform, Pressable, Share, StyleSheet, Text, TextInput, View } from 'r
 import { ACCOUNT_DELETE_CONFIRMATION } from '@/features/account/contracts';
 import { deleteAccountThenSignOut } from '@/features/account/delete-flow';
 import { HttpAccountDataClient, UnavailableAccountDataClient } from '@/features/account/http-account-client';
+import { authenticatedApiDiagnosticLabel, probeAuthenticatedApi, uncheckedAuthenticatedApiDiagnostic } from '@/features/auth/api-diagnostics';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useUiCopy } from '@/features/localization/ui-copy';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
@@ -37,7 +38,7 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState<'preferences' | 'export' | 'delete' | 'signout' | 'health' | null>(null);
   const [confirmation, setConfirmation] = useState('');
   const [postDeleteSignOutFailed, setPostDeleteSignOutFailed] = useState(false);
-  const [apiHealth, setApiHealth] = useState<'unchecked' | 'ok' | 'unreachable'>(apiBaseUrl ? 'unchecked' : 'unreachable');
+  const [apiDiagnostic, setApiDiagnostic] = useState(uncheckedAuthenticatedApiDiagnostic);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   async function savePreferences() {
@@ -101,18 +102,12 @@ export default function SettingsScreen() {
     }
   }
 
-  async function checkHealth() {
+  async function checkApi() {
     if (!apiBaseUrl) return;
     setBusy('health');
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5_000);
     try {
-      const response = await fetch(`${apiBaseUrl.replace(/\/$/u, '')}/health`, { signal: controller.signal });
-      setApiHealth(response.ok ? 'ok' : 'unreachable');
-    } catch {
-      setApiHealth('unreachable');
+      setApiDiagnostic(await probeAuthenticatedApi(apiBaseUrl, auth.getToken));
     } finally {
-      clearTimeout(timeout);
       setBusy(null);
     }
   }
@@ -126,7 +121,11 @@ export default function SettingsScreen() {
     `clerkConfigured=${auth.configured}`,
     `signedIn=${auth.isSignedIn}`,
     `revenuecatMode=${revenueCatMode}`,
-    `apiHealth=${apiHealth}`,
+    `apiStatus=${apiDiagnostic.httpStatus ?? 'none'}`,
+    `apiReason=${apiDiagnostic.reason}`,
+    `tokenPresent=${apiDiagnostic.tokenPresent}`,
+    `authorizedParty=${auth.authorizedParty ?? 'none'}`,
+    `issuer=${auth.issuer ?? 'none'}`,
   ].join('\n');
 
   return (
@@ -220,7 +219,7 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.sectionStatusHeader}>
             <SectionHeader index="03" title={t('Safe diagnostics', 'Chẩn đoán an toàn')} meta={t('STATUS ONLY', 'CHỈ TRẠNG THÁI')} />
-            <Pill tone={apiHealth === 'ok' ? 'success' : 'neutral'}>{runtimeMode === 'live' ? t('Live', 'Trực tuyến') : t('Preview', 'Xem trước')}</Pill>
+            <Pill tone={apiDiagnostic.reason === 'ok' ? 'success' : 'neutral'}>{runtimeMode === 'live' ? t('Live', 'Trực tuyến') : t('Preview', 'Xem trước')}</Pill>
           </View>
           <View style={styles.console}>
             <Text style={styles.consoleHeader}>LIVING_PLOT / SAFE_DIAGNOSTICS</Text>
@@ -228,10 +227,13 @@ export default function SettingsScreen() {
             <Diagnostic label="API" value={apiBaseUrl ? t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
             <Diagnostic label="Clerk" value={auth.configured ? auth.isSignedIn ? t('signed in', 'đã đăng nhập') : t('configured', 'đã cấu hình') : t('not configured', 'chưa cấu hình')} />
             <Diagnostic label="RevenueCat" value={revenueCatMode} />
-            <Diagnostic label={t('API health', 'Trạng thái API')} value={apiHealth} />
+            <Diagnostic label={t('API auth', 'Xác thực API')} value={authenticatedApiDiagnosticLabel(apiDiagnostic)} />
+            <Diagnostic label={t('Session token', 'Token phiên')} value={apiDiagnostic.tokenPresent ? t('present', 'có') : t('not observed', 'chưa thấy')} />
+            <Diagnostic label="azp" value={auth.authorizedParty ?? 'none'} />
+            <Diagnostic label="iss" value={auth.issuer ?? 'none'} />
           </View>
           <View style={styles.actions}>
-            <ActionButton label={t('Check API health', 'Kiểm tra API')} variant="secondary" busy={busy === 'health'} disabled={!apiBaseUrl} onPress={() => void checkHealth()} style={styles.flexAction} />
+            <ActionButton label={t('Check API', 'Kiểm tra API')} variant="secondary" busy={busy === 'health'} disabled={!apiBaseUrl || !auth.isSignedIn} onPress={() => void checkApi()} style={styles.flexAction} />
             <ActionButton label={t('Share diagnostics', 'Chia sẻ chẩn đoán')} variant="ghost" onPress={() => void Share.share({ message: diagnostics })} style={styles.flexAction} />
           </View>
           <Text style={styles.compactNote}>{t('No tokens, internal user IDs, API URL, drama text or secret values are included.', 'Không gồm token, ID người dùng nội bộ, URL API, nội dung drama hay secret.')}</Text>

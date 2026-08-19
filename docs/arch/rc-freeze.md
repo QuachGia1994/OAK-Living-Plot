@@ -34,7 +34,7 @@ Frozen surfaces: Home, Create, Playback A/B/C, Library, Settings, Plus, LP brand
 `useDramaPlayback` acquires a synchronous ref-backed playback-action lock before updating React presentation state. `commitChoice` / `continueDrama` therefore reject a second tap in the same render tick as well as later taps while a mutation is in flight.
 
 ## Platform
-- Android: `DynamicColorIOS` only under `Platform.OS === 'ios'`; the four-tab shell uses Expo Router JavaScript Tabs because Expo NativeTabs has no Android minimize API. One shared thresholded scroll controller compacts labels/height on downward scroll and expands on upward/top/route reset without changing route ownership.
+- Android: `DynamicColorIOS` only under `Platform.OS === 'ios'`; the four-tab shell uses Expo Router JavaScript Tabs because Expo NativeTabs has no Android minimize API. One custom tab-bar renderer reads navigator state directly: expanded mode remains the approved full-width labeled bar, while thresholded downward scroll switches to a centered 46dp icon-only rail capped at 248dp with a small selected-icon highlight; upward/top/route reset expands it, keyboard visibility hides it, and shared Screen bottom padding tracks rail height plus safe-area inset.
 - iOS: NativeTabs + `minimizeBehavior="onScrollDown"` retained unchanged.
 
 ## External live gate

@@ -15,8 +15,8 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAndroidTabBarState } from './android-tab-bar-state';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ANDROID_MINI_NAV_METRICS, useAndroidTabBarState } from './android-tab-bar-state';
 import { colors, radius, spacing, typography } from './theme';
 
 export function Screen({
@@ -29,13 +29,17 @@ export function Screen({
   footer?: ReactNode;
 }) {
   const androidTabBar = useAndroidTabBarState();
+  const insets = useSafeAreaInsets();
+  const androidBottomInset = Platform.OS === 'android' && androidTabBar
+    ? (androidTabBar.compact ? ANDROID_MINI_NAV_METRICS.compactRailHeight : ANDROID_MINI_NAV_METRICS.expandedHeight) + Math.max(insets.bottom, spacing.xs) + spacing.lg
+    : undefined;
   return (
     <SafeAreaView style={styles.safeArea} edges={footer ? ['top', 'right', 'bottom', 'left'] : ['top', 'right', 'left']}>
       <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           automaticallyAdjustKeyboardInsets
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={[styles.screenContent, footer ? styles.screenContentWithFooter : null, contentStyle]}
+          contentContainerStyle={[styles.screenContent, androidBottomInset === undefined ? null : { paddingBottom: androidBottomInset }, footer ? styles.screenContentWithFooter : null, contentStyle]}
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           keyboardShouldPersistTaps="handled"
           onScroll={Platform.OS === 'android' && androidTabBar ? (event) => androidTabBar.reportScroll(event.nativeEvent.contentOffset.y) : undefined}

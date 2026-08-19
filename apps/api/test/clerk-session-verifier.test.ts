@@ -18,6 +18,34 @@ describe('ClerkSessionVerifier', () => {
     expect(principal).toEqual({ subject: 'user_test_owner' });
   });
 
+  it('accepts a signed native session token when Clerk omits azp without inventing a web authorized party', async () => {
+    const fixture = await signedSessionToken(null);
+    const verifier = new ClerkSessionVerifier({
+      CLERK_JWT_KEY: fixture.publicKeyPem,
+      CLERK_AUTHORIZED_PARTIES: '',
+    });
+
+    const principal = await verifier.authenticate(new Request('https://api.test/v1/me', {
+      headers: { Authorization: `Bearer ${fixture.token}` },
+    }));
+
+    expect(principal).toEqual({ subject: 'user_test_owner' });
+  });
+
+  it('rejects an azp-bearing token when no authorized party is configured', async () => {
+    const fixture = await signedSessionToken(AUTHORIZED_PARTY);
+    const verifier = new ClerkSessionVerifier({
+      CLERK_JWT_KEY: fixture.publicKeyPem,
+      CLERK_AUTHORIZED_PARTIES: '',
+    });
+
+    const principal = await verifier.authenticate(new Request('https://api.test/v1/me', {
+      headers: { Authorization: `Bearer ${fixture.token}` },
+    }));
+
+    expect(principal).toBeNull();
+  });
+
   it('rejects a token minted for a different authorized party', async () => {
     const fixture = await signedSessionToken('https://other-client.test');
     const verifier = new ClerkSessionVerifier({
@@ -33,7 +61,9 @@ describe('ClerkSessionVerifier', () => {
   });
 });
 
-async function signedSessionToken(authorizedParty: string): Promise<{ token: string; publicKeyPem: string }> {
+let fixtureKeySequence = 0;
+
+async function signedSessionToken(authorizedParty: string | null): Promise<{ token: string; publicKeyPem: string }> {
   const keys = await crypto.subtle.generateKey(
     {
       name: 'RSASSA-PKCS1-v1_5',
@@ -45,9 +75,10 @@ async function signedSessionToken(authorizedParty: string): Promise<{ token: str
     ['sign', 'verify'],
   );
   const now = Math.floor(Date.now() / 1000);
-  const header = encodeSegment({ alg: 'RS256', typ: 'JWT', kid: 'test-key' });
+  fixtureKeySequence += 1;
+  const header = encodeSegment({ alg: 'RS256', typ: 'JWT', kid: `test-key-${fixtureKeySequence}` });
   const payload = encodeSegment({
-    azp: authorizedParty,
+    ...(authorizedParty ? { azp: authorizedParty } : {}),
     exp: now + 60,
     iat: now,
     iss: 'https://living-plot-test.clerk.accounts.dev',

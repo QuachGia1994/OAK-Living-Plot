@@ -2,6 +2,28 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 
 export const ANDROID_TAB_ROUTES = ['index', 'create', 'library', 'settings'] as const;
 
+export const ANDROID_MINI_NAV_METRICS = {
+  expandedHeight: 68,
+  compactRailHeight: 46,
+  compactRailMaxWidth: 248,
+  compactSideMargin: 20,
+  minimumTapTarget: 44,
+} as const;
+
+export const ANDROID_TAB_GLYPHS: Record<(typeof ANDROID_TAB_ROUTES)[number], string> = {
+  index: '⌂',
+  create: '＋',
+  library: '▤',
+  settings: '⚙',
+};
+
+export function androidMiniRailWidth(viewportWidth: number): number {
+  return Math.min(
+    ANDROID_MINI_NAV_METRICS.compactRailMaxWidth,
+    Math.max(ANDROID_MINI_NAV_METRICS.minimumTapTarget * ANDROID_TAB_ROUTES.length, viewportWidth - ANDROID_MINI_NAV_METRICS.compactSideMargin * 2),
+  );
+}
+
 const TOP_RESET_Y = 8;
 const MIN_COMPACT_Y = 28;
 const DOWN_THRESHOLD = 24;

@@ -4,7 +4,7 @@
 
 ## Identity boundary
 
-Clerk authenticates the external session. The Worker resolves that subject to one internal Living Plot user before any protected application read or mutation. Mobile never supplies the canonical internal user ID for drama ownership.
+Clerk authenticates the external session. The Worker resolves that subject to one internal Living Plot user before any protected application read or mutation. Mobile never supplies the canonical internal user ID for drama ownership. Networkless Worker verification always validates the Clerk signature and standard JWT time/subject claims; the configured authorized-party allowlist is additionally enforced when the token contains an `azp` claim, while native Clerk session tokens without `azp` are accepted under Clerk's current verification contract rather than assigned an invented web origin.
 
 Living Plot Phase 1 authentication is passwordless email OTP. The custom Expo flow starts `signIn.create({ identifier, signUpIfMissing: true })`, sends and verifies an email code, finalizes an existing-user sign-in directly, and transfers a verified unknown email with `signUp.create({ transfer: true })`. A transferred sign-up must complete with email alone; `password` or other extra required fields are treated as Clerk Dashboard configuration drift rather than added to the product UI. Same-tick auth mutations are single-flight guarded, and Start over resets both Clerk sign-in and sign-up attempts.
 
@@ -29,7 +29,7 @@ All IDs are checked against the authenticated internal owner before canonical st
 
 `DramaExperienceClient` is the application interface. The authenticated implementation uses fresh Clerk bearer tokens through the shared bounded transport. Preview implements the same Drama/Scene/Branch behavior for local UI development but is never used as a runtime fallback after a configured live provider/API failure.
 
-Safe GETs may retry once with a fresh token. POST mutations are never automatically retried by the transport. Instead, drama creation/continuation uses stable idempotency keys and canonical resync behavior.
+Safe GETs may retry once with a fresh token. POST mutations are never automatically retried by the transport. Instead, drama creation/continuation uses stable idempotency keys and canonical resync behavior. Settings diagnostics may probe authenticated `GET /v1/me` and expose only token-present state, HTTP status, normalized reason, and the non-secret `azp`/`iss` session claims; the bearer itself, API URL, internal user ID, and drama text never enter the diagnostic output.
 
 `AuthenticatedRuntimeProvider` keys the session-owned runtime by preview/live-auth state and Clerk user ID. A sign-out, sign-in transition, or account switch therefore unmounts the prior Drama/voice runtime subtree, disposing private narration state and transient canonical projections before a different principal can render them.
 

@@ -7,6 +7,8 @@ export interface MobileAuthSession {
   isLoaded: boolean;
   isSignedIn: boolean;
   clerkUserId: string | null;
+  authorizedParty: string | null;
+  issuer: string | null;
   getToken(): Promise<string | null>;
   signOut(): Promise<void>;
 }
@@ -16,6 +18,8 @@ const unconfiguredSession: MobileAuthSession = {
   isLoaded: true,
   isSignedIn: false,
   clerkUserId: null,
+  authorizedParty: null,
+  issuer: null,
   async getToken() { return null; },
   async signOut() {},
 };
@@ -37,12 +41,14 @@ export function MobileAuthProvider({ children }: { children: ReactNode }) {
 
 function ClerkAuthBridge({ children }: { children: ReactNode }) {
   const auth = useAuth({ treatPendingAsSignedOut: false });
-  const { getToken, isLoaded, isSignedIn, signOut, userId } = auth;
+  const { getToken, isLoaded, isSignedIn, sessionClaims, signOut, userId } = auth;
   const value = useMemo<MobileAuthSession>(() => ({
     configured: true,
     isLoaded,
     isSignedIn: isSignedIn === true,
     clerkUserId: userId ?? null,
+    authorizedParty: readSessionClaim(sessionClaims, 'azp'),
+    issuer: readSessionClaim(sessionClaims, 'iss'),
     async getToken() {
       if (!isSignedIn) return null;
       return getToken();
@@ -50,11 +56,17 @@ function ClerkAuthBridge({ children }: { children: ReactNode }) {
     async signOut() {
       if (isSignedIn) await signOut();
     },
-  }), [getToken, isLoaded, isSignedIn, signOut, userId]);
+  }), [getToken, isLoaded, isSignedIn, sessionClaims, signOut, userId]);
 
   return <MobileAuthContext.Provider value={value}>{children}</MobileAuthContext.Provider>;
 }
 
 export function useMobileAuth(): MobileAuthSession {
   return useContext(MobileAuthContext);
+}
+
+function readSessionClaim(claims: unknown, key: 'azp' | 'iss'): string | null {
+  if (typeof claims !== 'object' || claims === null || Array.isArray(claims)) return null;
+  const value = (claims as Record<string, unknown>)[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
