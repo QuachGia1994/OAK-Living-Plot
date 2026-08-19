@@ -79,9 +79,68 @@ const DIMENSIONS: NarrativeEvalDimension[] = [
   'returnPull',
 ];
 
-/** Hard floors for novelty and objective Phase-2 dimensions. */
+/** Offline quality floors (regression suite). Not identical to runtime publication authority. */
 const NOVELTY_HARD_MINIMUM = 60;
 const PHASE2_OBJECTIVE_MINIMUM = 60;
+
+const PUBLICATION_NOVELTY_DIMENSIONS = new Set([
+  'trajectoryDiversity',
+  'structuralVariety',
+  'longRangeNovelty',
+]);
+
+export interface NarrativePublicationDecision {
+  publishable: boolean;
+  report: NarrativeEvalReport;
+  rejectionReasons: string[];
+}
+
+/**
+ * Provider-neutral runtime publication gate.
+ * Rejects only structural/canonical failures, Phase-1 objective novelty failures,
+ * and explicitly approved Phase-2 hard codes. Eval-only dimensions never reject.
+ */
+export function validateNarrativePublication(
+  input: SceneGenerationInput,
+  proposal: SceneProposal,
+): NarrativePublicationDecision {
+  const report = evaluateNarrative(input, proposal);
+  const rejectionReasons: string[] = [];
+
+  for (const finding of report.findings) {
+    if (finding.code === 'STRUCTURAL_OR_CANONICAL_FAILURE') {
+      rejectionReasons.push(`${finding.code}: ${finding.message}`);
+      continue;
+    }
+    if (PUBLICATION_NOVELTY_DIMENSIONS.has(finding.dimension) && report.dimensions[finding.dimension as keyof typeof report.dimensions] < NOVELTY_HARD_MINIMUM) {
+      rejectionReasons.push(`${finding.code}: ${finding.message}`);
+      continue;
+    }
+    if (isPhase2HardFailure(finding.code)) {
+      rejectionReasons.push(`${finding.code}: ${finding.message}`);
+    }
+  }
+
+  // Also reject when novelty dimensions score below floor even without a finding edge case.
+  for (const dim of PUBLICATION_NOVELTY_DIMENSIONS) {
+    const score = report.dimensions[dim as keyof typeof report.dimensions];
+    if (score < NOVELTY_HARD_MINIMUM && !rejectionReasons.some((r) => r.includes(dim))) {
+      rejectionReasons.push(`${dim.toUpperCase()}_FLOOR: score ${score} below ${NOVELTY_HARD_MINIMUM}`);
+    }
+  }
+
+  if (report.dimensions.branchCommitment < PHASE2_OBJECTIVE_MINIMUM) {
+    if (!rejectionReasons.some((r) => r.includes('BRANCH_NO_DURABLE_EFFECT'))) {
+      rejectionReasons.push(`BRANCH_COMMITMENT_FLOOR: score ${report.dimensions.branchCommitment} below ${PHASE2_OBJECTIVE_MINIMUM}`);
+    }
+  }
+
+  return {
+    publishable: rejectionReasons.length === 0,
+    report,
+    rejectionReasons,
+  };
+}
 
 export function evaluateNarrative(
   input: SceneGenerationInput,
@@ -125,16 +184,8 @@ export function evaluateNarrative(
     returnPull: scoreReturnPull(proposal, findings),
   };
   const score = Math.round(DIMENSIONS.reduce((sum, key) => sum + dimensions[key], 0) / DIMENSIONS.length);
-  const hardPhase2Fail = findings.some((finding) => isPhase2HardFailure(finding.code));
-  const passed = score >= 80
-    && DIMENSIONS.every((key) => dimensions[key] >= 60)
-    && dimensions.trajectoryDiversity >= NOVELTY_HARD_MINIMUM
-    && dimensions.structuralVariety >= NOVELTY_HARD_MINIMUM
-    && dimensions.longRangeNovelty >= NOVELTY_HARD_MINIMUM
-    && dimensions.branchCommitment >= PHASE2_OBJECTIVE_MINIMUM
-    && dimensions.consequenceRealization >= PHASE2_OBJECTIVE_MINIMUM
-    && dimensions.threadPayoff >= PHASE2_OBJECTIVE_MINIMUM
-    && !hardPhase2Fail;
+  // Offline pass: average + every dimension floor. Runtime publication uses validateNarrativePublication.
+  const passed = score >= 80 && DIMENSIONS.every((key) => dimensions[key] >= 60);
   return { passed, score, dimensions, findings };
 }
 

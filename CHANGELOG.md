@@ -5,7 +5,10 @@ All notable changes to Living Plot will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Phase 2 narrative quality: consequenceRealization, threadPayoff, pacingRole rhythm, branchCommitment, relationshipProgression, protagonistAgency, arcCoherence, returnPull proxy; objective publication hard codes; long-horizon synthetic fixtures; no new schema migration; no mandatory LLM judge.
+- Phase 2 narrative quality: consequenceRealization, threadPayoff, pacingRole rhythm, branchCommitment, relationshipProgression, protagonistAgency, arcCoherence, returnPull proxy; shared provider-neutral `validateNarrativePublication` gate for Gemini and Workers AI; required beat/pacingRole on new Scene proposals; material-delta SSoT; long-horizon synthetic fixtures; no new schema migration; no mandatory LLM judge.
+
+### Fixed
+- Publication authority no longer rejects on eval-only dimensions; CRITICAL_THREAD_STALLED is eval-only (not per-thread age); Workers AI now runs the same narrative publication gate as Gemini.
 
 ### Changed
 - Phase 1 long-run narrative novelty: trajectory diversity, structural beat rotation (`BEAT_COOLDOWN_SCENES`), long-range motif signatures, evaluator dimensions, and Gemini publication reject/retry gate without Vector DB.

@@ -88,4 +88,69 @@ describe('WorkersAiSceneGenerator', () => {
       error: { code: 'provider_unavailable', message: 'Scene provider request failed.', retryable: true },
     });
   });
+
+  it('retries once on Phase-2 objective branch commitment failure then accepts valid proposal', async () => {
+    const weak = structuredClone(makeValidProposal());
+    for (const choice of weak.choices) {
+      choice.stateDelta.relationships = [];
+      choice.stateDelta.factsToAdd = [];
+      choice.stateDelta.factKeysToResolve = [];
+      choice.stateDelta.threadsToOpen = [];
+      choice.stateDelta.threadKeysToResolve = [];
+      choice.stateDelta.nextTone = '';
+    }
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: weak, usage: { prompt_tokens: 10, completion_tokens: 5 } })
+      .mockResolvedValueOnce({ response: makeValidProposal(), usage: { prompt_tokens: 20, completion_tokens: 15 } });
+    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
+
+    const result = await generator.generate(makeGenerationInput());
+
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ ok: true, value: { attempts: 2 } });
+  });
+
+  it('returns invalid_response after two Phase-2 objective rejections', async () => {
+    const weak = structuredClone(makeValidProposal());
+    for (const choice of weak.choices) {
+      choice.stateDelta.relationships = [];
+      choice.stateDelta.factsToAdd = [];
+      choice.stateDelta.factKeysToResolve = [];
+      choice.stateDelta.threadsToOpen = [];
+      choice.stateDelta.threadKeysToResolve = [];
+      choice.stateDelta.nextTone = '';
+    }
+    const run = vi.fn().mockResolvedValue({ response: weak, usage: { prompt_tokens: 10, completion_tokens: 5 } });
+    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
+
+    const result = await generator.generate(makeGenerationInput());
+
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ ok: false, error: { code: 'invalid_response', attempts: 2 } });
+  });
+
+  it('retries on Phase-1 excluded beat then accepts a different beat', async () => {
+    const input = makeGenerationInput();
+    input.recentHistory = [
+      { sceneNumber: 1, title: 'a', summary: 's', committedChoice: 'A', choiceIntent: 'x', consequence: 'y', choiceLabels: ['A', 'B', 'C'], beat: 'revelation' },
+      { sceneNumber: 2, title: 'b', summary: 's', committedChoice: 'A', choiceIntent: 'x', consequence: 'y', choiceLabels: ['A', 'B', 'C'], beat: 'dilemma' },
+      { sceneNumber: 3, title: 'c', summary: 's', committedChoice: 'A', choiceIntent: 'x', consequence: 'y', choiceLabels: ['A', 'B', 'C'], beat: 'pursuit' },
+    ];
+    const recycled = structuredClone(makeValidProposal());
+    recycled.beat = 'revelation';
+    const fixed = structuredClone(makeValidProposal());
+    fixed.beat = 'alliance';
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: recycled, usage: { prompt_tokens: 10, completion_tokens: 5 } })
+      .mockResolvedValueOnce({ response: fixed, usage: { prompt_tokens: 20, completion_tokens: 15 } });
+    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
+
+    const result = await generator.generate(input);
+
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ ok: true, value: { attempts: 2 } });
+    if (result.ok) expect(result.value.proposal.beat).toBe('alliance');
+  });
 });

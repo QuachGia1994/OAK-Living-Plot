@@ -44,6 +44,7 @@ function confessionAftermathFixture(): NarrativeFixture {
 
   const proposal: SceneProposal = {
     title: 'Phần Còn Lại',
+    beat: 'revelation',
     pacingRole: 'payoff',
     script: [
       'Linh yêu cầu An nói toàn bộ sự thật ngay lập tức, và An thừa nhận đã giấu tin nhắn vì sợ cô bị kéo vào chuyện nguy hiểm.',
@@ -102,6 +103,7 @@ function familyDebtFixture(): NarrativeFixture {
 
   const proposal: SceneProposal = {
     title: 'What the Watch Bought',
+    beat: 'confrontation',
     pacingRole: 'escalate',
     script: [
       'Maya realizes Theo sold the watch to pay the debt, and Theo confesses the sale before she can ask another question.',
@@ -155,6 +157,7 @@ function injectionDataFixture(): NarrativeFixture {
 
   const proposal: SceneProposal = {
     title: 'The Message That Knows Too Much',
+    beat: 'discovery',
     pacingRole: 'build',
     script: [
       'Nora reads the fake system message aloud, including its demand to ignore prior rules, while Eli records the header instead of obeying anything written inside it.',

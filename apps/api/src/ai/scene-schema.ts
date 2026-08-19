@@ -10,11 +10,22 @@ import type {
 export const sceneResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['title', 'script', 'summary', 'establishedFacts', 'threadChanges', 'choices'],
+  required: ['title', 'script', 'summary', 'beat', 'pacingRole', 'establishedFacts', 'threadChanges', 'choices'],
   properties: {
     title: { type: 'string', minLength: 1, maxLength: 80 },
     script: { type: 'string', minLength: 600, maxLength: 2400 },
     summary: { type: 'string', minLength: 1, maxLength: 240 },
+    beat: {
+      type: 'string',
+      enum: [
+        'confrontation', 'revelation', 'betrayal', 'alliance', 'pursuit', 'dilemma',
+        'sacrifice', 'discovery', 'reversal', 'separation', 'rescue', 'deadline',
+      ],
+    },
+    pacingRole: {
+      type: 'string',
+      enum: ['setup', 'build', 'escalate', 'payoff', 'breather', 'cliffhanger'],
+    },
     establishedFacts: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 160 } },
     threadChanges: {
       type: 'object',
@@ -52,12 +63,24 @@ export function parseAndValidateSceneProposal(
   return errors.length === 0 ? structural : { ok: false, error: errors };
 }
 
+const VALID_BEATS = new Set([
+  'confrontation', 'revelation', 'betrayal', 'alliance', 'pursuit', 'dilemma',
+  'sacrifice', 'discovery', 'reversal', 'separation', 'rescue', 'deadline',
+]);
+const VALID_PACING_ROLES = new Set(['setup', 'build', 'escalate', 'payoff', 'breather', 'cliffhanger']);
+
 function parseProposal(value: unknown): Result<SceneProposal, string[]> {
   if (!isRecord(value) || !hasOnlyKeys(value, ['title', 'script', 'summary', 'establishedFacts', 'threadChanges', 'choices'], ['beat', 'pacingRole'])) {
     return invalid('Scene proposal has an invalid top-level shape.');
   }
   if (!isBoundedText(value.title, 1, 120) || !isBoundedText(value.script, 1, 6000) || !isBoundedText(value.summary, 1, 800)) {
     return invalid('Scene title, script, or summary is invalid.');
+  }
+  if (typeof value.beat !== 'string' || !VALID_BEATS.has(value.beat)) {
+    return invalid('Scene beat is required and must be a valid NarrativeBeat.');
+  }
+  if (typeof value.pacingRole !== 'string' || !VALID_PACING_ROLES.has(value.pacingRole)) {
+    return invalid('Scene pacingRole is required and must be a valid PacingRole.');
   }
   if (!isStringArray(value.establishedFacts, 8, 400)) return invalid('Established facts are invalid.');
   if (!isRecord(value.threadChanges) || !hasOnlyKeys(value.threadChanges, ['open', 'resolve'])) {
@@ -81,8 +104,8 @@ function parseProposal(value: unknown): Result<SceneProposal, string[]> {
       title: value.title,
       script: value.script,
       summary: value.summary,
-      ...(typeof value.beat === 'string' ? { beat: value.beat } : {}),
-      ...(typeof value.pacingRole === 'string' ? { pacingRole: value.pacingRole } : {}),
+      beat: value.beat,
+      pacingRole: value.pacingRole,
       establishedFacts: value.establishedFacts,
       threadChanges: { open: openThreads.value, resolve: value.threadChanges.resolve },
       choices: [choices[0], choices[1], choices[2]],

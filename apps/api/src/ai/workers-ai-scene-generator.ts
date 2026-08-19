@@ -8,6 +8,7 @@ import type {
 } from './contracts';
 import { parseAndValidateSceneProposal, sceneResponseSchema } from './scene-schema';
 import { buildScenePrompt, validateSceneGenerationInput } from './scene-prompt';
+import { validateNarrativePublication } from '../evals/narrative-evaluator';
 import {
   NOOP_GENERATION_TELEMETRY,
   type GenerationAttemptOutcome,
@@ -38,21 +39,28 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
       usage.inputTokens += provider.value.usage.inputTokens;
       usage.outputTokens += provider.value.usage.outputTokens;
       const validated = parseAndValidateSceneProposal(normalizeCanonicalReferences(provider.value.text, input), input);
-      this.recordAttempt(attempt as 1 | 2, validated.ok ? 'accepted' : 'rejected', provider.value.usage);
-      if (validated.ok) {
-        return {
-          ok: true,
-          value: {
-            proposal: validated.value,
-            usage,
-            attempts: attempt,
-            provider: 'workers-ai',
-            model: WORKERS_AI_SCENE_MODEL,
-          },
-        };
+      if (!validated.ok) {
+        this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
+        validationErrors = validated.error;
+      } else {
+        const publication = validateNarrativePublication(input, validated.value);
+        if (!publication.publishable) {
+          this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
+          validationErrors = publication.rejectionReasons;
+        } else {
+          this.recordAttempt(attempt as 1 | 2, 'accepted', provider.value.usage);
+          return {
+            ok: true,
+            value: {
+              proposal: validated.value,
+              usage,
+              attempts: attempt,
+              provider: 'workers-ai',
+              model: WORKERS_AI_SCENE_MODEL,
+            },
+          };
+        }
       }
-
-      validationErrors = validated.error;
       if (attempt === 2) {
         return {
           ok: false,

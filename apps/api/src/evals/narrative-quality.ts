@@ -1,9 +1,10 @@
 import type { SceneChoiceProposal, SceneGenerationInput, SceneProposal } from '../ai/contracts';
+import { MATERIAL_RELATIONSHIP_DELTA } from './narrative-novelty';
 
 /** High urgency at or above this value is treated as critical for stall detection. */
 export const CRITICAL_THREAD_URGENCY = 80;
 
-/** Scenes a critical thread may remain untouched before stalling (history-derived age). */
+/** Scenes a critical thread may remain untouched before stalling (eval-only; not hard authority). */
 export const CRITICAL_THREAD_STALL_SCENES = 4;
 
 /** Opening this many new threads while ignoring critical open threads is explosion. */
@@ -32,13 +33,21 @@ export function isPacingRole(value: unknown): value is PacingRole {
 
 export type QualityFinding = { dimension: string; code: string; message: string };
 
-function choiceHasDurableEffect(choice: SceneChoiceProposal): boolean {
-  const delta = choice.stateDelta;
-  const materialRel = delta.relationships.some(
-    (rel) => Math.abs(rel.affinityDelta) >= 2 || Math.abs(rel.trustDelta) >= 2 || Math.abs(rel.tensionDelta) >= 2 || rel.statusText.trim().length > 0,
+function hasMaterialRelationshipDelta(choice: SceneChoiceProposal): boolean {
+  return choice.stateDelta.relationships.some(
+    (rel) =>
+      Math.abs(rel.affinityDelta) >= MATERIAL_RELATIONSHIP_DELTA
+      || Math.abs(rel.trustDelta) >= MATERIAL_RELATIONSHIP_DELTA
+      || Math.abs(rel.tensionDelta) >= MATERIAL_RELATIONSHIP_DELTA
+      || rel.statusText.trim().length > 0,
   );
+}
+
+/** Durable effect: material relationship (SSoT threshold), fact, or thread change. Tone alone is not enough. */
+export function choiceHasDurableEffect(choice: SceneChoiceProposal): boolean {
+  const delta = choice.stateDelta;
   return (
-    materialRel
+    hasMaterialRelationshipDelta(choice)
     || delta.factsToAdd.length > 0
     || delta.factKeysToResolve.length > 0
     || delta.threadsToOpen.length > 0
@@ -49,12 +58,9 @@ function choiceHasDurableEffect(choice: SceneChoiceProposal): boolean {
 function durableDomains(choice: SceneChoiceProposal): Set<string> {
   const domains = new Set<string>();
   const delta = choice.stateDelta;
-  if (delta.relationships.some((rel) => Math.abs(rel.affinityDelta) + Math.abs(rel.trustDelta) + Math.abs(rel.tensionDelta) > 0 || rel.statusText.trim())) {
-    domains.add('relationship');
-  }
+  if (hasMaterialRelationshipDelta(choice)) domains.add('relationship');
   if (delta.factsToAdd.length > 0 || delta.factKeysToResolve.length > 0) domains.add('fact');
   if (delta.threadsToOpen.length > 0 || delta.threadKeysToResolve.length > 0) domains.add('thread');
-  if (delta.nextTone.trim()) domains.add('tone');
   return domains;
 }
 
@@ -74,7 +80,7 @@ export function scoreBranchCommitment(
   findings.push({
     dimension: 'branchCommitment',
     code: 'BRANCH_NO_DURABLE_EFFECT',
-    message: `${emptyCount} of 3 choices create no durable relationship/fact/thread/tone effect.`,
+    message: `${emptyCount} of 3 choices create no durable relationship/fact/thread effect.`,
   });
   return emptyCount === 3 ? 0 : 35;
 }
@@ -117,8 +123,8 @@ export function scoreThreadPayoff(
     return 0;
   }
 
-  // Age proxy: recentHistory length after first appearance is unknown without key history;
-  // stall when critical exists, history is long enough, and none advanced.
+  // Eval-only stall signal: global recentHistory length is not per-thread age.
+  // Do not hard-reject on this heuristic alone (see PHASE2_HARD_CODES).
   if (
     advancedCritical.length === 0
     && input.recentHistory.length >= CRITICAL_THREAD_STALL_SCENES
@@ -127,7 +133,7 @@ export function scoreThreadPayoff(
     findings.push({
       dimension: 'threadPayoff',
       code: 'CRITICAL_THREAD_STALLED',
-      message: 'A critical high-urgency open thread was not advanced or resolved.',
+      message: 'A critical high-urgency open thread was not advanced or resolved (eval heuristic; not hard authority).',
     });
     return 20;
   }
@@ -142,7 +148,11 @@ export function scoreThreadPayoff(
   return 55;
 }
 
-/** Prior consequence must cause canonical development, not mere echo. */
+/**
+ * Causal consequence quality (eval-oriented).
+ * Continuity already hard-enforces that the prior consequence appears in the opening.
+ * This dimension requires progression that is not wholly unrelated noise.
+ */
 export function scoreConsequenceRealization(
   input: SceneGenerationInput,
   proposal: SceneProposal,
@@ -150,12 +160,33 @@ export function scoreConsequenceRealization(
 ): number {
   if (!input.previous) return 100;
 
+  const prior = input.previous.consequence.toLocaleLowerCase();
+  const priorTokens = prior.split(/[^\p{L}\p{N}]+/u).filter((t) => t.length > 3);
+  const developmentSurface = [
+    proposal.script,
+    proposal.summary,
+    ...proposal.establishedFacts,
+    ...proposal.threadChanges.open.map((t) => t.title),
+    ...proposal.choices.flatMap((c) => [c.consequence, ...c.stateDelta.factsToAdd, ...c.stateDelta.threadsToOpen.map((t) => t.title)]),
+  ].join(' ').toLocaleLowerCase();
+
+  const linked = priorTokens.length > 0
+    && priorTokens.filter((token) => developmentSurface.includes(token)).length / priorTokens.length >= 0.25;
+
   const developed = proposal.establishedFacts.length > 0
     || proposal.threadChanges.open.length > 0
     || proposal.threadChanges.resolve.length > 0
     || proposal.choices.some((choice) => choiceHasDurableEffect(choice));
 
-  if (developed) return 100;
+  if (developed && linked) return 100;
+  if (developed && !linked) {
+    findings.push({
+      dimension: 'consequenceRealization',
+      code: 'CONSEQUENCE_UNRELATED_PROGRESSION',
+      message: 'New canonical development appears unrelated to the prior committed consequence.',
+    });
+    return 55;
+  }
 
   findings.push({
     dimension: 'consequenceRealization',
@@ -216,7 +247,10 @@ export function scoreRelationshipProgression(
 ): number {
   const materialChoices = proposal.choices.filter((choice) =>
     choice.stateDelta.relationships.some(
-      (rel) => Math.abs(rel.affinityDelta) >= 4 || Math.abs(rel.trustDelta) >= 4 || Math.abs(rel.tensionDelta) >= 4,
+      (rel) =>
+        Math.abs(rel.affinityDelta) >= MATERIAL_RELATIONSHIP_DELTA
+        || Math.abs(rel.trustDelta) >= MATERIAL_RELATIONSHIP_DELTA
+        || Math.abs(rel.tensionDelta) >= MATERIAL_RELATIONSHIP_DELTA,
     ));
   if (materialChoices.length === 0) return 100;
 
@@ -225,7 +259,6 @@ export function scoreRelationshipProgression(
     choice.stateDelta.relationships.map((rel) => rel.statusText.toLocaleLowerCase()).filter(Boolean),
   );
   const reflected = statusHints.some((hint) => hint.length >= 4 && story.includes(hint.slice(0, Math.min(hint.length, 12))));
-  // Also accept when consequence text is non-generic (already scored elsewhere).
   const consequenceDepth = materialChoices.every((choice) => choice.consequence.trim().split(/\s+/).length >= 8);
   if (reflected || consequenceDepth) return 100;
 
@@ -244,7 +277,6 @@ export function scoreProtagonistAgency(
 ): number {
   const protagonist = input.characters[0];
   if (!protagonist?.name.trim()) return 100;
-  // Structured evidence: choices are protagonist decisions by product contract.
   const agencyFromStructure = proposal.choices.every((choice) => choice.intent.trim().length >= 4 && choiceHasDurableEffect(choice));
   if (agencyFromStructure) return 100;
   if (proposal.choices.every((choice) => choice.intent.trim().length >= 4)) return 80;
@@ -272,10 +304,6 @@ export function scoreArcCoherence(
       message: 'Long-run arc keeps opening questions without paying off existing critical threads.',
     });
     return 40;
-  }
-  if (resolves > 0 && proposal.establishedFacts.length === 0 && opens === 0) {
-    // resolve without any setup residue is fine if resolve alone is payoff
-    return 90;
   }
   return 100;
 }
@@ -308,10 +336,14 @@ export function scoreReturnPull(
   return 40;
 }
 
-/** Objective Phase-2 codes that may reject publication. */
+/**
+ * Objective Phase-2 codes that may reject publication.
+ * CRITICAL_THREAD_STALLED is intentionally excluded: age is not per-thread.
+ * CONSEQUENCE_NOT_REALIZED remains hard only when there is zero development;
+ * CONSEQUENCE_UNRELATED_PROGRESSION is eval-only.
+ */
 export const PHASE2_HARD_CODES = new Set([
   'BRANCH_NO_DURABLE_EFFECT',
-  'CRITICAL_THREAD_STALLED',
   'THREAD_EXPLOSION',
   'CONSEQUENCE_NOT_REALIZED',
   'PACING_ROLE_INVALID',
