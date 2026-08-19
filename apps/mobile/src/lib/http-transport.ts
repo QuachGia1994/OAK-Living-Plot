@@ -28,7 +28,7 @@ export class AuthenticatedJsonTransport {
     private readonly timeoutMs = 12_000,
   ) {}
 
-  async request(path: string, method: 'GET' | 'POST', body?: unknown): Promise<JsonHttpResponse> {
+  async request(path: string, method: 'GET' | 'POST', body?: unknown, timeoutMs = this.timeoutMs): Promise<JsonHttpResponse> {
     const base = this.baseUrl();
     const attempts = method === 'GET' ? 2 : 1;
     let lastTransportError: HttpTransportError | null = null;
@@ -47,7 +47,7 @@ export class AuthenticatedJsonTransport {
             },
             body: body === undefined ? undefined : JSON.stringify(body),
           },
-          this.timeoutMs,
+          timeoutMs,
         );
         if (method === 'GET' && attempt < attempts && result.status >= 500) continue;
         return result;

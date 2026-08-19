@@ -281,7 +281,7 @@ function validKey(value: string): boolean {
 
 function mapGenerationError(error: SceneGenerationError): DramaResult<never> {
   if (error.code === 'provider_unavailable') {
-    return { ok: false, error: { code: 'provider_unavailable', message: error.message } };
+    return { ok: false, error: { code: 'provider_unavailable', message: error.message, providerStatus: error.providerStatus } };
   }
   if (error.code === 'invalid_response') {
     return { ok: false, error: { code: 'invalid_generation', message: error.message } };

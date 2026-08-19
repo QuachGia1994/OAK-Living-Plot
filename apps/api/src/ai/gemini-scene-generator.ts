@@ -33,7 +33,7 @@ interface GeminiResponse {
 export class GeminiSceneGenerator implements SceneGenerator {
   constructor(
     private readonly apiKey: string,
-    private readonly fetcher: FetchLike = fetch,
+    private readonly fetcher: FetchLike = fetch.bind(globalThis),
     private readonly timeoutMs = 12_000,
     private readonly telemetry: GenerationTelemetrySink = NOOP_GENERATION_TELEMETRY,
   ) {}
@@ -99,6 +99,8 @@ export class GeminiSceneGenerator implements SceneGenerator {
   ): Promise<Result<{ text: string; usage: SceneGenerationUsage }, SceneGenerationError>> {
     const prompt = buildScenePrompt(input, validationErrors);
     let response: Response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       response = await this.fetcher(GEMINI_ENDPOINT, {
         method: 'POST',
@@ -106,7 +108,7 @@ export class GeminiSceneGenerator implements SceneGenerator {
           'Content-Type': 'application/json',
           'x-goog-api-key': this.apiKey,
         },
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: controller.signal,
         body: JSON.stringify({
           model: SCENE_MODEL,
           input: prompt.userContent,
@@ -123,8 +125,10 @@ export class GeminiSceneGenerator implements SceneGenerator {
     } catch {
       return {
         ok: false,
-        error: { code: 'provider_unavailable', message: 'Scene provider request failed.', retryable: true },
+        error: { code: 'provider_unavailable', message: controller.signal.aborted ? 'Scene provider request timed out.' : 'Scene provider request failed.', retryable: true },
       };
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (!response.ok) {
@@ -134,6 +138,7 @@ export class GeminiSceneGenerator implements SceneGenerator {
           code: 'provider_unavailable',
           message: 'Scene provider rejected the request.',
           retryable: response.status === 429 || response.status >= 500,
+          providerStatus: response.status,
         },
       };
     }

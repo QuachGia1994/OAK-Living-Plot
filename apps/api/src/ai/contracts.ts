@@ -86,7 +86,7 @@ export interface SceneGenerationUsage {
 
 export type SceneGenerationError =
   | { code: 'invalid_input'; message: string }
-  | { code: 'provider_unavailable'; message: string; retryable: boolean }
+  | { code: 'provider_unavailable'; message: string; retryable: boolean; providerStatus?: number }
   | { code: 'invalid_response'; message: string; attempts: number };
 
 export interface SceneGenerationSuccess {

@@ -272,7 +272,7 @@ function dramaErrorResponse(error: DramaError): Response {
   if (error.code === 'quota_exceeded') {
     return json({ error: error.code, limit: error.limit, utcDay: error.utcDay, resetAt: error.utcDay ? nextUtcReset(error.utcDay) : undefined }, 429);
   }
-  if (error.code === 'provider_unavailable') return json({ error: error.code }, 503);
+  if (error.code === 'provider_unavailable') return json({ error: error.code, providerStatus: error.providerStatus }, 503);
   if (error.code === 'invalid_generation') return json({ error: error.code }, 502);
   if (error.code === 'persistence_error') return json({ error: 'internal_error' }, 500);
   return json({

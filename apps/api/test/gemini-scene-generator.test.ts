@@ -3,6 +3,23 @@ import { GeminiSceneGenerator, SCENE_MODEL } from '../src/ai/gemini-scene-genera
 import { makeGenerationInput, makeValidProposal } from './drama-fixtures';
 
 describe('GeminiSceneGenerator', () => {
+  it('binds the default Worker fetch to globalThis instead of calling it as a generator method', async () => {
+    const originalFetch = globalThis.fetch;
+    const strictFetch = vi.fn(async function (this: unknown) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      return Response.json(geminiResponse(JSON.stringify(makeValidProposal()), 120, 80));
+    });
+    globalThis.fetch = strictFetch as typeof fetch;
+    try {
+      const generator = new GeminiSceneGenerator('test-api-key');
+      const result = await generator.generate(makeGenerationInput());
+      expect(result.ok).toBe(true);
+      expect(strictFetch).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('sends a structured-output request without leaking the API key into the body', async () => {
     const fetcher = vi.fn<TestFetch>(async () => Response.json(geminiResponse(JSON.stringify(makeValidProposal()), 120, 80)));
     const generator = new GeminiSceneGenerator('test-api-key', fetcher);
@@ -44,6 +61,21 @@ describe('GeminiSceneGenerator', () => {
     expect(secondBody.system_instruction).toContain('previous proposal was rejected');
   });
 
+  it('aborts a hanging provider request with a portable AbortController timeout', async () => {
+    const fetcher = vi.fn<TestFetch>(async (_input, init) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    }));
+    const generator = new GeminiSceneGenerator('test-api-key', fetcher, 5);
+
+    const result = await generator.generate(makeGenerationInput());
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'provider_unavailable', message: 'Scene provider request timed out.', retryable: true },
+    });
+  });
+
   it('does not retry provider HTTP failures', async () => {
     const fetcher = vi.fn<TestFetch>(async () => new Response('provider down', { status: 503 }));
     const generator = new GeminiSceneGenerator('test-api-key', fetcher);
@@ -53,7 +85,7 @@ describe('GeminiSceneGenerator', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       ok: false,
-      error: { code: 'provider_unavailable', message: 'Scene provider rejected the request.', retryable: true },
+      error: { code: 'provider_unavailable', message: 'Scene provider rejected the request.', retryable: true, providerStatus: 503 },
     });
   });
 

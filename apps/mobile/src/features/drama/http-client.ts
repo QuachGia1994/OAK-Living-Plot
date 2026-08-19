@@ -12,6 +12,8 @@ import { DramaClientError } from './contracts';
 import { createIdempotencyKey } from '../../lib/idempotency-key';
 import { AuthenticatedJsonTransport, HttpTransportError, type FetchLike, type TokenProvider } from '../../lib/http-transport';
 
+const AI_MUTATION_TIMEOUT_MS = 30_000;
+
 export class HttpDramaExperienceClient implements DramaExperienceClient {
   private readonly createGenerationKeys = new Map<string, string>();
   private readonly nextGenerationKeys = new Map<string, string>();
@@ -52,7 +54,7 @@ export class HttpDramaExperienceClient implements DramaExperienceClient {
         mood: draft.mood,
         characterName: draft.characterName.trim(),
         locale: this.locale,
-      });
+      }, AI_MUTATION_TIMEOUT_MS);
       this.createGenerationKeys.delete(creationKey);
       return parseDramaEnvelope(payload);
     } catch (error) {
@@ -99,6 +101,7 @@ export class HttpDramaExperienceClient implements DramaExperienceClient {
         `/v1/dramas/${encodeURIComponent(dramaId)}/scenes`,
         'POST',
         { generationKey },
+        AI_MUTATION_TIMEOUT_MS,
       ));
       this.nextGenerationKeys.delete(dramaId);
       return drama;
@@ -118,9 +121,9 @@ export class HttpDramaExperienceClient implements DramaExperienceClient {
     return parseDramaSummary(payload.dramaSummary, this.clock(), this.uiLocale);
   }
 
-  private async request(path: string, method: 'GET' | 'POST', body?: unknown): Promise<unknown> {
+  private async request(path: string, method: 'GET' | 'POST', body?: unknown, timeoutMs?: number): Promise<unknown> {
     try {
-      const response = await this.transport.request(path, method, body);
+      const response = await this.transport.request(path, method, body, timeoutMs);
       if (!response.jsonValid && response.ok) throw invalidBackendResponse();
       if (!response.ok) throw mapHttpError(response.status, response.payload);
       return response.payload;

@@ -39,6 +39,20 @@ describe('AuthenticatedJsonTransport', () => {
     expect(writeFetcher).toHaveBeenCalledTimes(1);
   });
 
+  it('allows an explicit longer timeout for idempotent AI mutations without changing the default', async () => {
+    const fetcher = vi.fn<TestFetch>(async (_input, init) => new Promise<Response>((resolve, reject) => {
+      const timer = setTimeout(() => resolve(Response.json({ ok: true })), 10);
+      init?.signal?.addEventListener('abort', () => {
+        clearTimeout(timer);
+        reject(new Error('aborted'));
+      }, { once: true });
+    }));
+    const transport = new AuthenticatedJsonTransport('https://api.test', async () => 'token', fetcher, 5);
+
+    await expect(transport.request('/v1/dramas', 'POST', {}, 30)).resolves.toMatchObject({ status: 200 });
+    await expect(transport.request('/v1/dramas', 'POST', {})).rejects.toMatchObject({ code: 'timeout' });
+  });
+
   it('aborts a hanging request at the configured timeout', async () => {
     const fetcher = vi.fn<TestFetch>(async (_input, init) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });

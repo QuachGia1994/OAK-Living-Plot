@@ -12,17 +12,17 @@ export const sceneResponseSchema = {
   additionalProperties: false,
   required: ['title', 'script', 'summary', 'establishedFacts', 'threadChanges', 'choices'],
   properties: {
-    title: { type: 'string' },
-    script: { type: 'string' },
-    summary: { type: 'string' },
-    establishedFacts: { type: 'array', maxItems: 8, items: { type: 'string' } },
+    title: { type: 'string', minLength: 1, maxLength: 80 },
+    script: { type: 'string', minLength: 600, maxLength: 2400 },
+    summary: { type: 'string', minLength: 1, maxLength: 240 },
+    establishedFacts: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 160 } },
     threadChanges: {
       type: 'object',
       additionalProperties: false,
       required: ['open', 'resolve'],
       properties: {
         open: { type: 'array', maxItems: 4, items: threadSchema() },
-        resolve: { type: 'array', maxItems: 4, items: { type: 'string' } },
+        resolve: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 120 } },
       },
     },
     choices: {
@@ -215,20 +215,20 @@ function choiceSchema() {
     required: ['key', 'label', 'intent', 'consequence', 'stateDelta'],
     properties: {
       key: { type: 'string', enum: ['A', 'B', 'C'] },
-      label: { type: 'string' },
-      intent: { type: 'string' },
-      consequence: { type: 'string' },
+      label: { type: 'string', minLength: 1, maxLength: 120 },
+      intent: { type: 'string', minLength: 1, maxLength: 120 },
+      consequence: { type: 'string', minLength: 1, maxLength: 240 },
       stateDelta: {
         type: 'object',
         additionalProperties: false,
         required: ['relationships', 'factsToAdd', 'factKeysToResolve', 'threadsToOpen', 'threadKeysToResolve', 'nextTone'],
         properties: {
           relationships: { type: 'array', maxItems: 8, items: relationshipSchema() },
-          factsToAdd: { type: 'array', maxItems: 6, items: { type: 'string' } },
-          factKeysToResolve: { type: 'array', maxItems: 6, items: { type: 'string' } },
+          factsToAdd: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 160 } },
+          factKeysToResolve: { type: 'array', maxItems: 6, items: { type: 'string', maxLength: 120 } },
           threadsToOpen: { type: 'array', maxItems: 4, items: threadSchema() },
-          threadKeysToResolve: { type: 'array', maxItems: 4, items: { type: 'string' } },
-          nextTone: { type: 'string' },
+          threadKeysToResolve: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 120 } },
+          nextTone: { type: 'string', minLength: 1, maxLength: 80 },
         },
       },
     },
@@ -257,7 +257,7 @@ function threadSchema() {
     additionalProperties: false,
     required: ['title', 'urgency'],
     properties: {
-      title: { type: 'string' },
+      title: { type: 'string', minLength: 1, maxLength: 160 },
       urgency: { type: 'integer', minimum: 0, maximum: 100 },
     },
   } as const;

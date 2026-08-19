@@ -173,13 +173,14 @@ describe('authenticated drama HTTP loop', () => {
     const flaky: SceneGenerator = {
       async generate(input) {
         calls += 1;
-        if (calls === 1) return { ok: false, error: { code: 'provider_unavailable', message: 'provider down', retryable: true } };
+        if (calls === 1) return { ok: false, error: { code: 'provider_unavailable', message: 'provider down', retryable: true, providerStatus: 429 } };
         return successGeneration(input, 1);
       },
     };
 
     const first = await dramaRequest('/v1/dramas', 'POST', createBody(), 'clerk-owner', flaky);
     expect(first.status).toBe(503);
+    expect(await first.json()).toEqual({ error: 'provider_unavailable', providerStatus: 429 });
     const second = await dramaRequest('/v1/dramas', 'POST', createBody(), 'clerk-owner', flaky);
     expect(second.status).toBe(201);
     expect(calls).toBe(2);

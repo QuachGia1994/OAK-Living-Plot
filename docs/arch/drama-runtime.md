@@ -10,7 +10,7 @@ Living Plot has one product vocabulary above persistence: **Drama → Scene → 
 | --- | --- | --- |
 | user premise/mood/lead → generation request | mobile `features/drama/setup.ts` + `HttpDramaExperienceClient` | `DramaDraft`, idempotency keys, `DramaLocale` |
 | generation request → provider-neutral scene proposal | API `SceneGenerator` | `SceneGenerationInput` → `SceneProposal` or normalized generation error |
-| Gemini payload → validated proposal | `GeminiSceneGenerator` + `scene-schema.ts` | strict `SceneProposal`; raw provider JSON never reaches domain/UI |
+| provider payload → validated proposal | `SceneGenerator` adapter + `scene-schema.ts` | strict `SceneProposal`; raw provider JSON never reaches domain/UI |
 | validated proposal → persisted current scene | `D1EpisodePublisher` persistence adapter + `DramaService` | D1 write with generation-key/idempotency/version guards, then `D1DramaRepository` projects `Drama` |
 | persisted rows → application drama | `D1DramaRepository` | `Drama`, `Scene`, `CharacterIdentity`, `Branch` |
 | scene → voice request/status/private playback | `D1AudioService` + `AudioProcessor` | public `MediaAsset` lifecycle; R2/provider fields remain private |
@@ -48,13 +48,13 @@ The mobile selection before commit is provisional playback state, not a canonica
 
 ## Generation boundary
 
-`SceneGenerator` is provider-neutral. The current adapter is `GeminiSceneGenerator`, but `DramaService`, D1 projection, and mobile code do not depend on Gemini response types.
+`SceneGenerator` is provider-neutral. The non-production live-development Worker uses the Workers AI binding with `@cf/meta/llama-3.1-8b-instruct-fast`; deployments without that binding retain `GeminiSceneGenerator` as the adapter. `DramaService`, D1 projection, and mobile code depend on neither provider response type.
 
 Provider flow:
 1. `SceneGenerationInput` is assembled only from bounded canonical drama memory.
 2. `scene-prompt.ts` serializes user/drama strings as data inside `DRAMA_CONTEXT_JSON`.
-3. Gemini returns structured JSON.
-4. `scene-schema.ts` parses and validates the proposal, including A/B/C branches, canonical references, score bounds, script envelope, and no unexpected fields.
+3. the selected adapter requests structured JSON; the Workers AI adapter constrains output size and removes only provider references that do not exist in the canonical character/fact/thread input.
+4. `scene-schema.ts` parses and validates the proposal, including A/B/C branches, canonical references, score bounds, script envelope, and no unexpected fields. Schema string bounds mirror the domain envelope so incomplete/undersized provider output is rejected before publication.
 5. One controlled regeneration is allowed only for a successful-but-invalid provider proposal.
 6. provider/network failures normalize to `provider_unavailable`; a second invalid proposal normalizes to `invalid_generation` at HTTP/mobile application boundaries.
 7. only validated `SceneProposal` reaches publication.
@@ -126,7 +126,7 @@ Changing UI language may choose matching defaults for a new drama/narrator, but 
 Behavioral proof is intentionally attached to business transitions:
 - `apps/api/test/http-drama.test.ts` — create, persisted restore, owner isolation, branch commit/conflict, next-scene consequence, idempotent retry, generation failure/quota release.
 - `apps/api/test/scene-schema.test.ts` — provider normalization and invalid references/shape rejection.
-- `apps/api/test/gemini-scene-generator.test.ts` — provider adapter, controlled validation retry, normalized failures.
+- `apps/api/test/gemini-scene-generator.test.ts` + `workers-ai-scene-generator.test.ts` — provider adapters, Worker-safe fetch binding, structured output, canonical-reference normalization, controlled validation retry, normalized failures.
 - `apps/api/test/gemini-tts-synthesizer.test.ts` + `audio-service.test.ts` + `audio-processor.test.ts` + `http-media.test.ts` — Gemini TTS normalization plus media ownership, quota/idempotency, internal/partial/ready/failure states, private delivery.
 - `apps/mobile/test/http-drama-client.test.ts` — HTTP normalization, conflict resync, stable continuation key, malformed branch rejection.
 - `apps/mobile/test/drama-domain.test.ts` — player phase transitions.

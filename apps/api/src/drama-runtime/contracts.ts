@@ -106,6 +106,7 @@ export interface DramaError {
   utcDay?: string;
   currentStateVersion?: number;
   committedChoiceId?: string;
+  providerStatus?: number;
 }
 
 export type DramaResult<T> = { ok: true; value: T } | { ok: false; error: DramaError };
