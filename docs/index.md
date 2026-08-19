@@ -6,7 +6,7 @@
 - [Phase 1 foundation architecture](arch/foundation.md) — workspace/runtime boundaries and deferred infrastructure.
 - [Phase 1 D1 data model](arch/data-model.md) — persistence schema invariants and local migration workflow; D1 `plots/episodes` names are storage vocabulary, not application terminology.
 - [Phase 1 auth and ownership boundary](arch/auth-security.md) — Clerk session verification, internal-user mapping, and owner-scoped access rules.
-- [Scene-generation boundary](arch/scene-generation.md) — provider-neutral `SceneGenerator`, bounded canonical + recent novelty context, deterministic repetition guard, controlled retry, and provider isolation.
+- [Scene-generation boundary](arch/scene-generation.md) — provider-neutral `SceneGenerator` (Gemini + Workers AI), shared narrative publication gate, required beat/pacingRole, controlled retry.
 - [Phase 1 episode publication boundary](arch/episode-publication.md) — atomic D1 publish, generation-key idempotency, and optimistic version guards.
 - [Phase 1 branch / choice-commit boundary](arch/choice-commit.md) — `DramaState`, exactly-one canonical branch, idempotency, state application, and commit concurrency.
 - [Quota ledger](arch/quota-ledger.md) — Free/Plus UTC limits, atomic daily reservations, referral voice-credit fallback, terminal transitions, and reconciliation.
@@ -15,7 +15,7 @@
 - [Derived character portraits](arch/character-portraits.md) — story fingerprints, identity-reference regeneration, private R2 delivery, and non-canonical media ownership.
 - [Phase 1 RevenueCat entitlements](arch/revenuecat-entitlements.md) — verified webhook/provider sync, D1 Free/Plus authority, and mobile paywall/restore trust boundary.
 - [Phase 1 analytics and AI cost telemetry](arch/analytics-cost.md) — privacy-safe Analytics Engine schema, fail-open semantics, retry-aware Gemini token usage, and exact nano-USD rate-card arithmetic.
-- [Phase 1 narrative quality evaluations](arch/narrative-evals.md) — deterministic continuity/thread/branch/consequence/repetition/protagonist/locale/progression fixtures and adversarial regression thresholds.
+- [Narrative quality evaluations](arch/narrative-evals.md) — Phase-1 novelty + Phase-2 quality dimensions; offline `evaluateNarrative` vs runtime `validateNarrativePublication`; hard vs eval-only publication gates.
 - [Phase 1 mobile auth and live drama](arch/mobile-auth-live-drama.md) — Clerk email OTP, internal identity, protected `/v1/dramas` core-loop routes, retry convergence, and shared billing trust chain.
 - [Phase 1 retention loop](arch/retention.md) — canonical choice-history streaks, resume context, deterministic UTC daily sparks, and anti-dark-pattern guardrails.
 - [Phase 1 drama library and history](arch/drama-library-history.md) — reversible archive/restore lifecycle, owner-scoped library, persisted restoration, and canonical read-only branch recap.

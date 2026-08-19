@@ -6,6 +6,8 @@ import type {
   Result,
   ThreadProposal,
 } from './contracts';
+import { isNarrativeBeat, NARRATIVE_BEATS } from '../evals/narrative-novelty';
+import { isPacingRole, PACING_ROLES } from '../evals/narrative-quality';
 
 export const sceneResponseSchema = {
   type: 'object',
@@ -17,14 +19,11 @@ export const sceneResponseSchema = {
     summary: { type: 'string', minLength: 1, maxLength: 240 },
     beat: {
       type: 'string',
-      enum: [
-        'confrontation', 'revelation', 'betrayal', 'alliance', 'pursuit', 'dilemma',
-        'sacrifice', 'discovery', 'reversal', 'separation', 'rescue', 'deadline',
-      ],
+      enum: [...NARRATIVE_BEATS],
     },
     pacingRole: {
       type: 'string',
-      enum: ['setup', 'build', 'escalate', 'payoff', 'breather', 'cliffhanger'],
+      enum: [...PACING_ROLES],
     },
     establishedFacts: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 160 } },
     threadChanges: {
@@ -63,12 +62,6 @@ export function parseAndValidateSceneProposal(
   return errors.length === 0 ? structural : { ok: false, error: errors };
 }
 
-const VALID_BEATS = new Set([
-  'confrontation', 'revelation', 'betrayal', 'alliance', 'pursuit', 'dilemma',
-  'sacrifice', 'discovery', 'reversal', 'separation', 'rescue', 'deadline',
-]);
-const VALID_PACING_ROLES = new Set(['setup', 'build', 'escalate', 'payoff', 'breather', 'cliffhanger']);
-
 function parseProposal(value: unknown): Result<SceneProposal, string[]> {
   if (!isRecord(value) || !hasOnlyKeys(value, ['title', 'script', 'summary', 'establishedFacts', 'threadChanges', 'choices'], ['beat', 'pacingRole'])) {
     return invalid('Scene proposal has an invalid top-level shape.');
@@ -76,10 +69,10 @@ function parseProposal(value: unknown): Result<SceneProposal, string[]> {
   if (!isBoundedText(value.title, 1, 120) || !isBoundedText(value.script, 1, 6000) || !isBoundedText(value.summary, 1, 800)) {
     return invalid('Scene title, script, or summary is invalid.');
   }
-  if (typeof value.beat !== 'string' || !VALID_BEATS.has(value.beat)) {
+  if (!isNarrativeBeat(value.beat)) {
     return invalid('Scene beat is required and must be a valid NarrativeBeat.');
   }
-  if (typeof value.pacingRole !== 'string' || !VALID_PACING_ROLES.has(value.pacingRole)) {
+  if (!isPacingRole(value.pacingRole)) {
     return invalid('Scene pacingRole is required and must be a valid PacingRole.');
   }
   if (!isStringArray(value.establishedFacts, 8, 400)) return invalid('Established facts are invalid.');
