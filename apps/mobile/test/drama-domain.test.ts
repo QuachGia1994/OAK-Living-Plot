@@ -3,6 +3,7 @@ import type { Drama } from '../src/features/drama/domain';
 import {
   derivePlaybackState,
   releasePlaybackAction,
+  shouldResetTransientPlayback,
   tryAcquirePlaybackAction,
   type PlaybackActionLock,
 } from '../src/features/drama/playback-state';
@@ -70,6 +71,30 @@ describe('drama playback domain', () => {
     if (committed.currentScene.branch.state === 'committed') {
       expect(committed.currentScene.branch.choiceId).toBe(selectedId);
     }
+  });
+
+  it('preserves same-scene transient playback across canonical refreshes but resets on branch/scene changes', () => {
+    const sameSceneRefresh: Drama = {
+      ...openDrama,
+      title: 'Updated projection title',
+      currentScene: { ...openDrama.currentScene },
+    };
+    expect(shouldResetTransientPlayback(openDrama, sameSceneRefresh)).toBe(false);
+
+    const committed: Drama = {
+      ...openDrama,
+      currentScene: {
+        ...openDrama.currentScene,
+        branch: { state: 'committed', choiceId: 'choice-a', consequence: 'The visitor steps inside.' },
+      },
+    };
+    expect(shouldResetTransientPlayback(openDrama, committed)).toBe(true);
+
+    const nextScene: Drama = {
+      ...openDrama,
+      currentScene: { ...openDrama.currentScene, id: 'scene-2', number: 2 },
+    };
+    expect(shouldResetTransientPlayback(openDrama, nextScene)).toBe(true);
   });
 
   it('keeps committing_choice phase while action is in flight so UI cannot double-lock', () => {

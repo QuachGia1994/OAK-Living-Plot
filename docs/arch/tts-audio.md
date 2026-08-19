@@ -13,13 +13,15 @@ The boundary owns:
 - private R2 object persistence;
 - owner-scoped HTTP request/status/audio delivery.
 
-RevenueCat entitlement materialization and analytics/cost accounting remain separate authority domains. Mobile playback now consumes this boundary without making audio canonical.
+RevenueCat entitlement materialization and analytics/cost accounting remain separate authority domains. Mobile playback consumes this boundary without making audio canonical. When provider-generated private audio is unavailable, the native app may explicitly offer device text-to-speech as a local fallback; that fallback is not a `MediaAsset`, is not uploaded, and consumes no server narration quota.
 
 ## Gemini authentication
-The live Beta RC speech adapter uses the same server-side `GEMINI_API_KEY` trust boundary as scene generation. `GeminiTtsSynthesizer` sends the key only as the Gemini API `x-goog-api-key` header from the Worker; it never enters D1, mobile configuration, public DTOs, or R2 metadata. Google Cloud service-account credentials are not required by the current narration runtime.
+The configured private-audio adapter keeps `GEMINI_API_KEY` strictly server-side. `GeminiTtsSynthesizer` sends the key only as the Gemini API `x-goog-api-key` header from the Worker; it never enters D1, mobile configuration, public DTOs, or R2 metadata. Development Scene generation is independently provider-neutral and currently uses Workers AI, so Scene text can remain live even while the Gemini narration provider is unhealthy. Google Cloud service-account credentials are not required by the current narration runtime.
 
 ## Speech provider
-`SpeechSynthesizer` remains provider-neutral. The current live adapter is `GeminiTtsSynthesizer` using `gemini-2.5-flash-preview-tts` through the Gemini Interactions API. It requests inline MP3 output, validates the returned MIME/container, and exposes only normalized MP3 bytes, `audio/mpeg`, and input-character count to `AudioProcessor`.
+`SpeechSynthesizer` remains provider-neutral. The configured private-audio adapter is `GeminiTtsSynthesizer` using `gemini-2.5-flash-preview-tts` through the Gemini Interactions API. It requests inline MP3 output, validates the returned MIME/container, and exposes only normalized MP3 bytes, `audio/mpeg`, and input-character count to `AudioProcessor`.
+
+The current Cloudflare development egress does not prove this Gemini TTS path healthy: live assets have exhausted retries and ended `failed`. That provider failure does not block canonical Scene text. Mobile therefore exposes a clearly labeled device-system speech fallback via `expo-speech`; it reads the already-canonical Scene text locally in `dramaLocale`, does not create/cache private media, and does not consume the Free/Plus narration ledger.
 
 Approved Phase 1 product variants remain stable and map internally to Gemini voice `Aoede`:
 - `vi-narrator-female` → `vi-VN` product locale → `Aoede`;
@@ -79,7 +81,7 @@ The consumer writes deterministic MP3 keys:
 
 `GET /v1/media/:assetId/status` authenticates the user and returns only client-safe lifecycle metadata for polling. `GET /v1/media/:assetId` separately authenticates the owner through scene → drama ownership before reading R2; non-ready reads return HTTP 202 metadata and ready assets stream `audio/mpeg` with private cache headers. The object key and provider voice ID are never exposed.
 
-The Expo client requests one approved narrator variant, polls the status route while work is pending, and uses Expo Audio with the protected stream URL plus an Authorization header after `ready`. Public live configuration and signed-in session state are separate concerns: API URL + Clerk configuration select the authenticated HTTP client, while a missing session produces `auth_required` at the transport boundary. A deliberately unconfigured preview build exposes voice as unavailable and never fabricates audio. Playback failure never invalidates or hides the text scene.
+The Expo client requests one approved narrator variant, polls the status route while work is pending, and uses Expo Audio with the protected stream URL plus an Authorization header after `ready`. Until that generated-media path is healthy, `expo-speech` can read the Scene locally as an explicitly separate device-voice fallback. Public live configuration and signed-in session state are separate concerns: API URL + Clerk configuration select the authenticated HTTP client, while a missing session produces `auth_required` at the transport boundary. A deliberately unconfigured preview build exposes cloud voice as unavailable and never fabricates private audio. Playback/provider failure never invalidates or hides the text scene.
 
 ## Idempotency and failure semantics
 - same episode/voice request while work exists returns the canonical asset;

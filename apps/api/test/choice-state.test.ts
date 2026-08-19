@@ -37,6 +37,23 @@ describe('applyCommittedChoiceState', () => {
     expect(result.value.tone).toBe('raw');
   });
 
+  it('deduplicates semantically identical facts and open threads across scenes and choices', () => {
+    const proposal = makeValidProposal();
+    proposal.establishedFacts = ['  An hid a message from Linh.  '];
+    proposal.threadChanges.open = [{ title: 'LINH QUESTIONS AN’S HONESTY.', urgency: 99 }];
+    proposal.choices[0].stateDelta.factsToAdd = ['An hid a message from Linh.'];
+    proposal.choices[0].stateDelta.threadsToOpen = [{ title: 'Linh questions An’s honesty.', urgency: 95 }];
+
+    const result = applyCommittedChoiceState(initialState(), 'episode-1', 'choice-a', proposal, proposal.choices[0].stateDelta);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.facts).toHaveLength(1);
+    expect(result.value.facts[0]).toEqual({ key: 'fact-hidden-message', text: 'An hid a message from Linh.' });
+    expect(result.value.openThreads).toHaveLength(1);
+    expect(result.value.openThreads[0]).toEqual({ key: 'thread-trust', title: 'Linh questions An’s honesty.', urgency: 80 });
+  });
+
   it('rejects resolving an unknown canonical key', () => {
     const proposal = makeValidProposal();
     proposal.choices[0].stateDelta.factKeysToResolve = ['missing-fact'];

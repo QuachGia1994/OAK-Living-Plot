@@ -54,10 +54,10 @@ Provider flow:
 1. `SceneGenerationInput` is assembled only from bounded canonical drama memory.
 2. `scene-prompt.ts` serializes user/drama strings as data inside `DRAMA_CONTEXT_JSON`.
 3. the selected adapter requests structured JSON; the Workers AI adapter constrains output size and removes only provider references that do not exist in the canonical character/fact/thread input.
-4. `scene-schema.ts` parses and validates the proposal, including A/B/C branches, canonical references, score bounds, script envelope, and no unexpected fields. Schema string bounds mirror the domain envelope so incomplete/undersized provider output is rejected before publication.
+4. `scene-schema.ts` parses and validates the proposal, including A/B/C branches, canonical references, score bounds, script envelope, continuation advancement, active-thread duplication, and no unexpected fields. Schema string bounds mirror the domain envelope so incomplete/undersized provider output is rejected before publication.
 5. One controlled regeneration is allowed only for a successful-but-invalid provider proposal.
 6. provider/network failures normalize to `provider_unavailable`; a second invalid proposal normalizes to `invalid_generation` at HTTP/mobile application boundaries.
-7. only validated `SceneProposal` reaches publication.
+7. only validated `SceneProposal` reaches publication. Canonical state application deduplicates semantically identical fact/thread text before and during branch commits, and generation context performs the same normalization so previously polluted development state cannot keep feeding repeated facts/threads back into later Scenes.
 
 Provider/model names may exist in adapter telemetry and persistence provenance. They are never application state.
 

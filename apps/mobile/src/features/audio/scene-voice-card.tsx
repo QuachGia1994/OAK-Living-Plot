@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import * as Speech from 'expo-speech';
 import { StyleSheet, Text, View } from 'react-native';
 import { useUiCopy } from '@/features/localization/ui-copy';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
@@ -11,7 +12,7 @@ import { SceneVoiceClientError } from './contracts';
 import { useSceneVoiceClient } from './audio-client-context';
 import { nextMediaPoll } from './media-polling';
 
-export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
+export function SceneVoiceCard({ sceneId, sceneText }: { sceneId: string; sceneText: string }) {
   const client = useSceneVoiceClient();
   const { locale, t } = useUiCopy();
   const { preferences } = useUserPreferences();
@@ -24,6 +25,8 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
   const [autoPollCount, setAutoPollCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [statusRetryNeeded, setStatusRetryNeeded] = useState(false);
+  const [deviceSpeaking, setDeviceSpeaking] = useState(false);
+  const [deviceSpeechError, setDeviceSpeechError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,6 +53,16 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
       clearTimeout(timer);
     };
   }, [asset, autoPollCount, client, locale]);
+
+  useEffect(() => () => {
+    void Speech.stop();
+  }, [sceneId]);
+
+  useEffect(() => {
+    if (asset?.status === 'ready' && deviceSpeaking) {
+      void Speech.stop().finally(() => setDeviceSpeaking(false));
+    }
+  }, [asset?.status, deviceSpeaking]);
 
   useEffect(() => {
     if (!asset || asset.status !== 'ready' || loadedAssetId.current === asset.id) return;
@@ -112,6 +125,36 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
     player.play();
   }
 
+  async function toggleDeviceSpeech() {
+    setDeviceSpeechError(null);
+    const text = sceneText.normalize('NFC').trim();
+    if (!text) {
+      setDeviceSpeechError(t('This scene has no readable text.', 'Cảnh này không có văn bản để đọc.'));
+      return;
+    }
+    try {
+      if (deviceSpeaking || await Speech.isSpeakingAsync()) {
+        await Speech.stop();
+        setDeviceSpeaking(false);
+        return;
+      }
+      Speech.speak(text, {
+        language: preferences.dramaLocale,
+        rate: 0.96,
+        onStart: () => setDeviceSpeaking(true),
+        onDone: () => setDeviceSpeaking(false),
+        onStopped: () => setDeviceSpeaking(false),
+        onError: () => {
+          setDeviceSpeaking(false);
+          setDeviceSpeechError(t('Device voice is unavailable on this phone.', 'Giọng đọc của thiết bị không khả dụng trên máy này.'));
+        },
+      });
+    } catch {
+      setDeviceSpeaking(false);
+      setDeviceSpeechError(t('Device voice is unavailable on this phone.', 'Giọng đọc của thiết bị không khả dụng trên máy này.'));
+    }
+  }
+
   const progress = playerStatus.duration > 0 ? Math.min(1, playerStatus.currentTime / playerStatus.duration) : 0;
   const pollBudgetExhausted = Boolean(asset && isPending(asset.status) && !nextMediaPoll(asset.status, autoPollCount));
   const needsStatusRefresh = statusRetryNeeded || pollBudgetExhausted;
@@ -162,7 +205,19 @@ export function SceneVoiceCard({ sceneId }: { sceneId: string }) {
         />
       )}
 
+      {asset?.status !== 'ready' ? (
+        <View style={styles.deviceVoiceFallback}>
+          <ActionButton
+            label={deviceSpeaking ? t('Stop device voice', 'Dừng giọng máy') : t('Read with device voice', 'Đọc bằng giọng máy')}
+            variant="ghost"
+            onPress={() => void toggleDeviceSpeech()}
+          />
+          <Text style={styles.deviceVoiceNote}>{t('Uses your phone’s system voice and does not consume a narration slot.', 'Dùng giọng hệ thống trên điện thoại và không tốn lượt giọng đọc.')}</Text>
+        </View>
+      ) : null}
+
       {error ? <Text style={styles.notice} accessibilityLiveRegion="polite">{error}</Text> : null}
+      {deviceSpeechError ? <Text style={styles.notice} accessibilityLiveRegion="polite">{deviceSpeechError}</Text> : null}
     </View>
   );
 }
@@ -220,4 +275,6 @@ const styles = StyleSheet.create({
   flexButton: { flex: 1 },
   kicker: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
   notice: { color: colors.inkMuted, fontSize: 12, lineHeight: 18 },
+  deviceVoiceFallback: { gap: spacing.xs },
+  deviceVoiceNote: { color: colors.quietInk, fontSize: 11, lineHeight: 16 },
 });

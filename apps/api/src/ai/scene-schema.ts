@@ -167,6 +167,23 @@ function validateBusinessRules(proposal: SceneProposal, input: SceneGenerationIn
   if (new Set(proposal.choices.map((choice) => normalize(choice.label))).size !== 3) errors.push('Choice labels must be materially distinct.');
   if (new Set(proposal.choices.map((choice) => normalize(choice.intent))).size !== 3) errors.push('Choice intents must be materially distinct.');
 
+  if (input.previous) {
+    const previousSummary = semanticText(input.previous.sceneSummary);
+    const nextSummary = semanticText(proposal.summary);
+    if (previousSummary.length >= 20 && (nextSummary.includes(previousSummary) || previousSummary.includes(nextSummary))) {
+      errors.push('Continuation summary must materially advance beyond the previous scene summary.');
+    }
+    const previousAction = semanticText(input.previous.chosenAction);
+    if (proposal.choices.some((choice) => semanticText(choice.label) === previousAction)) {
+      errors.push('Continuation choices must not repeat the previously committed action.');
+    }
+  }
+
+  const existingThreadTitles = new Set(input.openThreads.map((thread) => semanticText(thread.title)));
+  for (const thread of proposal.threadChanges.open) {
+    if (existingThreadTitles.has(semanticText(thread.title))) errors.push('Scene must not reopen an already active thread with the same title.');
+  }
+
   const wordCount = proposal.script.trim().split(/\s+/u).filter(Boolean).length;
   if (wordCount < 100 || wordCount > 300) errors.push('Scene script must stay within the Phase 1 spoken-length envelope.');
 
@@ -298,6 +315,15 @@ function isIntegerBetween(value: unknown, min: number, max: number): value is nu
 
 function normalize(value: string): string {
   return value.trim().toLocaleLowerCase();
+}
+
+function semanticText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
 }
 
 function invalid<T>(message: string): Result<T, string[]> {

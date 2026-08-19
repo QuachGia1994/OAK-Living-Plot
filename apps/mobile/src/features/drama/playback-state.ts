@@ -17,6 +17,12 @@ export function releasePlaybackAction(lock: PlaybackActionLock, action: ActivePl
   if (lock.current === action) lock.current = null;
 }
 
+export function shouldResetTransientPlayback(previous: Drama | null, next: Drama): boolean {
+  if (!previous || previous.id !== next.id) return true;
+  if (previous.currentScene.id !== next.currentScene.id) return true;
+  return previous.currentScene.branch.state !== next.currentScene.branch.state;
+}
+
 export type PlaybackState =
   | { phase: 'restoring' }
   | { phase: 'playing' }

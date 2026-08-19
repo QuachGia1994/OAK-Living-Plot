@@ -6,6 +6,7 @@ import { useDramaExperienceClient } from './drama-client-context';
 import {
   derivePlaybackState,
   releasePlaybackAction,
+  shouldResetTransientPlayback,
   tryAcquirePlaybackAction,
   type PlaybackAction,
 } from './playback-state';
@@ -19,7 +20,7 @@ export interface DramaFailure {
 
 export function useDramaPlayback(input: { dramaId: string | null; enabled: boolean }) {
   const client = useDramaExperienceClient();
-  const currentSceneId = useRef<string | null>(null);
+  const dramaRef = useRef<Drama | null>(null);
   const loadVersion = useRef(0);
   const actionLock = useRef<PlaybackAction>(null);
   const [drama, setDrama] = useState<Drama | null>(null);
@@ -30,11 +31,14 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
   const [loading, setLoading] = useState(true);
 
   const adoptDrama = useCallback((next: Drama) => {
-    const sceneChanged = currentSceneId.current !== next.currentScene.id;
-    currentSceneId.current = next.currentScene.id;
+    const previous = dramaRef.current;
+    const resetTransient = shouldResetTransientPlayback(previous, next);
+    dramaRef.current = next;
     setDrama(next);
-    setSelectedChoiceId(null);
-    if (sceneChanged) setSceneComplete(next.currentScene.branch.state === 'committed');
+    if (resetTransient) {
+      setSelectedChoiceId(null);
+      setSceneComplete(next.currentScene.branch.state === 'committed');
+    }
   }, []);
 
   const load = useCallback(async () => {
@@ -44,7 +48,14 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const sameDramaAlreadyVisible = dramaRef.current?.id === input.dramaId;
+    if (!sameDramaAlreadyVisible) {
+      dramaRef.current = null;
+      setDrama(null);
+      setSelectedChoiceId(null);
+      setSceneComplete(false);
+      setLoading(true);
+    }
     setFailure(null);
     try {
       const next = await client.loadDrama(input.dramaId);
@@ -57,7 +68,7 @@ export function useDramaPlayback(input: { dramaId: string | null; enabled: boole
   }, [adoptDrama, client, input.dramaId]);
 
   const refresh = useCallback(async () => {
-    if (!input.enabled || !input.dramaId) return;
+    if (!input.enabled || !input.dramaId || actionLock.current !== null) return;
     try {
       adoptDrama(await client.loadDrama(input.dramaId));
       setFailure(null);

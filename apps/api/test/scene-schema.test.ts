@@ -32,6 +32,32 @@ describe('scene proposal validation', () => {
     }
   });
 
+  it('rejects continuation summaries and choices that repeat the previous canonical turn', () => {
+    const input = makeGenerationInput();
+    const proposal = makeValidProposal();
+    proposal.summary = `${input.previous!.sceneSummary} Then the same setup continues.`;
+    proposal.choices[0].label = input.previous!.chosenAction;
+
+    const result = parseAndValidateSceneProposal(JSON.stringify(proposal), input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.join(' ')).toContain('materially advance');
+      expect(result.error.join(' ')).toContain('previously committed action');
+    }
+  });
+
+  it('rejects reopening an already active thread with the same semantic title', () => {
+    const input = makeGenerationInput();
+    const proposal = makeValidProposal();
+    proposal.threadChanges.open = [{ title: `  ${input.openThreads[0].title.toUpperCase()}  `, urgency: 90 }];
+
+    const result = parseAndValidateSceneProposal(JSON.stringify(proposal), input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.join(' ')).toContain('already active thread');
+  });
+
   it('rejects relationship mutations that escape canonical bounds', () => {
     const input = makeGenerationInput();
     input.relationships[0].tension = 95;

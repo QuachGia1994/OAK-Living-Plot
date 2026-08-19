@@ -1,5 +1,5 @@
 import type { ChoiceStateDelta, RelationshipDelta, SceneProposal, ThreadProposal } from '../ai/contracts';
-import type { DramaState, FactState, RelationshipState, ThreadState } from '../domain/drama-state';
+import { normalizeDramaStateSemantics, semanticTextKey, type DramaState, type FactState, type RelationshipState, type ThreadState } from '../domain/drama-state';
 
 export type StateApplicationResult =
   | { ok: true; value: DramaState }
@@ -17,8 +17,8 @@ export function applyCommittedChoiceState(
   const sceneThreadResolution = resolveThreads(state.openThreads, scene.threadChanges.resolve);
   if (!sceneThreadResolution.ok) return sceneThreadResolution;
   state.openThreads = sceneThreadResolution.value;
-  state.openThreads.push(...createThreads(`scene:${sceneId}:thread`, scene.threadChanges.open));
-  state.facts.push(...createFacts(`scene:${sceneId}:fact`, scene.establishedFacts));
+  state.openThreads = appendUniqueThreads(state.openThreads, createThreads(`scene:${sceneId}:thread`, scene.threadChanges.open));
+  state.facts = appendUniqueFacts(state.facts, createFacts(`scene:${sceneId}:fact`, scene.establishedFacts));
 
   for (const relationshipDelta of delta.relationships) {
     const result = applyRelationshipDelta(state.relationships, relationshipDelta);
@@ -28,12 +28,12 @@ export function applyCommittedChoiceState(
   const factResolution = resolveFacts(state.facts, delta.factKeysToResolve);
   if (!factResolution.ok) return factResolution;
   state.facts = factResolution.value;
-  state.facts.push(...createFacts(`choice:${choiceId}:fact`, delta.factsToAdd));
+  state.facts = appendUniqueFacts(state.facts, createFacts(`choice:${choiceId}:fact`, delta.factsToAdd));
 
   const threadResolution = resolveThreads(state.openThreads, delta.threadKeysToResolve);
   if (!threadResolution.ok) return threadResolution;
   state.openThreads = threadResolution.value;
-  state.openThreads.push(...createThreads(`choice:${choiceId}:thread`, delta.threadsToOpen));
+  state.openThreads = appendUniqueThreads(state.openThreads, createThreads(`choice:${choiceId}:thread`, delta.threadsToOpen));
   state.tone = delta.nextTone;
 
   const duplicate = findDuplicateStateKey(state);
@@ -42,13 +42,7 @@ export function applyCommittedChoiceState(
 }
 
 function cloneState(state: DramaState): DramaState {
-  return {
-    schemaVersion: 2,
-    relationships: state.relationships.map((item) => ({ ...item })),
-    facts: state.facts.map((item) => ({ ...item })),
-    openThreads: state.openThreads.map((item) => ({ ...item })),
-    tone: state.tone,
-  };
+  return normalizeDramaStateSemantics(state);
 }
 
 function applyRelationshipDelta(
@@ -119,6 +113,26 @@ function createThreads(prefix: string, threads: ThreadProposal[]): ThreadState[]
     title: thread.title,
     urgency: thread.urgency,
   }));
+}
+
+function appendUniqueFacts(current: FactState[], incoming: FactState[]): FactState[] {
+  return appendUniqueByText(current, incoming, (item) => item.text);
+}
+
+function appendUniqueThreads(current: ThreadState[], incoming: ThreadState[]): ThreadState[] {
+  return appendUniqueByText(current, incoming, (item) => item.title);
+}
+
+function appendUniqueByText<T>(current: T[], incoming: T[], textOf: (value: T) => string): T[] {
+  const seen = new Set(current.map((item) => semanticTextKey(textOf(item))));
+  const result = [...current];
+  for (const item of incoming) {
+    const key = semanticTextKey(textOf(item));
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
 }
 
 function findDuplicateStateKey(state: DramaState): string | null {

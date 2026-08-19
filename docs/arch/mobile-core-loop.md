@@ -23,7 +23,7 @@ Client-generated request keys survive uncertain network failures:
 - next-Scene generation keeps the same generation key per Drama until canonical success or a definite invalid request;
 - stale/choice-conflict responses reload the canonical Drama rather than inventing a local winner.
 
-This composes with server idempotency so a lost HTTP response does not imply a second provider Scene generation. Read-only HTTP keeps the bounded 12-second transport budget; idempotent Scene-generation mutations use a 30-second request budget because provider inference is materially slower while their stable generation keys prevent duplicate canonical work on manual retry.
+This composes with server idempotency so a lost HTTP response does not imply a second provider Scene generation. Read-only HTTP keeps the bounded 12-second transport budget; idempotent Scene-generation mutations use a 30-second request budget because provider inference is materially slower while their stable generation keys prevent duplicate canonical work on manual retry. Foreground/same-Drama refreshes adopt canonical data without clearing the current read/selection state unless the Scene ID or branch state actually changes; refresh is also skipped while a commit/continue mutation owns the action lock.
 
 ## Scene and consequence UX
 All three choices render together. A tap selects locally; only a successful server commit changes the screen to committed state. The consequence appears before the next-Scene action.

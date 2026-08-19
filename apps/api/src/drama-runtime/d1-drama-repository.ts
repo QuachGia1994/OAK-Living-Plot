@@ -1,5 +1,5 @@
 import { isDramaMood, type Choice, type CharacterIdentity, type Drama, type Scene } from '../domain/drama';
-import { createInitialDramaState, parseDramaState } from '../domain/drama-state';
+import { createInitialDramaState, normalizeDramaStateSemantics, parseDramaState } from '../domain/drama-state';
 import type { RetentionActivityDay } from '../retention/retention';
 import type {
   CreatedDramaRecord,
@@ -182,7 +182,7 @@ export class D1DramaRepository {
     if (!plot || plot.status !== 'active') return null;
     const characters = await this.loadCharacters(plot.id);
     if (characters.length === 0) return null;
-    const state = parseDramaState(plot.state_json);
+    const state = normalizeDramaStateSemantics(parseDramaState(plot.state_json));
     const previous = await this.loadPrevious(plot.id);
     return {
       dramaId: plot.id,

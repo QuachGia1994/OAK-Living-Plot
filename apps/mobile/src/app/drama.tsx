@@ -172,7 +172,7 @@ export default function DramaScreen() {
           </MotionReveal>
         ) : null}
 
-        <SceneVoiceCard key={scene.id} sceneId={scene.id} />
+        <SceneVoiceCard key={scene.id} sceneId={scene.id} sceneText={scene.script} />
 
         <View style={styles.dramaUtilityRail}>
           <View style={styles.dramaUtilityCopy}>

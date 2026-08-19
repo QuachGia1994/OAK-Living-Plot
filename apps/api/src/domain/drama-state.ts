@@ -51,6 +51,16 @@ export function createInitialDramaState(): DramaState {
   };
 }
 
+export function normalizeDramaStateSemantics(state: DramaState): DramaState {
+  return {
+    schemaVersion: 2,
+    relationships: state.relationships.map((item) => ({ ...item })),
+    facts: dedupeSemantic(state.facts, (item) => item.text),
+    openThreads: dedupeSemantic(state.openThreads, (item) => item.title),
+    tone: state.tone,
+  };
+}
+
 export function requireThreeChoices<T extends Pick<SceneChoiceContract, 'position' | 'label'>>(
   choices: readonly T[],
 ): readonly [T, T, T] {
@@ -172,4 +182,20 @@ function requireInteger(value: unknown, min: number, max: number, message: strin
 
 function ensureUnique(values: string[], message: string): void {
   if (new Set(values).size !== values.length) throw new DomainInvariantError(message);
+}
+
+function dedupeSemantic<T extends object>(items: T[], textOf: (value: T) => string): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const item of items) {
+    const key = semanticTextKey(textOf(item));
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push({ ...item });
+  }
+  return result;
+}
+
+export function semanticTextKey(value: string): string {
+  return value.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/gu, ' ');
 }
