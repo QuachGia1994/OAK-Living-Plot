@@ -15,7 +15,7 @@ import {
   type GenerationTelemetrySink,
 } from '../telemetry/contracts';
 
-export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
+export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 export class WorkersAiSceneGenerator implements SceneGenerator {
   constructor(
@@ -106,8 +106,8 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
           type: 'json_schema',
           json_schema: sceneResponseSchema,
         },
-        max_tokens: 2400,
-        temperature: 0.5,
+        max_tokens: 4096,
+        temperature: 0.35,
       });
     } catch {
       return {

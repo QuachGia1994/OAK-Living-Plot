@@ -6,7 +6,7 @@
 
 Application code generates one drama scene through `SceneGenerator` in `apps/api/src/ai/contracts.ts`. Its input/output are `SceneGenerationInput` and `SceneProposal`; neither contains provider-native response types.
 
-Development uses `WorkersAiSceneGenerator` as the primary adapter when the Worker `AI` binding exists (`@cf/meta/llama-3.1-8b-instruct-fast`). The Workers AI binding receives `response_format.type = json_schema` with the Living Plot JSON Schema directly in `json_schema`, matching Workers AI JSON Mode rather than wrapping it in provider-specific metadata. When a Gemini API key is also configured, `FailoverSceneGenerator` invokes Gemini 3.6 Flash with low thinking and a wider provider timeout only after the primary ends in `invalid_response` or `provider_unavailable`; invalid canonical input never fans out. Environments without the `AI` binding keep the default Gemini adapter. Both adapters share the same structural parser and narrative publication decision, so failover changes provider reliability without weakening canonical validation or changing `DramaService`, D1 state, mobile contracts, or playback state.
+Development uses `WorkersAiSceneGenerator` whenever the Worker `AI` binding exists, using `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. The Workers AI binding receives `response_format.type = json_schema` with the Living Plot JSON Schema directly in `json_schema`, a 4096-token output ceiling, and a lower 0.35 temperature. A live remote-binding smoke test with the real Living Plot schema/prompt produced a publication-valid 143-word Scene in about 21 seconds; the previous 8B adapter repeatedly truncated or violated the full contract. Environments without the `AI` binding keep the Gemini adapter. A configured Gemini key is not used as failover when Workers AI exists because the deployed Worker region currently receives a Gemini HTTP 400 location restriction; routing a deterministic Workers AI validation failure into that endpoint only changed the user-visible error to `provider_unavailable`. Both provider adapters retain the same structural parser and narrative publication decision.
 
 ## Canonical input
 
@@ -52,7 +52,7 @@ Offline `evaluateNarrative().passed` (average ≥80 and every dimension ≥60) i
 
 Invalid local input stops before provider use and is never forwarded to another provider. Inside each adapter, a successful provider response that fails structural validation or the shared publication gate receives exactly one controlled regeneration with validation feedback.
 
-When development has both Workers AI and Gemini configured, exhaustion of the Workers AI adapter (`invalid_response`) or a Workers AI provider failure triggers one provider-level failover to Gemini 3.6 Flash, which independently applies the same parse/retry/publication gate. The fallback has a 25-second provider timeout; mobile AI mutations allow 60 seconds end-to-end so a legitimate fallback is not cancelled by the client first. Only after the configured provider chain fails does HTTP/mobile receive `invalid_generation` or `provider_unavailable`. Privacy-safe logs record only failover stage/error code/status/retryability, never story text or user identifiers. Generation-key protection and publication idempotency remain unchanged.
+With a Workers AI binding present, the adapter owns the complete two-attempt structured-generation cycle. A first structural/publication rejection receives one controlled retry with validation feedback. Provider failure returns `provider_unavailable`; two rejected structured proposals return `invalid_generation` through the HTTP boundary. The client allows 60 seconds end-to-end, which covers the observed ~21-second 70B generation while preserving generation-key idempotency. Gemini remains available only for environments where Workers AI is absent; it is deliberately not a development failover while the Worker execution location is rejected by the Gemini API.
 
 ## Persistence boundary
 
@@ -61,5 +61,5 @@ Adapters have no D1 authority. Only a publication-accepted `SceneProposal` reach
 ## Verification
 
 - `test/scene-prompt.test.ts`, `test/scene-schema.test.ts`
-- `test/gemini-scene-generator.test.ts`, `test/workers-ai-scene-generator.test.ts`
+- `test/gemini-scene-generator.test.ts`, `test/workers-ai-scene-generator.test.ts`, `test/scene-generator-factory.test.ts`
 - `test/narrative-novelty.test.ts`, `test/narrative-quality.test.ts`, `test/narrative-evals.test.ts`

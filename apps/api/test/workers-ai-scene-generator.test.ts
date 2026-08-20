@@ -23,11 +23,11 @@ describe('WorkersAiSceneGenerator', () => {
     });
     expect(run).toHaveBeenCalledTimes(1);
     const [model, request] = run.mock.calls[0] as [string, Record<string, unknown>];
-    expect(model).toBe('@cf/meta/llama-3.1-8b-instruct-fast');
+    expect(model).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
     expect(request).toMatchObject({
       response_format: { type: 'json_schema' },
-      max_tokens: 2400,
-      temperature: 0.5,
+      max_tokens: 4096,
+      temperature: 0.35,
     });
     const responseFormat = request.response_format as { json_schema: Record<string, unknown> };
     expect(responseFormat.json_schema.type).toBe('object');

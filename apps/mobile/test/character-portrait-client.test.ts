@@ -29,6 +29,25 @@ describe('HttpCharacterPortraitClient', () => {
     ]);
   });
 
+  it('reconciles a transport failure against server status so a completed portrait is not reported as failed', async () => {
+    const requests: string[] = [];
+    const client = new HttpCharacterPortraitClient('https://api.test', async () => 'token', async (input, init) => {
+      const url = String(input);
+      requests.push(`${init?.method}:${url}`);
+      if (init?.method === 'POST' && url.endsWith('/portrait')) throw new Error('socket closed after provider finished');
+      if (init?.method === 'GET' && url.endsWith('/portrait/status')) {
+        return new Response(JSON.stringify({ portrait }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      throw new Error('Unexpected request');
+    });
+
+    expect(await client.generate('plot-1')).toEqual(portrait);
+    expect(requests).toEqual([
+      'POST:https://api.test/v1/dramas/plot-1/portrait',
+      'GET:https://api.test/v1/dramas/plot-1/portrait/status',
+    ]);
+  });
+
   it('refreshes the bearer token once when private portrait delivery returns unauthorized', async () => {
     let token = 0;
     let mediaCalls = 0;

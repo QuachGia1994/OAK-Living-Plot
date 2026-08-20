@@ -27,6 +27,8 @@ export class CharacterPortraitClientError extends Error {
   }
 }
 
+const PORTRAIT_GENERATION_TIMEOUT_MS = 90_000;
+
 export class HttpCharacterPortraitClient implements CharacterPortraitClient {
   readonly configured = true;
   private readonly transport: AuthenticatedJsonTransport;
@@ -40,7 +42,19 @@ export class HttpCharacterPortraitClient implements CharacterPortraitClient {
   }
 
   async generate(dramaId: string): Promise<PortraitSnapshot> {
-    return this.parse(await this.request(`/v1/dramas/${encodeURIComponent(dramaId)}/portrait`, 'POST', undefined, 30_000));
+    try {
+      return this.parse(await this.request(
+        `/v1/dramas/${encodeURIComponent(dramaId)}/portrait`,
+        'POST',
+        undefined,
+        PORTRAIT_GENERATION_TIMEOUT_MS,
+      ));
+    } catch (error) {
+      if (!(error instanceof CharacterPortraitClientError) || error.code !== 'backend_unavailable') throw error;
+      const reconciled = await this.status(dramaId).catch(() => null);
+      if (reconciled?.status === 'ready' && reconciled.current) return reconciled;
+      throw error;
+    }
   }
 
   source(dramaId: string): Promise<{ uri: string }> {
