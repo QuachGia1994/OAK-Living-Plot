@@ -1,6 +1,6 @@
 # Living Plot concept-gap audit
 
-> updated 2026-08-19 · current product decisions
+> updated 2026-08-20 · current product decisions
 
 ## Purpose
 The supplied Living Plot mirror is a product-direction reference, not an implementation specification. The current app keeps the dark cinematic/editorial identity, native tab ownership, canonical Drama/Scene/Branch state, account privacy, and server-owned quota/entitlement boundaries. Features are adopted only when they strengthen the core loop: create → read → choose → consequence → continue → return.
@@ -16,8 +16,8 @@ The static Mina artwork remains the zero-latency fallback. An owner-scoped deriv
 ### Growth loop with a real reward boundary
 Every signed-in account receives a random referral code. A referred account may claim one code. The inviter receives 50 persistent cloud-narration bonus credits only when the referred internal account is later verified as Plus through the canonical RevenueCat webhook path. Sharing, clicking, installing, or signing up alone never grants credits. Bonus credits are used only after the normal daily voice allowance is exhausted and use reserve/consume/release idempotency.
 
-### More room to explore branching
-Free now permits 50 generated Scenes per UTC day. Plus is raised to 100 generated Scenes/day so the paid tier remains strictly superior, while fresh cloud narration remains Free 1/day and Plus 10/day. This is an application quota; provider/account capacity is a separate operational limit.
+### Unlimited branching text
+Generated Scenes are unlimited on both Free and Plus so a committed branch can always continue without a daily text-quota dead end. Plus differentiation remains fresh cloud narration at 10/day versus 1/day on Free, plus referral voice rewards. Scene quota policy and provider/account capacity remain separate operational concerns.
 
 ### Existing concept parity retained
 The current product already covers the mirror's core surfaces in a different visual system: Library/Home, Create, character-led Scene, three choices, consequence, continue, History branch map, narration, Plus, Settings, privacy/export/delete, email OTP, persistent bottom navigation, and resume.

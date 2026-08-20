@@ -1,17 +1,17 @@
 # Quota ledger and UTC enforcement
 
-> updated 2026-08-19 · current server contract
+> updated 2026-08-20 · current server contract
 
 ## Policy
-Current limits remain server-owned:
+Current policy remains server-owned:
 
-- Free: 50 generated Scenes per UTC day, 1 fresh cloud narration per UTC day.
-- Plus: 100 generated Scenes per UTC day, 10 fresh cloud narrations per UTC day.
-- Successful referral rewards may add persistent voice bonus credits; these are not a daily tier and do not raise text quota.
-- Store/production runtime keeps those limits enforced.
-- The isolated development preview runtime uses server-owned `QUOTA_MODE=preview_unlimited`: requests still pass through the same D1 reservation/consume/release ledger for observability and idempotency, but the daily limit guard does not reject Scene or fresh-voice work while the product is being tested.
+- Generated Scenes are unlimited for both Free and Plus. Every Scene still passes through the D1 reservation/consume/release ledger for observability, idempotency, and retry reconciliation, but text usage never gates generation.
+- Fresh cloud narration remains limited to 1 per UTC day on Free and 10 per UTC day on Plus.
+- Successful referral rewards may add persistent voice bonus credits; these are not a daily tier.
+- Store/production runtime enforces fresh-voice limits only.
+- The isolated development preview runtime uses server-owned `QUOTA_MODE=preview_unlimited`, which additionally disables fresh-voice rejection while product flows are being tested.
 
-`preview_unlimited` is an environment/runtime policy, not an entitlement tier and not a client flag. Missing, unknown, or production values fail closed to `enforced`, so a Store client cannot unlock preview access. The trusted tier still comes from backend entitlement state; clients cannot select their own quota tier. D1 stores historical resource strings `text_episode` and `voice_episode`; those are persistence vocabulary for generated-scene and fresh-voice usage.
+`preview_unlimited` is an environment/runtime policy, not an entitlement tier and not a client flag. Missing, unknown, or production values fail closed to voice enforcement, while Scene generation remains unlimited in every mode. The trusted tier still comes from backend entitlement state; clients cannot select their own quota tier. D1 stores historical resource strings `text_episode` and `voice_episode`; those are persistence vocabulary for generated-scene and fresh-voice usage. The numeric text limit fields retained in Home responses are backward-compatible legacy display fields only and are explicitly paired with `textEnforced=false`.
 
 ## Why reservation exists
 Quota is claimed before an external scene/TTS provider call. `D1QuotaLedger.reserve()` atomically owns one in-flight slot. The caller then makes one transition for that attempt:
@@ -32,7 +32,7 @@ Every transition still has a unique event ID and is written only by the transiti
 One materialized lifecycle row per `(user_id, reservation_key)`. Status is `reserved`, `consumed`, or `released`. A released row can move back to `reserved` for an explicit retry. When it is re-armed, its `utc_day` moves to the current server UTC day so a retry never consumes yesterday's allowance.
 
 ### `daily_usage`
-Materialized enforcement counters for consumed and in-flight text/voice work. Effective usage is `consumed + reserved`; a new or re-armed reservation succeeds only while that current UTC-day total is below the trusted tier limit.
+Materialized counters for consumed and in-flight text/voice work. Text counters are observational and never block Scene generation. Voice effective usage is `consumed + reserved`; a new or re-armed voice reservation succeeds only while that current UTC-day total is below the trusted tier limit in an enforcing runtime.
 
 ## UTC rule
 Server time is authoritative. Client timestamps are not accepted.
@@ -47,7 +47,7 @@ The append-only ledger therefore preserves both cycles:
 
 Initial reserve and released-reservation re-arm both use guarded D1 batches:
 1. ensure the current daily counter row exists;
-2. materialize the reservation transition only when current effective usage is below the limit;
+2. materialize the reservation transition, applying a current-effective-usage limit only when that resource is enforced;
 3. append a uniquely identified transition event only for the winning `last_event_id`;
 4. adjust exactly the matching current-day counter.
 
@@ -73,4 +73,4 @@ Because retries append new events, the arithmetic remains valid for same-day and
 
 ## Integration boundary
 
-`DramaService` reserves before `SceneGenerator`; provider failure releases the reservation. Retrying the same generation key re-arms that reservation. `D1AudioService` uses `D1VoiceQuota`: it first reserves from the normal daily voice ledger, then falls back to a persistent referral bonus credit only when daily voice quota is exhausted. Referral bonus reservations have the same reserve/release/consume lifecycle so queue/provider failures refund the bonus credit and successful private audio consumes exactly one. Neither UI nor provider adapter mutates quota counters directly.
+`DramaService` reserves before `SceneGenerator`; the text reservation is unlimited but remains ledgered, and provider failure releases it. Retrying the same generation key re-arms that reservation. `D1AudioService` uses `D1VoiceQuota`: it first reserves from the normal daily voice ledger, then falls back to a persistent referral bonus credit only when daily voice quota is exhausted. Referral bonus reservations have the same reserve/release/consume lifecycle so queue/provider failures refund the bonus credit and successful private audio consumes exactly one. Neither UI nor provider adapter mutates quota counters directly.

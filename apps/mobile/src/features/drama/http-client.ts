@@ -216,9 +216,11 @@ function parseHome(value: Record<string, unknown>, nowMs: number, uiLocale: UiLo
   const quota = value.quota;
   const voiceBonusCredits = quota.voiceBonusCredits === undefined ? 0 : quota.voiceBonusCredits;
   const enforced = quota.enforced === undefined ? true : quota.enforced;
+  const textEnforced = quota.textEnforced === undefined ? enforced : quota.textEnforced;
+  const voiceEnforced = quota.voiceEnforced === undefined ? enforced : quota.voiceEnforced;
   if (
     ![quota.textRemaining, quota.textLimit, quota.voiceRemaining, quota.voiceLimit, voiceBonusCredits].every(Number.isInteger) ||
-    typeof quota.resetAt !== 'string' || typeof enforced !== 'boolean'
+    typeof quota.resetAt !== 'string' || typeof enforced !== 'boolean' || typeof textEnforced !== 'boolean' || typeof voiceEnforced !== 'boolean'
   ) {
     throw invalidBackendResponse();
   }
@@ -226,6 +228,8 @@ function parseHome(value: Record<string, unknown>, nowMs: number, uiLocale: UiLo
     recentDramas: value.recentDramas.map((drama) => parseDramaSummary(drama, nowMs, uiLocale)),
     quota: {
       enforced,
+      textEnforced,
+      voiceEnforced,
       textRemaining: Number(quota.textRemaining),
       textLimit: Number(quota.textLimit),
       voiceRemaining: Number(quota.voiceRemaining),

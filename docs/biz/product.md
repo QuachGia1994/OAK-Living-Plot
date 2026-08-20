@@ -19,11 +19,11 @@ Phase 2 deepens consequence realization, critical-thread payoff vs explosion, pa
 `returnPull` is a narrative proxy only. Actual retention remains behavioral telemetry (return/continue rates), not a publication score.
 
 ## Monetization baseline
-- Free: 50 generated Scenes/day and 1 fresh cloud narration/day.
-- Plus hypothesis: $8.99/month local-equivalent where practical, 100 generated Scenes/day and 10 fresh cloud narrations/day.
+- Free: unlimited generated Scenes and 1 fresh cloud narration/day.
+- Plus hypothesis: $8.99/month local-equivalent where practical, unlimited generated Scenes and 10 fresh cloud narrations/day.
 - Referral growth loop: one inviter code per account; after a referred account is verified as Plus, the inviter receives 50 persistent cloud-narration bonus credits. Sharing/sign-up alone does not grant the reward.
 - Existing generated narration can replay without another fresh-voice charge.
-- No unlimited AI promise.
+- Unlimited applies to the application Scene quota; provider availability, abuse controls, and operational capacity remain separate boundaries.
 
 ## Current differentiation
 - Choice consequences must visibly alter later Scenes.

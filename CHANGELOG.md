@@ -8,13 +8,13 @@ All notable changes to Living Plot will be documented in this file.
 - Phase 2 narrative quality: consequenceRealization, threadPayoff, pacingRole rhythm, branchCommitment, relationshipProgression, protagonistAgency, arcCoherence, returnPull proxy; shared provider-neutral `validateNarrativePublication` gate for Gemini and Workers AI; required beat/pacingRole on new Scene proposals; material-delta SSoT; long-horizon synthetic fixtures; no new schema migration; no mandatory LLM judge.
 
 ### Fixed
-- Development preview now disables daily Scene/fresh-voice quota rejection only through the server-owned Worker environment while preserving the same D1 ledger and fail-closed Store enforcement; Home also accepts older additive quota projections so missing preview/bonus display fields no longer collapse the entire recent-Drama screen.
+- Scene generation no longer fails after a daily text threshold; generated Scenes remain fully ledgered for idempotency/reconciliation, while fresh-voice limits stay server-enforced outside the development preview. Home exposes resource-specific enforcement so mobile can show unlimited Scenes without misreporting voice quota.
 - Publication authority no longer rejects on eval-only dimensions; CRITICAL_THREAD_STALLED is eval-only (not per-thread age); Workers AI now runs the same narrative publication gate as Gemini.
 
 ### Changed
 - Phase 1 long-run narrative novelty: trajectory diversity, structural beat rotation (`BEAT_COOLDOWN_SCENES`), long-range motif signatures, evaluator dimensions, and Gemini publication reject/retry gate without Vector DB.
 - Raised owner-data export to schema v3 so referral/bonus-credit state and privacy-safe portrait metadata travel with account export while internal IDs, reward events, reservation keys, portrait fingerprints, private R2 keys, and generated media bytes remain excluded.
-- Raised server-owned daily Scene generation limits to Free 50 / Plus 100 while keeping fresh cloud narration at Free 1 / Plus 10; referral voice credits are persistent bonus inventory rather than a client-selected tier.
+- Made generated Scenes unlimited for Free and Plus while keeping fresh cloud narration at Free 1 / Plus 10; referral voice credits remain persistent bonus inventory rather than a client-selected tier.
 - Strengthened continuation novelty with a bounded 12-Scene history blocklist plus deterministic rejection of materially recycled titles, summaries, branch labels, choice intents, and consequences; A/B/C actions, intents, and consequences must also be materially distinct inside each Scene before canonical publication.
 - Switched the Worker Clerk boundary to direct networkless `verifyToken()` validation with the configured JWT public key and authorized parties; the backend no longer requires a Clerk publishable key while mobile keeps its public Expo key.
 - Migrated live Beta RC narration from Google Cloud Text-to-Speech service-account auth to server-side Gemini TTS using the existing `GEMINI_API_KEY`, preserving provider-neutral Queue/R2/media ownership and private MP3 delivery without a Google Cloud billing dependency.

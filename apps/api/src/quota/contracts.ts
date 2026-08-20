@@ -3,7 +3,7 @@ export type QuotaResource = 'text_episode' | 'voice_episode';
 export type QuotaReservationStatus = 'reserved' | 'released' | 'consumed';
 
 export interface QuotaPolicy {
-  textEpisodesPerUtcDay: number;
+  legacyTextDisplayLimit: number;
   voiceEpisodesPerUtcDay: number;
 }
 

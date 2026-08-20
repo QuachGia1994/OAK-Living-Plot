@@ -9,7 +9,7 @@ import type {
   QuotaResource,
   QuotaResult,
 } from './contracts';
-import { quotaIsEnforced, quotaLimitFor, type QuotaMode } from './policy';
+import { quotaLimitFor, quotaResourceIsEnforced, type QuotaMode } from './policy';
 
 type Clock = () => number;
 
@@ -92,8 +92,8 @@ export class D1QuotaLedger {
       return { ok: true, value: await this.snapshot(reservation, reservation.id !== reservationId) };
     }
 
-    if (!quotaIsEnforced(this.quotaMode)) {
-      return { ok: false, error: { code: 'persistence_error', message: 'Preview quota reservation did not materialize.' } };
+    if (!quotaResourceIsEnforced(this.quotaMode, input.resourceType)) {
+      return { ok: false, error: { code: 'persistence_error', message: 'Unlimited quota reservation did not materialize.' } };
     }
     return {
       ok: false,
@@ -232,7 +232,8 @@ export class D1QuotaLedger {
     const usageExpression = input.resourceType === 'text_episode'
       ? 'du.text_episodes + du.text_reserved'
       : 'du.voiced_episodes + du.voice_reserved';
-    const quotaGuard = quotaIsEnforced(this.quotaMode) ? ` AND ${usageExpression} < ?` : '';
+    const enforced = quotaResourceIsEnforced(this.quotaMode, input.resourceType);
+    const quotaGuard = enforced ? ` AND ${usageExpression} < ?` : '';
     const statement = this.db.prepare(
       `INSERT INTO quota_reservations
          (id, user_id, reservation_key, utc_day, resource_type, status, last_event_id, created_at, updated_at)
@@ -255,7 +256,7 @@ export class D1QuotaLedger {
       input.userId,
       utcDay,
     ];
-    return quotaIsEnforced(this.quotaMode)
+    return enforced
       ? statement.bind(...baseBindings, limit, input.userId, input.reservationKey)
       : statement.bind(...baseBindings, input.userId, input.reservationKey);
   }
@@ -323,7 +324,8 @@ export class D1QuotaLedger {
       ? 'text_episodes + text_reserved'
       : 'voiced_episodes + voice_reserved';
     const counterColumn = input.resourceType === 'text_episode' ? 'text_reserved' : 'voice_reserved';
-    const quotaGuard = quotaIsEnforced(this.quotaMode) ? ` AND ${usageExpression} < ?` : '';
+    const enforced = quotaResourceIsEnforced(this.quotaMode, input.resourceType);
+    const quotaGuard = enforced ? ` AND ${usageExpression} < ?` : '';
     const reactivateStatement = this.db.prepare(
       `UPDATE quota_reservations
        SET status = 'reserved', utc_day = ?, resource_id = NULL, last_event_id = ?, updated_at = ?
@@ -333,7 +335,7 @@ export class D1QuotaLedger {
            WHERE user_id = ? AND usage_date = ?${quotaGuard}
          )`,
     );
-    const boundReactivate = quotaIsEnforced(this.quotaMode)
+    const boundReactivate = enforced
       ? reactivateStatement.bind(utcDay, eventId, now, existing.id, input.userId, utcDay, limit)
       : reactivateStatement.bind(utcDay, eventId, now, existing.id, input.userId, utcDay);
 
@@ -370,8 +372,8 @@ export class D1QuotaLedger {
 
     const current = await this.loadReservation(input.userId, input.reservationKey);
     if (current?.status === 'reserved') return { ok: true, value: await this.snapshot(current, current.last_event_id !== eventId) };
-    if (!quotaIsEnforced(this.quotaMode)) {
-      return { ok: false, error: { code: 'persistence_error', message: 'Preview quota retry reservation did not materialize.' } };
+    if (!enforced) {
+      return { ok: false, error: { code: 'persistence_error', message: 'Unlimited quota retry reservation did not materialize.' } };
     }
     return {
       ok: false,

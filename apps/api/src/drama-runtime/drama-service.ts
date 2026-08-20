@@ -9,7 +9,7 @@ import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences'
 import { isDramaLocale } from '../preferences/contracts';
 import { D1QuotaLedger } from '../quota/d1-quota-ledger';
 import type { QuotaError } from '../quota/contracts';
-import { quotaIsEnforced, quotaPolicyFor, type QuotaMode } from '../quota/policy';
+import { quotaPolicyFor, quotaResourceIsEnforced, type QuotaMode } from '../quota/policy';
 import { buildRetentionSnapshot } from '../retention/retention';
 import { D1VoiceBonusLedger } from '../referrals/d1-voice-bonus-ledger';
 import type { ProductEventTelemetry, ProductTelemetrySink } from '../telemetry/product-events';
@@ -69,9 +69,11 @@ export class DramaService {
       value: {
         recentDramas,
         quota: {
-          enforced: quotaIsEnforced(this.quotaMode),
-          textRemaining: remaining(policy.textEpisodesPerUtcDay, usage.textConsumed, usage.textReserved),
-          textLimit: policy.textEpisodesPerUtcDay,
+          enforced: quotaResourceIsEnforced(this.quotaMode, 'voice_episode'),
+          textEnforced: quotaResourceIsEnforced(this.quotaMode, 'text_episode'),
+          voiceEnforced: quotaResourceIsEnforced(this.quotaMode, 'voice_episode'),
+          textRemaining: remaining(policy.legacyTextDisplayLimit, usage.textConsumed, usage.textReserved),
+          textLimit: policy.legacyTextDisplayLimit,
           voiceRemaining: remaining(policy.voiceEpisodesPerUtcDay, usage.voiceConsumed, usage.voiceReserved),
           voiceLimit: policy.voiceEpisodesPerUtcDay,
           voiceBonusCredits,

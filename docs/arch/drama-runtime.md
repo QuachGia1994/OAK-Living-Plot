@@ -1,6 +1,6 @@
 # Canonical drama runtime ownership
 
-> updated 2026-08-19 · current application contract
+> updated 2026-08-20 · current application contract
 
 Living Plot has one product vocabulary above persistence: **Drama → Scene → Choice → Branch → next Scene**. The existing D1 schema still stores historical table/column names such as `plots`, `episodes`, `plot_id`, `episode_id`, and `story_locale`. Those names are storage details and must not be projected into new mobile or HTTP contracts.
 
@@ -67,7 +67,7 @@ Mobile `GenerationJob` represents user-visible generation state. Server mutation
 
 - initial drama creation reuses the caller creation key and a stable generation key;
 - continuation reuses its generation key after a lost response;
-- provider failure releases the reservation; retrying the same logical generation key re-arms that released reservation against the current UTC-day quota instead of creating duplicate work;
+- provider failure releases the reservation; retrying the same logical generation key re-arms that released reservation without creating duplicate work, and Scene reservations never block on a daily text limit;
 - a published-but-response-lost mutation converges on persisted state rather than generating a second canonical scene;
 - HTTP `201 Created` reflects the first successfully published canonical Drama, not the earlier insertion of an internal D1 `plots` row.
 
@@ -114,7 +114,7 @@ Changing UI language may choose matching defaults for a new drama/narrator, but 
 
 - auth failure: HTTP auth boundary; no canonical mutation.
 - invalid input: setup/HTTP validation; provider not called.
-- provider unavailable: `SceneGenerator` normalized failure; reserved generation quota released.
+- provider unavailable: `SceneGenerator` normalized failure; reserved generation ledger entry released.
 - invalid provider proposal after controlled retry: `invalid_generation`; no publication.
 - stale/conflicting branch: choice/version boundary; mobile reloads canonical drama.
 - media queue/provider failure: explicit `MediaAsset.failed` plus failure code; narrative scene remains readable.

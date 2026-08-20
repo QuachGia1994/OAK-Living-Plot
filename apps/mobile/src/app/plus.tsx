@@ -119,7 +119,7 @@ export default function PlusScreen() {
       <DramaUtilityHero
         kicker="LIVING PLOT PLUS"
         title={t('Stay for the next scene.', 'Ở lại cho cảnh tiếp theo.')}
-        detail={t('More daily scenes and fresh narration when the cliffhanger should not end here.', 'Thêm cảnh và giọng đọc mới mỗi ngày khi cao trào chưa nên dừng lại.')}
+        detail={t('Scenes stay unlimited. Plus gives you more fresh narration when the cliffhanger should not end here.', 'Cảnh luôn không giới hạn. Plus cho thêm giọng đọc mới khi cao trào chưa nên dừng lại.')}
         mood="romantic"
         characterName="Plus"
         artworkSource={require('../../assets/living-plot-scene-mina-3d.jpg')}
@@ -137,7 +137,7 @@ export default function PlusScreen() {
         </View>
 
         <View style={styles.metricGrid}>
-          <PlanMetric locale={locale} label={t('Drama scenes', 'Cảnh drama')} free="50" plus="100" />
+          <PlanMetric locale={locale} label={t('Drama scenes', 'Cảnh drama')} free="∞" plus="∞" />
           <PlanMetric locale={locale} label={t('Fresh narration', 'Giọng đọc mới')} free="1" plus="10" />
         </View>
 
@@ -149,10 +149,6 @@ export default function PlusScreen() {
 
       <View style={styles.benefits}>
         <Eyebrow>{t('WHY PLUS', 'VÌ SAO NÂNG CẤP PLUS')}</Eyebrow>
-        <BenefitRow
-          title={t('More room for branching stories', 'Nhiều không gian hơn cho cốt truyện phân nhánh')}
-          detail={t('Free includes 50 generated scenes per day; Plus raises that to 100.', 'Gói Miễn phí có 50 cảnh tạo mỗi ngày; Plus tăng lên 100 cảnh.')}
-        />
         <BenefitRow
           title={t('More fresh narration', 'Nhiều giọng kể mới hơn')}
           detail={t('Create up to 10 fresh narrations per day instead of 1 on Free.', 'Tạo tối đa 10 giọng đọc mới mỗi ngày thay vì 1 ở gói Miễn phí.')}

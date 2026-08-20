@@ -7,7 +7,7 @@ import migrationFour from '../migrations/0004_quota_ledger.sql?raw';
 import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?raw';
 import type { AppEnv } from '../src/env';
 import { D1QuotaLedger } from '../src/quota/d1-quota-ledger';
-import { quotaModeFromEnv, quotaPolicyFor } from '../src/quota/policy';
+import { quotaModeFromEnv, quotaPolicyFor, quotaResourceIsEnforced } from '../src/quota/policy';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
 
 const db = (env as unknown as AppEnv).DB;
@@ -28,9 +28,16 @@ beforeEach(async () => {
 });
 
 describe('quota policy', () => {
-  it('locks the current Free and Plus limits', () => {
-    expect(quotaPolicyFor('free')).toEqual({ textEpisodesPerUtcDay: 50, voiceEpisodesPerUtcDay: 1 });
-    expect(quotaPolicyFor('plus')).toEqual({ textEpisodesPerUtcDay: 100, voiceEpisodesPerUtcDay: 10 });
+  it('keeps legacy text display thresholds and current voice limits stable', () => {
+    expect(quotaPolicyFor('free')).toEqual({ legacyTextDisplayLimit: 50, voiceEpisodesPerUtcDay: 1 });
+    expect(quotaPolicyFor('plus')).toEqual({ legacyTextDisplayLimit: 100, voiceEpisodesPerUtcDay: 10 });
+  });
+
+  it('never enforces text Scene quota while preserving environment-owned voice enforcement', () => {
+    expect(quotaResourceIsEnforced('enforced', 'text_episode')).toBe(false);
+    expect(quotaResourceIsEnforced('preview_unlimited', 'text_episode')).toBe(false);
+    expect(quotaResourceIsEnforced('enforced', 'voice_episode')).toBe(true);
+    expect(quotaResourceIsEnforced('preview_unlimited', 'voice_episode')).toBe(false);
   });
 
   it('fails closed to enforced quota unless the server explicitly selects preview unlimited', () => {
@@ -41,7 +48,7 @@ describe('quota policy', () => {
 });
 
 describe('D1QuotaLedger', () => {
-  it('atomically caps concurrent Free text reservations at fifty', async () => {
+  it('keeps concurrent Free text reservations unlimited beyond the former fifty-scene threshold', async () => {
     await db.prepare(`INSERT INTO daily_usage (user_id, usage_date, text_episodes, text_reserved) VALUES ('user-1', '2026-08-16', 49, 0)`).run();
     const ledger = quotaLedger();
     const results = await Promise.all([
@@ -49,12 +56,11 @@ describe('D1QuotaLedger', () => {
       ledger.reserve({ userId: 'user-1', reservationKey: 'free-boundary-right', resourceType: 'text_episode', tier: 'free' }),
     ]);
 
-    expect(results.filter((result) => result.ok)).toHaveLength(1);
-    expect(results.filter((result) => !result.ok && result.error.code === 'quota_exceeded')).toHaveLength(1);
-    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textReserved: 1, textConsumed: 49 });
+    expect(results.filter((result) => result.ok)).toHaveLength(2);
+    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textReserved: 2, textConsumed: 49 });
   });
 
-  it('enforces the Plus text limit at one hundred under contention', async () => {
+  it('keeps concurrent Plus text reservations unlimited beyond the former hundred-scene threshold', async () => {
     await db.prepare(`INSERT INTO daily_usage (user_id, usage_date, text_episodes, text_reserved) VALUES ('user-1', '2026-08-16', 99, 0)`).run();
     const ledger = quotaLedger();
     const results = await Promise.all([
@@ -62,9 +68,20 @@ describe('D1QuotaLedger', () => {
       ledger.reserve({ userId: 'user-1', reservationKey: 'plus-boundary-right', resourceType: 'text_episode', tier: 'plus' }),
     ]);
 
-    expect(results.filter((result) => result.ok)).toHaveLength(1);
-    expect(results.filter((result) => !result.ok && result.error.code === 'quota_exceeded')).toHaveLength(1);
-    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textReserved: 1, textConsumed: 99 });
+    expect(results.filter((result) => result.ok)).toHaveLength(2);
+    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textReserved: 2, textConsumed: 99 });
+  });
+
+  it('keeps text Scene generation unlimited while enforced mode still caps fresh voice', async () => {
+    await db.prepare(`INSERT INTO daily_usage (user_id, usage_date, text_episodes, voiced_episodes, text_reserved, voice_reserved) VALUES ('user-1', '2026-08-16', 50, 1, 0, 0)`).run();
+    const ledger = quotaLedger();
+
+    const text = await ledger.reserve({ userId: 'user-1', reservationKey: 'unlimited-text-over-limit', resourceType: 'text_episode', tier: 'free' });
+    const voice = await ledger.reserve({ userId: 'user-1', reservationKey: 'enforced-voice-over-limit', resourceType: 'voice_episode', tier: 'free' });
+
+    expect(text.ok).toBe(true);
+    expect(voice).toMatchObject({ ok: false, error: { code: 'quota_exceeded', resourceType: 'voice_episode', limit: 1 } });
+    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textConsumed: 50, voiceConsumed: 1, textReserved: 1, voiceReserved: 0 });
   });
 
   it('keeps preview work ledgered but does not block after the production daily limit', async () => {

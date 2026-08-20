@@ -106,7 +106,7 @@ describe('HttpDramaExperienceClient', () => {
       async () => 'token',
       async () => Response.json({ home: {
         recentDramas: [summaryPayload(now - 3_600_000)],
-        quota: { textRemaining: 49, textLimit: 50, voiceRemaining: 1, voiceLimit: 1, voiceBonusCredits: 0, resetAt: '2026-08-18T00:00:00.000Z' },
+        quota: { enforced: true, textEnforced: false, voiceEnforced: true, textRemaining: 49, textLimit: 50, voiceRemaining: 1, voiceLimit: 1, voiceBonusCredits: 0, resetAt: '2026-08-18T00:00:00.000Z' },
         retention: {
           currentStreakDays: 1,
           choicesMade: 2,
@@ -122,6 +122,7 @@ describe('HttpDramaExperienceClient', () => {
     const home = await client.loadHome();
 
     expect(home.recentDramas[0].updatedLabel).toBe('1 giờ trước');
+    expect(home.quota).toMatchObject({ enforced: true, textEnforced: false, voiceEnforced: true });
     expect(home.quota.resetLabel).toBe('Đặt lại lúc 00:00 UTC');
   });
 
@@ -134,7 +135,7 @@ describe('HttpDramaExperienceClient', () => {
     } }), 'en-US', 'en', () => now);
 
     const home = await client.loadHome();
-    expect(home.quota).toMatchObject({ enforced: true, voiceBonusCredits: 0, textRemaining: 49, voiceRemaining: 1 });
+    expect(home.quota).toMatchObject({ enforced: true, textEnforced: true, voiceEnforced: true, voiceBonusCredits: 0, textRemaining: 49, voiceRemaining: 1 });
   });
 
   it('parses home retention independently of canonical drama state', async () => {

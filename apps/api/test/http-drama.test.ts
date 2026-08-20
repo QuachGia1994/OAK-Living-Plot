@@ -169,10 +169,9 @@ describe('authenticated drama HTTP loop', () => {
     expect((await home.json() as HomeEnvelope).home.recentDramas[0]?.id).toBe(drama.id);
   });
 
-  it('keeps Scene continuation unblocked after the Store limit in development preview', async () => {
+  it('keeps Scene continuation unlimited after the nominal Free text limit while voice quota stays enforced', async () => {
     const generator = new FixtureSceneGenerator();
-    const previewEnv: AppEnv = { ...testEnv, QUOTA_MODE: 'preview_unlimited' };
-    const created = await dramaRequest('/v1/dramas', 'POST', createBody(), 'clerk-owner', generator, undefined, previewEnv);
+    const created = await dramaRequest('/v1/dramas', 'POST', createBody(), 'clerk-owner', generator);
     const drama = (await created.json() as DramaEnvelope).drama;
     const choice = drama.currentScene.choices[0];
     await dramaRequest(
@@ -181,8 +180,6 @@ describe('authenticated drama HTTP loop', () => {
       undefined,
       'clerk-owner',
       generator,
-      undefined,
-      previewEnv,
     );
     const user = await db.prepare('SELECT id FROM users WHERE auth_subject = ?').bind('clerk-owner').first<{ id: string }>();
     await db.prepare('UPDATE daily_usage SET text_episodes = 50, text_reserved = 0 WHERE user_id = ? AND usage_date = ?')
@@ -192,17 +189,15 @@ describe('authenticated drama HTTP loop', () => {
     const next = await dramaRequest(
       `/v1/dramas/${drama.id}/scenes`,
       'POST',
-      { generationKey: 'generation-preview-over-limit' },
+      { generationKey: 'generation-unlimited-over-limit' },
       'clerk-owner',
       generator,
-      undefined,
-      previewEnv,
     );
     expect(next.status).toBe(200);
     expect((await next.json() as DramaEnvelope).drama.currentScene.number).toBe(2);
 
-    const home = await dramaRequest('/v1/dramas/home', 'GET', undefined, 'clerk-owner', generator, undefined, previewEnv);
-    expect((await home.json() as HomeEnvelope).home.quota).toMatchObject({ enforced: false });
+    const home = await dramaRequest('/v1/dramas/home', 'GET', undefined, 'clerk-owner', generator);
+    expect((await home.json() as HomeEnvelope).home.quota).toMatchObject({ textEnforced: false, voiceEnforced: true });
   });
 
   it('releases generation quota when the provider fails and allows an idempotent retry', async () => {
@@ -365,7 +360,7 @@ interface DramaEnvelope {
 }
 
 interface HomeEnvelope {
-  home: { recentDramas: Array<{ id: string }>; quota: { enforced: boolean } };
+  home: { recentDramas: Array<{ id: string }>; quota: { enforced: boolean; textEnforced: boolean; voiceEnforced: boolean } };
 }
 
 interface LibraryEnvelope {

@@ -143,7 +143,7 @@ export default function HomeScreen() {
           <DramaHud snapshot={snapshot} t={t} />
 
           <View style={styles.plusRow}>
-            <View style={styles.plusCopy}><Text style={styles.plusKicker}>{t('PLUS · 100 SCENES / 10 VOICES', 'PLUS · 100 CẢNH / 10 GIỌNG')}</Text></View>
+            <View style={styles.plusCopy}><Text style={styles.plusKicker}>{t('UNLIMITED SCENES · PLUS 10 VOICES', 'CẢNH VÔ HẠN · PLUS 10 GIỌNG')}</Text></View>
             <ActionButton label={t('Upgrade Plus', 'Nâng cấp Plus')} variant="ghost" onPress={() => router.push('/plus')} />
           </View>
         </>
@@ -163,13 +163,13 @@ function DramaHud({ snapshot, t }: { snapshot: DramaHomeSnapshot; t: Translate }
       <HudMetric label={t('Streak', 'Chuỗi')} value={retention.currentStreakDays > 0 ? `${retention.currentStreakDays}D` : '—'} />
       <HudMetric label={t('Choices', 'Lựa chọn')} value={String(retention.choicesMade)} />
       <HudMetric
-        label={quota.enforced ? t('Scenes left', 'Cảnh còn lại') : t('Preview scenes', 'Cảnh preview')}
-        value={quota.enforced ? `${quota.textRemaining}/${quota.textLimit}` : '∞'}
+        label={quota.textEnforced ? t('Scenes left', 'Cảnh còn lại') : t('Unlimited scenes', 'Cảnh vô hạn')}
+        value={quota.textEnforced ? `${quota.textRemaining}/${quota.textLimit}` : '∞'}
         accent
       />
       <HudMetric
-        label={quota.enforced ? t('Voice left', 'Giọng còn lại') : t('Preview voices', 'Giọng preview')}
-        value={quota.enforced ? `${quota.voiceRemaining}/${quota.voiceLimit}${quota.voiceBonusCredits > 0 ? ` +${quota.voiceBonusCredits}` : ''}` : '∞'}
+        label={quota.voiceEnforced ? t('Voice left', 'Giọng còn lại') : t('Preview voices', 'Giọng preview')}
+        value={quota.voiceEnforced ? `${quota.voiceRemaining}/${quota.voiceLimit}${quota.voiceBonusCredits > 0 ? ` +${quota.voiceBonusCredits}` : ''}` : '∞'}
       />
     </View>
   );
