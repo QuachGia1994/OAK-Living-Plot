@@ -16,6 +16,7 @@ import {
 } from '../telemetry/contracts';
 
 export const SCENE_MODEL = 'gemini-3.5-flash-lite';
+export const SCENE_FALLBACK_MODEL = 'gemini-3.6-flash';
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -37,6 +38,8 @@ export class GeminiSceneGenerator implements SceneGenerator {
     private readonly fetcher: FetchLike = fetch.bind(globalThis),
     private readonly timeoutMs = 12_000,
     private readonly telemetry: GenerationTelemetrySink = NOOP_GENERATION_TELEMETRY,
+    private readonly model = SCENE_MODEL,
+    private readonly thinkingLevel: 'minimal' | 'low' | 'medium' | 'high' = 'minimal',
   ) {}
 
   async generate(input: SceneGenerationInput): Promise<Result<SceneGenerationSuccess, SceneGenerationError>> {
@@ -70,7 +73,7 @@ export class GeminiSceneGenerator implements SceneGenerator {
           this.recordAttempt(attempt as 1 | 2, 'accepted', provider.value.usage);
           return {
             ok: true,
-            value: { proposal: validated.value, usage, attempts: attempt, provider: 'gemini', model: SCENE_MODEL },
+            value: { proposal: validated.value, usage, attempts: attempt, provider: 'gemini', model: this.model },
           };
         }
       }
@@ -96,7 +99,7 @@ export class GeminiSceneGenerator implements SceneGenerator {
     usage: SceneGenerationUsage,
   ): void {
     try {
-      this.telemetry.recordGenerationAttempt({ provider: 'gemini', model: SCENE_MODEL, attempt, outcome, usage });
+      this.telemetry.recordGenerationAttempt({ provider: 'gemini', model: this.model, attempt, outcome, usage });
     } catch {
       // Telemetry is observational and must never change scene-generation behavior.
     }
@@ -119,10 +122,10 @@ export class GeminiSceneGenerator implements SceneGenerator {
         },
         signal: controller.signal,
         body: JSON.stringify({
-          model: SCENE_MODEL,
+          model: this.model,
           input: prompt.userContent,
           system_instruction: prompt.systemInstruction,
-          generation_config: { thinking_level: 'minimal' },
+          generation_config: { thinking_level: this.thinkingLevel },
           response_format: {
             type: 'text',
             mime_type: 'application/json',

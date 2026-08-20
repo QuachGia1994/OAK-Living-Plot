@@ -14,7 +14,7 @@ export interface CharacterPortraitClient {
   configured: boolean;
   status(dramaId: string): Promise<PortraitSnapshot>;
   generate(dramaId: string): Promise<PortraitSnapshot>;
-  source(dramaId: string): Promise<{ uri: string; headers: Record<string, string> }>;
+  source(dramaId: string): Promise<{ uri: string }>;
 }
 
 export class CharacterPortraitClientError extends Error {
@@ -43,8 +43,8 @@ export class HttpCharacterPortraitClient implements CharacterPortraitClient {
     return this.parse(await this.request(`/v1/dramas/${encodeURIComponent(dramaId)}/portrait`, 'POST', undefined, 30_000));
   }
 
-  source(dramaId: string): Promise<{ uri: string; headers: Record<string, string> }> {
-    return this.transport.authorizedSource(`/v1/dramas/${encodeURIComponent(dramaId)}/portrait`);
+  source(dramaId: string): Promise<{ uri: string }> {
+    return this.transport.authorizedDataUriSource(`/v1/dramas/${encodeURIComponent(dramaId)}/portrait`);
   }
 
   private async request(path: string, method: 'GET' | 'POST', body?: unknown, timeoutMs?: number): Promise<unknown> {
@@ -84,7 +84,7 @@ export class UnavailableCharacterPortraitClient implements CharacterPortraitClie
   private fail(): never { throw new CharacterPortraitClientError('not_configured', 'Character portraits are not configured.'); }
   async status(): Promise<PortraitSnapshot> { return this.fail(); }
   async generate(): Promise<PortraitSnapshot> { return this.fail(); }
-  async source(): Promise<{ uri: string; headers: Record<string, string> }> { return this.fail(); }
+  async source(): Promise<{ uri: string }> { return this.fail(); }
 }
 
 function mapError(status: number, payload: unknown): CharacterPortraitClientError {

@@ -14,6 +14,7 @@ export function CharacterPortraitCard({ dramaId, characterName, storyRevision }:
   const [snapshot, setSnapshot] = useState<PortraitSnapshot | null>(null);
   const [source, setSource] = useState<ImageSourcePropType>(fallbackPortrait);
   const [busy, setBusy] = useState(false);
+  const [mediaFailed, setMediaFailed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,11 +26,16 @@ export function CharacterPortraitCard({ dramaId, characterName, storyRevision }:
         setSnapshot(next);
         if (next.status === 'ready' || next.status === 'stale') {
           const nextSource = await client.source(dramaId);
-          if (active) setSource(nextSource);
+          if (active) {
+            setSource(nextSource);
+            setMediaFailed(false);
+          }
         }
       })
       .catch(() => {
-        // Portrait media is optional; the static branded fallback remains visible.
+        if (!active) return;
+        setSource(fallbackPortrait);
+        setMediaFailed(true);
       });
     return () => { active = false; };
   }, [client, dramaId, storyRevision]);
@@ -40,7 +46,10 @@ export function CharacterPortraitCard({ dramaId, characterName, storyRevision }:
     try {
       const next = await client.generate(dramaId);
       setSnapshot(next);
-      if (next.status === 'ready') setSource(await client.source(dramaId));
+      if (next.status === 'ready') {
+        setSource(await client.source(dramaId));
+        setMediaFailed(false);
+      }
       setMessage(t('Portrait updated from the current story.', 'Đã cập nhật chân dung theo cốt truyện hiện tại.'));
     } catch (error) {
       setMessage(portraitMessage(error, t));
@@ -49,16 +58,18 @@ export function CharacterPortraitCard({ dramaId, characterName, storyRevision }:
     }
   }
 
-  const needsRefresh = client.configured && snapshot?.status !== 'ready';
+  const needsRefresh = client.configured && (snapshot?.status !== 'ready' || mediaFailed);
   const statusLabel = !client.configured
     ? t('Preview', 'Bản xem trước')
-    : snapshot?.status === 'ready'
-      ? t('Current', 'Đang khớp')
-      : snapshot?.status === 'stale'
-        ? t('Story changed', 'Cốt truyện đã đổi')
-        : snapshot?.status === 'generating'
-          ? t('Updating', 'Đang cập nhật')
-          : t('Optional', 'Tùy chọn');
+    : mediaFailed
+      ? t('Fallback image', 'Ảnh dự phòng')
+      : snapshot?.status === 'ready'
+        ? t('Current', 'Đang khớp')
+        : snapshot?.status === 'stale'
+          ? t('Story changed', 'Cốt truyện đã đổi')
+          : snapshot?.status === 'generating'
+            ? t('Updating', 'Đang cập nhật')
+            : t('Optional', 'Tùy chọn');
 
   return (
     <View style={styles.card}>
@@ -67,17 +78,35 @@ export function CharacterPortraitCard({ dramaId, characterName, storyRevision }:
           <Eyebrow>{t('Living character', 'Nhân vật sống')}</Eyebrow>
           <Text style={styles.name}>{characterName}</Text>
         </View>
-        <Pill tone={snapshot?.status === 'ready' ? 'success' : 'neutral'}>{statusLabel}</Pill>
+        <Pill tone={snapshot?.status === 'ready' && !mediaFailed ? 'success' : 'neutral'}>{statusLabel}</Pill>
       </View>
-      <Image source={source} style={styles.portrait} resizeMode="cover" accessibilityLabel={t(`Current portrait of ${characterName}`, `Chân dung hiện tại của ${characterName}`)} />
+      <Image
+        source={source}
+        style={styles.portrait}
+        resizeMode="cover"
+        onError={() => {
+          setSource(fallbackPortrait);
+          setMediaFailed(true);
+        }}
+        accessibilityLabel={t(`Current portrait of ${characterName}`, `Chân dung hiện tại của ${characterName}`)}
+      />
       <Text style={styles.detail}>{t('The profile can evolve with the current canonical story while preserving the previous portrait as an identity reference.', 'Chân dung có thể thay đổi theo cốt truyện chuẩn hiện tại và dùng ảnh trước làm tham chiếu để giữ nhận diện nhân vật.')}</Text>
       {needsRefresh ? (
         <ActionButton
-          label={snapshot?.status === 'stale' ? t('Update portrait', 'Cập nhật chân dung') : t('Generate portrait', 'Tạo chân dung')}
+          label={mediaFailed
+            ? t('Reload portrait', 'Tải lại chân dung')
+            : snapshot?.status === 'stale'
+              ? t('Update portrait', 'Cập nhật chân dung')
+              : t('Generate portrait', 'Tạo chân dung')}
           variant="secondary"
           busy={busy || snapshot?.status === 'generating'}
           onPress={() => void regenerate()}
         />
+      ) : null}
+      {mediaFailed ? (
+        <Text style={styles.message} accessibilityLiveRegion="polite">
+          {t('Private portrait media could not be displayed; the branded fallback is shown instead.', 'Không thể hiển thị ảnh chân dung riêng tư; đang dùng ảnh dự phòng.')}
+        </Text>
       ) : null}
       {message ? <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text> : null}
     </View>

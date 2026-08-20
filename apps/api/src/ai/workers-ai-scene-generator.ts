@@ -104,11 +104,7 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
         ],
         response_format: {
           type: 'json_schema',
-          json_schema: {
-            name: 'living_plot_scene',
-            schema: sceneResponseSchema,
-            strict: true,
-          },
+          json_schema: sceneResponseSchema,
         },
         max_tokens: 2400,
         temperature: 0.5,

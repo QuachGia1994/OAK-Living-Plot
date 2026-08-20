@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { GeminiSceneGenerator, SCENE_MODEL } from '../src/ai/gemini-scene-generator';
+import { GeminiSceneGenerator, SCENE_FALLBACK_MODEL, SCENE_MODEL } from '../src/ai/gemini-scene-generator';
 import { makeGenerationInput, makeValidProposal } from './drama-fixtures';
 
 describe('GeminiSceneGenerator', () => {
@@ -40,6 +40,18 @@ describe('GeminiSceneGenerator', () => {
     expect(body.response_format.schema.properties.choices.maxItems).toBe(3);
     expect(body.store).toBe(false);
     expect(String(init?.body)).not.toContain('test-api-key');
+  });
+
+  it('can use the stronger configured fallback model without changing the default adapter contract', async () => {
+    const fetcher = vi.fn<TestFetch>(async () => Response.json(geminiResponse(JSON.stringify(makeValidProposal()), 120, 80)));
+    const generator = new GeminiSceneGenerator('test-api-key', fetcher, 25_000, undefined, SCENE_FALLBACK_MODEL, 'low');
+
+    const result = await generator.generate(makeGenerationInput());
+
+    expect(result).toMatchObject({ ok: true, value: { provider: 'gemini', model: SCENE_FALLBACK_MODEL } });
+    const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body)) as GeminiRequestBody;
+    expect(body.model).toBe('gemini-3.6-flash');
+    expect(body.generation_config.thinking_level).toBe('low');
   });
 
   it('retries exactly once for an invalid structured proposal and sums usage', async () => {

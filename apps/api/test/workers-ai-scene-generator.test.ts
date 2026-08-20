@@ -29,6 +29,11 @@ describe('WorkersAiSceneGenerator', () => {
       max_tokens: 2400,
       temperature: 0.5,
     });
+    const responseFormat = request.response_format as { json_schema: Record<string, unknown> };
+    expect(responseFormat.json_schema.type).toBe('object');
+    expect(responseFormat.json_schema).not.toHaveProperty('name');
+    expect(responseFormat.json_schema).not.toHaveProperty('schema');
+    expect(responseFormat.json_schema).not.toHaveProperty('strict');
     const messages = request.messages as Array<{ role: string; content: string }>;
     expect(messages[0].role).toBe('system');
     expect(messages[0].content).toContain('Living Plot interactive short-drama scene engine');

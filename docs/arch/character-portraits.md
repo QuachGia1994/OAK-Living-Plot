@@ -1,6 +1,6 @@
 # Derived character portraits
 
-> updated 2026-08-19 · current derived-media contract
+> updated 2026-08-20 · current derived-media contract
 
 ## Ownership
 Character identity and story state remain canonical D1 text/domain data. A portrait is optional derived media. Portrait failure, provider delay, or R2 failure never blocks Scene publication, choice commit, continuation, History, or account restore.
@@ -25,7 +25,7 @@ Owner-scoped routes:
 - `POST /v1/dramas/:dramaId/portrait`
 - `GET /v1/dramas/:dramaId/portrait`
 
-The media GET authenticates the drama owner before private R2 read and sends private cache headers. If the current fingerprint has no ready image, the latest older ready portrait may be delivered as stale. The bundled Mina illustration remains the zero-network mobile fallback.
+The media GET authenticates the drama owner before private R2 read and sends private cache headers. Mobile fetches those private bytes itself with a fresh bearer token (retrying one 401/5xx with a refreshed token), validates a bounded image MIME/size envelope, and converts the response to an in-memory data URI before handing it to the native `<Image>` view. This avoids relying on platform image loaders to preserve custom Authorization headers. If delivery or rendering still fails, the card immediately restores the bundled branded illustration, marks the media as fallback, and exposes a reload action instead of showing an empty image surface. If the current fingerprint has no ready image, the latest older ready portrait may be delivered as stale.
 
 ## Account deletion
 Account erasure deletes both private narration objects and private character portraits from R2 before deleting the D1 user so D1 cascade cannot orphan object keys.
