@@ -33,7 +33,8 @@ export class PreviewDramaExperienceClient implements DramaExperienceClient {
   }
 
   async loadHome(): Promise<DramaHomeSnapshot> {
-    const active = this.allDramas().filter((drama) => !this.state.archivedDramaIds.has(drama.id));
+    const all = this.allDramas();
+    const active = all.filter((drama) => !this.state.archivedDramaIds.has(drama.id));
     return {
       recentDramas: active.map((drama) => toSummary(drama, this.uiLocale)).reverse(),
       quota: {
@@ -49,7 +50,7 @@ export class PreviewDramaExperienceClient implements DramaExperienceClient {
         currentStreakDays: 2,
         choicesMade: 4,
         activeDramas: active.length,
-        dailyPrompt: previewDailyPrompt(this.dramaLocale),
+        dailyPrompt: previewDailyPrompt(this.dramaLocale, all.map((drama) => drama.premise)),
       },
     };
   }
@@ -187,16 +188,71 @@ export class PreviewDramaExperienceClient implements DramaExperienceClient {
 
 export const previewDramaExperienceClient: DramaExperienceClient = new PreviewDramaExperienceClient();
 
-function previewDailyPrompt(dramaLocale: DramaLocale): DramaHomeSnapshot['retention']['dailyPrompt'] {
-  const vi = dramaLocale === 'vi-VN';
+function previewDailyPrompt(
+  dramaLocale: DramaLocale,
+  usedPremises: readonly string[] = [],
+): DramaHomeSnapshot['retention']['dailyPrompt'] {
+  const prompts = [
+    {
+      label: { en: 'A message at the wrong time', vi: 'Tin nhắn sai thời điểm' },
+      premise: {
+        en: 'A voice note arrives from someone who should have no way to contact you, and it contains one detail only you would recognize.',
+        vi: 'Một tin nhắn thoại đến từ người lẽ ra không thể liên lạc với bạn, và nó chứa một chi tiết chỉ bạn mới nhận ra.',
+      },
+      mood: 'mysterious',
+      characterName: 'Mina',
+    },
+    {
+      label: { en: 'One seat left', vi: 'Chỉ còn một chỗ trống' },
+      premise: {
+        en: 'At a wedding dinner, the only empty seat is beside the person you promised yourself you would never speak to again.',
+        vi: 'Trong bữa tiệc cưới, chỗ trống duy nhất nằm cạnh người mà bạn từng tự hứa sẽ không bao giờ nói chuyện lại.',
+      },
+      mood: 'romantic',
+      characterName: 'Kai',
+    },
+    {
+      label: { en: 'The favor comes due', vi: 'Đến lúc trả món nợ ân tình' },
+      premise: {
+        en: 'A friend who once saved your career asks for one favor that could destroy somebody else’s life.',
+        vi: 'Một người bạn từng cứu sự nghiệp của bạn nhờ một việc có thể phá hủy cuộc đời của người khác.',
+      },
+      mood: 'tense',
+      characterName: 'Noah',
+    },
+    {
+      label: { en: 'The room behind the wall', vi: 'Căn phòng sau bức tường' },
+      premise: {
+        en: 'Renovation work reveals a sealed room in your childhood home, and your name is written on the inside of the door.',
+        vi: 'Việc sửa nhà làm lộ một căn phòng bị niêm kín trong ngôi nhà thời thơ ấu, và tên bạn được viết ở mặt trong cánh cửa.',
+      },
+      mood: 'mysterious',
+      characterName: 'Linh',
+    },
+    {
+      label: { en: 'A second chance with a cost', vi: 'Cơ hội thứ hai có cái giá' },
+      premise: {
+        en: 'You are offered the exact opportunity you lost years ago, but accepting it means leaving one person behind tonight.',
+        vi: 'Bạn được trao lại đúng cơ hội đã đánh mất nhiều năm trước, nhưng nhận nó đồng nghĩa phải bỏ lại một người ngay tối nay.',
+      },
+      mood: 'hopeful',
+      characterName: 'Ari',
+    },
+  ] as const;
+  const used = new Set(usedPremises.map(normalizePromptText).filter(Boolean));
+  const selected = prompts.find((candidate) =>
+    !Object.values(candidate.premise).some((premise) => used.has(normalizePromptText(premise)))) ?? prompts[0];
+  const localeKey = dramaLocale === 'vi-VN' ? 'vi' : 'en';
   return {
-    label: vi ? 'Tin nhắn sai thời điểm' : 'A message at the wrong time',
-    premise: vi
-      ? 'Một tin nhắn thoại đến từ người lẽ ra không thể liên lạc với bạn, và nó chứa một chi tiết chỉ bạn mới nhận ra.'
-      : 'A voice note arrives from someone who should have no way to contact you, and it contains one detail only you would recognize.',
-    mood: 'mysterious',
-    characterName: 'Mina',
+    label: selected.label[localeKey],
+    premise: selected.premise[localeKey],
+    mood: selected.mood,
+    characterName: selected.characterName,
   };
+}
+
+function normalizePromptText(value: string): string {
+  return value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase();
 }
 
 function createSeedDrama(dramaLocale: DramaLocale): Drama {

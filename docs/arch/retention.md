@@ -16,9 +16,9 @@ The underlying D1 tables still use `plots/episodes`; `D1DramaRepository` normali
 
 ## Daily spark
 
-`GET /v1/dramas/home` includes one deterministic UTC daily drama prompt with label, premise, mood, and lead name. The prompt set is bounded in code and localized using the saved `uiLocale`; the user's `dramaLocale` remains the generation-language default for newly created dramas.
+`GET /v1/dramas/home` includes one deterministic UTC daily drama prompt with label, premise, mood, and lead name. The prompt set is bounded in code and localized using the saved `uiLocale`; the user's `dramaLocale` remains the generation-language default for newly created dramas. When that day's prompt already matches a recent owned drama, Home rotates deterministically to the next unused prompt while the bounded catalog has an alternative.
 
-The mobile Home surface passes the prompt into `/create` as editable setup data. Generation remains an explicit user action.
+The mobile Home surface passes the prompt into `/create` as editable setup data. Each recommendation launch is treated as a fresh setup handoff even when the Create tab is already mounted; generation remains an explicit user action.
 
 ## Home contract
 

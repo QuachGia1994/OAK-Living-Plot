@@ -77,7 +77,13 @@ export class DramaService {
           voiceBonusCredits,
           resetAt: nextUtcReset(utcDay),
         },
-        retention: buildRetentionSnapshot(activity, recentDramas.length, this.clock(), preferences.uiLocale),
+        retention: buildRetentionSnapshot(
+          activity,
+          recentDramas.length,
+          this.clock(),
+          preferences.uiLocale,
+          recentDramas.map((drama) => drama.premise),
+        ),
       },
     };
   }

@@ -111,8 +111,8 @@ export function scoreThreadPayoff(
   if (critical.length === 0) return 100;
 
   const advancedCritical = critical.filter((thread) => proposalAdvancesThread(proposal, thread.key, thread.title));
-  const newOpens = proposal.threadChanges.open.length
-    + proposal.choices.reduce((sum, choice) => sum + choice.stateDelta.threadsToOpen.length, 0);
+  const maxCommittedBranchOpens = Math.max(0, ...proposal.choices.map((choice) => choice.stateDelta.threadsToOpen.length));
+  const newOpens = proposal.threadChanges.open.length + maxCommittedBranchOpens;
 
   if (advancedCritical.length === 0 && newOpens >= THREAD_EXPLOSION_NEW_OPEN) {
     findings.push({

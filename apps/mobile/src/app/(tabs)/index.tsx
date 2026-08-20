@@ -32,7 +32,15 @@ export default function HomeScreen() {
 
   function openDailySpark(source: DramaHomeSnapshot) {
     const prompt = source.retention.dailyPrompt;
-    router.push({ pathname: '/create', params: { premise: prompt.premise, mood: prompt.mood, characterName: prompt.characterName } });
+    router.navigate({
+      pathname: '/create',
+      params: {
+        premise: prompt.premise,
+        mood: prompt.mood,
+        characterName: prompt.characterName,
+        launchKey: String(Date.now()),
+      },
+    });
   }
 
   useEffect(() => {

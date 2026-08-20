@@ -27,4 +27,13 @@ describe('retention snapshot', () => {
     expect(promptForUtcDay('2026-08-17', 'vi').label).not.toBe(promptForUtcDay('2026-08-17', 'en').label);
     expect(buildRetentionSnapshot([], 0, now, 'vi').dailyPrompt).toEqual(promptForUtcDay('2026-08-17', 'vi'));
   });
+
+  it('rotates past a recent matching daily drama even when the UI locale changed', () => {
+    const originalEn = promptForUtcDay('2026-08-17', 'en');
+    const originalVi = promptForUtcDay('2026-08-17', 'vi');
+    const rotated = promptForUtcDay('2026-08-17', 'vi', [originalEn.premise]);
+
+    expect(rotated.premise).not.toBe(originalVi.premise);
+    expect(buildRetentionSnapshot([], 1, now, 'vi', [originalEn.premise]).dailyPrompt).toEqual(rotated);
+  });
 });

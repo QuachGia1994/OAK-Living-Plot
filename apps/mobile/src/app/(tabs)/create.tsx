@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { GenerationJob } from '@/features/drama/domain';
@@ -21,12 +21,14 @@ const initialDraft: DramaDraft = {
 
 export default function CreateDramaScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ premise?: string | string[]; mood?: string | string[]; characterName?: string | string[] }>();
+  const params = useLocalSearchParams<{ premise?: string | string[]; mood?: string | string[]; characterName?: string | string[]; launchKey?: string | string[] }>();
   const auth = useMobileAuth();
   const { locale, t } = useUiCopy();
   const dramaExperienceClient = useDramaExperienceClient();
   const creationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
   const submitting = useRef(false);
+  const initialLaunchKey = readParam(params.launchKey);
+  const appliedLaunchKey = useRef(initialLaunchKey);
   const [draft, setDraft] = useState<DramaDraft>(() => ({
     premise: readParam(params.premise) ?? initialDraft.premise,
     mood: readMood(params.mood) ?? initialDraft.mood,
@@ -35,6 +37,22 @@ export default function CreateDramaScreen() {
   const [showValidation, setShowValidation] = useState(false);
   const [generationJob, setGenerationJob] = useState<GenerationJob>({ state: 'idle' });
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const launchKey = readParam(params.launchKey);
+    if (!launchKey || launchKey === appliedLaunchKey.current) return;
+    appliedLaunchKey.current = launchKey;
+    creationAttempt.current = null;
+    setDraft({
+      premise: readParam(params.premise) ?? initialDraft.premise,
+      mood: readMood(params.mood) ?? initialDraft.mood,
+      characterName: readParam(params.characterName) ?? initialDraft.characterName,
+    });
+    setShowValidation(false);
+    setGenerationJob({ state: 'idle' });
+    setSubmitError(null);
+  }, [params.characterName, params.launchKey, params.mood, params.premise]);
+
   const errors = validateDramaDraft(draft, locale);
   const moodOptions = dramaMoodOptionsFor(locale);
 

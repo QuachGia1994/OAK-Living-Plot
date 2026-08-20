@@ -66,6 +66,7 @@ export function buildRetentionSnapshot(
   activeDramas: number,
   nowMs: number,
   uiLocale: UiLocale = 'en',
+  usedPremises: readonly string[] = [],
 ): DramaRetention {
   const normalized = [...days]
     .filter((day) => /^\d{4}-\d{2}-\d{2}$/u.test(day.utcDay) && Number.isInteger(day.choicesMade) && day.choicesMade > 0)
@@ -75,19 +76,36 @@ export function buildRetentionSnapshot(
     currentStreakDays: currentStreak(normalized.map((day) => day.utcDay), utcDay),
     choicesMade: normalized.reduce((total, day) => total + day.choicesMade, 0),
     activeDramas,
-    dailyPrompt: promptForUtcDay(utcDay, uiLocale),
+    dailyPrompt: promptForUtcDay(utcDay, uiLocale, usedPremises),
   };
 }
 
-export function promptForUtcDay(utcDay: string, uiLocale: UiLocale = 'en'): DramaDailyPrompt {
-  const index = hash(utcDay) % DAILY_PROMPTS.length;
-  const prompt = DAILY_PROMPTS[index];
+export function promptForUtcDay(
+  utcDay: string,
+  uiLocale: UiLocale = 'en',
+  usedPremises: readonly string[] = [],
+): DramaDailyPrompt {
+  const startIndex = hash(utcDay) % DAILY_PROMPTS.length;
+  const used = new Set(usedPremises.map(normalizePromptText).filter(Boolean));
+  let prompt = DAILY_PROMPTS[startIndex]!;
+  for (let offset = 0; offset < DAILY_PROMPTS.length; offset += 1) {
+    const candidate = DAILY_PROMPTS[(startIndex + offset) % DAILY_PROMPTS.length]!;
+    const alreadyUsed = Object.values(candidate.premise).some((premise) => used.has(normalizePromptText(premise)));
+    if (!alreadyUsed) {
+      prompt = candidate;
+      break;
+    }
+  }
   return {
     label: prompt.label[uiLocale],
     premise: prompt.premise[uiLocale],
     mood: prompt.mood,
     characterName: prompt.characterName,
   };
+}
+
+function normalizePromptText(value: string): string {
+  return value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase();
 }
 
 function currentStreak(days: readonly string[], today: string): number {

@@ -32,6 +32,7 @@ describe('WorkersAiSceneGenerator', () => {
     const messages = request.messages as Array<{ role: string; content: string }>;
     expect(messages[0].role).toBe('system');
     expect(messages[0].content).toContain('Living Plot interactive short-drama scene engine');
+    expect(messages[0].content).toContain('nextTone alone never satisfies branch commitment');
     expect(messages[0].content).toContain('script must be 130–180 words');
     expect(messages[1].content).toContain('DRAMA_CONTEXT_JSON');
   });
@@ -75,6 +76,33 @@ describe('WorkersAiSceneGenerator', () => {
     expect(result.value.proposal.choices[0].stateDelta.factKeysToResolve).toEqual([]);
     expect(result.value.proposal.choices[0].stateDelta.threadKeysToResolve).toEqual([]);
     expect(result.value.proposal.choices[0].stateDelta.relationships).toEqual([]);
+  });
+
+  it('recovers a one-character continuation when tone-only branches fail durable commitment', async () => {
+    const input = makeGenerationInput();
+    input.characters = [input.characters[0]!];
+    input.relationships = [];
+    const toneOnly = structuredClone(makeValidProposal());
+    for (const choice of toneOnly.choices) {
+      choice.stateDelta.factsToAdd = [];
+      choice.stateDelta.factKeysToResolve = [];
+      choice.stateDelta.threadsToOpen = [];
+      choice.stateDelta.threadKeysToResolve = [];
+    }
+    const repaired = structuredClone(makeValidProposal());
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: toneOnly, usage: { prompt_tokens: 10, completion_tokens: 5 } })
+      .mockResolvedValueOnce({ response: repaired, usage: { prompt_tokens: 20, completion_tokens: 15 } });
+    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
+
+    const result = await generator.generate(input);
+
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ ok: true, value: { attempts: 2 } });
+    const secondRequest = run.mock.calls[1][1] as { messages: Array<{ role: string; content: string }> };
+    expect(secondRequest.messages[0].content).toContain('With only one canonical character');
+    expect(secondRequest.messages[0].content).toContain('BRANCH_NO_DURABLE_EFFECT');
   });
 
   it('normalizes binding failures without exposing provider internals', async () => {

@@ -86,6 +86,8 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
       'Summary: one sentence, at most 30 words. establishedFacts: at most 2 short strings. threadChanges.open: at most 1 short thread.',
       'Each choice label: at most 8 words; intent: at most 10 words; consequence: at most 18 words.',
       'Each choice stateDelta must be minimal: factsToAdd at most 2 short strings, threadsToOpen at most 1, nextTone at most 4 words.',
+      'Every choice must include at least one durable non-tone change: a material valid relationship change, a fact add/resolve, or a thread open/resolve. nextTone alone never satisfies branch commitment.',
+      'With only one canonical character, relationships must stay empty, so give every choice a distinct fact or thread change instead.',
       'For continuations, do not retell the previous scene setup. Start from previous.consequence immediately, make the summary describe only the new development, and never reuse previous.chosenAction as a new choice label.',
       'Do not reopen an active thread under the same title. Advance or resolve an existing thread before opening a genuinely new one.',
       'establishedFacts, factsToAdd, and thread titles must be natural-language phrases in the requested locale, never snake_case, slugs, IDs, or database-like labels.',

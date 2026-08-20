@@ -135,6 +135,23 @@ describe('Phase-2 narrative quality', () => {
     expect(findings.some((f) => f.code === 'THREAD_EXPLOSION')).toBe(true);
   });
 
+  it('counts only the one branch that can commit when checking thread explosion', () => {
+    const input = makeGenerationInput();
+    input.openThreads = [{ key: 'thread-trust', title: 'Linh questions honesty', urgency: 95 }];
+    const proposal = makeValidProposal();
+    proposal.threadChanges = { open: [], resolve: [] };
+    proposal.choices.forEach((choice, index) => {
+      choice.stateDelta.threadKeysToResolve = [];
+      choice.stateDelta.threadsToOpen = [{ title: `Distinct branch thread ${index + 1}`, urgency: 50 }];
+    });
+    const findings: Array<{ dimension: string; code: string; message: string }> = [];
+
+    const score = scoreThreadPayoff(input, proposal, findings);
+
+    expect(score).toBeGreaterThan(0);
+    expect(findings.some((finding) => finding.code === 'THREAD_EXPLOSION')).toBe(false);
+  });
+
   it('does not hard-reject a newly introduced critical thread merely because drama age is high', () => {
     const input = makeGenerationInput();
     input.recentHistory = Array.from({ length: 30 }, (_, index) => ({
