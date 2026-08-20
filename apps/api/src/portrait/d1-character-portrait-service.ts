@@ -1,4 +1,4 @@
-import { CHARACTER_PORTRAIT_MODEL, type CharacterPortraitDelivery, type CharacterPortraitResult, type CharacterPortraitSnapshot } from './contracts';
+import { CHARACTER_PORTRAIT_FALLBACK_MODEL, CHARACTER_PORTRAIT_MODEL, type CharacterPortraitDelivery, type CharacterPortraitResult, type CharacterPortraitSnapshot } from './contracts';
 
 const GENERATION_LEASE_MS = 120_000;
 
@@ -128,43 +128,16 @@ export class D1CharacterPortraitService {
       return { ok: true, value: snapshot(row, true), replayed: true };
     }
 
-    let payload: unknown;
-    try {
-      const reference = await this.loadLatestReady(plotId);
-      const referenceObject = reference?.object_key ? await this.bucket.get(reference.object_key) : null;
-      const form = new FormData();
-      form.append('prompt', portraitPrompt(context, Boolean(referenceObject)));
-      form.append('width', '480');
-      form.append('height', '480');
-      if (referenceObject) {
-        const referenceBytes = await referenceObject.arrayBuffer();
-        form.append('input_image_0', new Blob([referenceBytes], { type: referenceObject.httpMetadata?.contentType ?? 'image/jpeg' }), 'reference.jpg');
-      }
-      const encoded = new Response(form);
-      const body = encoded.body;
-      const contentType = encoded.headers.get('content-type');
-      if (!body || !contentType) throw new Error('Portrait multipart encoding failed.');
-      payload = await this.ai.run(CHARACTER_PORTRAIT_MODEL, {
-        multipart: {
-          body: body as unknown as object,
-          contentType,
-        },
-      });
-    } catch {
-      await this.fail(plotId, fingerprint, generationToken, 'provider_unavailable');
-      return providerUnavailable('Character portrait provider is temporarily unavailable.');
+    const reference = await this.loadLatestReady(plotId);
+    const referenceObject = reference?.object_key ? await this.bucket.get(reference.object_key) : null;
+    const generated = await generatePortraitImage(this.ai, context, referenceObject);
+    if (!generated.ok) {
+      await this.fail(plotId, fingerprint, generationToken, generated.code);
+      return generated.code === 'provider_unavailable'
+        ? providerUnavailable('Character portrait provider is temporarily unavailable.')
+        : { ok: false, error: { code: 'invalid_response', message: 'Character portrait provider returned invalid image bytes.' } };
     }
-
-    const base64 = extractBase64Image(payload);
-    if (!base64) {
-      await this.fail(plotId, fingerprint, generationToken, 'invalid_response');
-      return { ok: false, error: { code: 'invalid_response', message: 'Character portrait provider returned no image.' } };
-    }
-    const image = decodeImage(base64);
-    if (!image || image.bytes.byteLength < 256) {
-      await this.fail(plotId, fingerprint, generationToken, 'invalid_response');
-      return { ok: false, error: { code: 'invalid_response', message: 'Character portrait provider returned invalid image bytes.' } };
-    }
+    const { image, model } = generated;
 
     const objectKey = `portraits/${plotId}/${fingerprint}/${generationToken}.${image.extension}`;
     try {
@@ -173,10 +146,10 @@ export class D1CharacterPortraitService {
       await this.db
         .prepare(
           `UPDATE character_portraits
-           SET status = 'ready', generation_token = NULL, object_key = ?, failure_code = NULL, ready_at = ?, updated_at = ?
+           SET status = 'ready', generation_token = NULL, object_key = ?, model = ?, failure_code = NULL, ready_at = ?, updated_at = ?
            WHERE plot_id = ? AND story_fingerprint = ? AND status = 'generating' AND generation_token = ?`,
         )
-        .bind(objectKey, readyAt, readyAt, plotId, fingerprint, generationToken)
+        .bind(objectKey, model, readyAt, readyAt, plotId, fingerprint, generationToken)
         .run();
     } catch {
       await this.fail(plotId, fingerprint, generationToken, 'r2_write_failed');
@@ -259,6 +232,63 @@ export class D1CharacterPortraitService {
       // Best-effort cleanup only; canonical story and the winning portrait row remain authoritative.
     }
   }
+}
+
+type DecodedPortraitImage = NonNullable<ReturnType<typeof decodeImage>>;
+type GeneratedPortraitImage =
+  | { ok: true; image: DecodedPortraitImage; model: string }
+  | { ok: false; code: 'provider_unavailable' | 'invalid_response' };
+
+async function generatePortraitImage(
+  ai: Ai,
+  context: PortraitContextRow,
+  referenceObject: R2ObjectBody | null,
+): Promise<GeneratedPortraitImage> {
+  try {
+    const form = new FormData();
+    form.append('prompt', portraitPrompt(context, Boolean(referenceObject)));
+    form.append('width', '480');
+    form.append('height', '480');
+    if (referenceObject) {
+      const referenceBytes = await referenceObject.arrayBuffer();
+      form.append(
+        'input_image_0',
+        new Blob([referenceBytes], { type: referenceObject.httpMetadata?.contentType ?? 'image/jpeg' }),
+        'reference.jpg',
+      );
+    }
+    const encoded = new Response(form);
+    const body = encoded.body;
+    const contentType = encoded.headers.get('content-type');
+    if (!body || !contentType) throw new Error('Portrait multipart encoding failed.');
+    const payload = await ai.run(CHARACTER_PORTRAIT_MODEL, {
+      multipart: { body: body as unknown as object, contentType },
+    });
+    const image = decodedImageFromPayload(payload);
+    if (image) return { ok: true, image, model: CHARACTER_PORTRAIT_MODEL };
+  } catch {
+    // The multi-reference partner model is best effort; a hosted fallback keeps portraits available.
+  }
+
+  try {
+    const payload = await ai.run(CHARACTER_PORTRAIT_FALLBACK_MODEL, {
+      prompt: portraitPrompt(context, false),
+      steps: 4,
+    });
+    const image = decodedImageFromPayload(payload);
+    return image
+      ? { ok: true, image, model: CHARACTER_PORTRAIT_FALLBACK_MODEL }
+      : { ok: false, code: 'invalid_response' };
+  } catch {
+    return { ok: false, code: 'provider_unavailable' };
+  }
+}
+
+function decodedImageFromPayload(payload: unknown): DecodedPortraitImage | null {
+  const base64 = extractBase64Image(payload);
+  if (!base64) return null;
+  const image = decodeImage(base64);
+  return image && image.bytes.byteLength >= 256 ? image : null;
 }
 
 function portraitPrompt(context: PortraitContextRow, hasReference: boolean): string {

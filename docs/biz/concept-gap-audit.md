@@ -19,8 +19,14 @@ Every signed-in account receives a random referral code. A referred account may 
 ### Unlimited branching text
 Generated Scenes are unlimited on both Free and Plus so a committed branch can always continue without a daily text-quota dead end. Plus differentiation remains fresh cloud narration at 10/day versus 1/day on Free, plus referral voice rewards. Scene quota policy and provider/account capacity remain separate operational concerns.
 
+### Scene-sheet review without leaving the drama
+The active Scene now behaves as three reviewable sheets: Scene → Choice → Consequence. Progress only unlocks sheets that canonical playback has actually reached. Horizontal gestures and explicit sheet tabs move backward/forward inside that review stack, while the native iOS route-pop gesture is disabled on the drama player so a review swipe cannot accidentally leave the story. A newly generated Scene starts again on its Scene sheet; committing a branch advances to Consequence without mutating navigation history.
+
+### Library shelves and canonical journey metrics
+Library now mirrors the concept's shelf controls with Continue / All / Paused filters while preserving the product's infinite-story lifecycle instead of inventing a false Completed state. History adds a compact journey summary derived only from canonical History rows: Scenes traveled, committed choices, and furthest Scene. No client-owned counters or fabricated completion state are introduced.
+
 ### Existing concept parity retained
-The current product already covers the mirror's core surfaces in a different visual system: Library/Home, Create, character-led Scene, three choices, consequence, continue, History branch map, narration, Plus, Settings, privacy/export/delete, email OTP, persistent bottom navigation, and resume.
+The current product covers the mirror's core surfaces in a different visual system: Library/Home, Create, character-led Scene, three choices, consequence, continue, in-player sheet review, History branch map and journey metrics, narration, living portrait, Plus, Settings, privacy/export/delete, email OTP, persistent bottom navigation, and resume.
 
 ## Defer
 

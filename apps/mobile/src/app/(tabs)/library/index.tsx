@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaLibrarySnapshot, DramaSummary } from '@/features/drama/contracts';
+import { libraryView, type DramaLibraryFilter } from '@/features/drama/library-view';
 import { DramaEmptyStage, DramaLoadingStage, DramaCoverTile } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
@@ -13,6 +14,7 @@ export default function DramaLibraryScreen() {
   const { locale, t } = useUiCopy();
   const client = useDramaExperienceClient();
   const [snapshot, setSnapshot] = useState<DramaLibrarySnapshot | null>(null);
+  const [filter, setFilter] = useState<DramaLibraryFilter>('continue');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,16 +56,23 @@ export default function DramaLibraryScreen() {
   }
 
   const emptyLibrary = Boolean(snapshot && snapshot.active.length === 0 && snapshot.archived.length === 0);
-  const featured = snapshot?.active[0] ?? null;
-  const restActive = snapshot?.active.slice(1) ?? [];
+  const view = snapshot ? libraryView(snapshot, filter) : null;
+  const featured = view?.active[0] ?? null;
+  const restActive = view?.active.slice(1) ?? [];
+  const filteredEmpty = Boolean(snapshot && !emptyLibrary && view?.total === 0);
 
   return (
     <Screen>
       <View style={styles.topBar}><BrandMark /></View>
       <View style={styles.hero}>
         <Eyebrow>{t('Library', 'Thư viện')}</Eyebrow>
-        <Text style={styles.title}>{t('Your dramas', 'Drama của bạn')}</Text>
+        <View style={styles.heroTitleRow}>
+          <Text style={styles.title}>{t('Your dramas', 'Drama của bạn')}</Text>
+          <ActionButton label={t('New drama', 'Drama mới')} variant="ghost" onPress={() => router.push('/create')} style={styles.newDramaAction} />
+        </View>
       </View>
+
+      {snapshot && !emptyLibrary ? <LibraryFilterRail filter={filter} snapshot={snapshot} locale={locale} onChange={setFilter} /> : null}
 
       {error ? <ErrorState title={t('Drama shelf could not update', 'Không thể cập nhật kệ drama')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
       {!snapshot && !error ? <DramaLoadingStage label={t('Lighting your drama shelf…', 'Đang thắp sáng kệ drama…')} detail={t('Restoring covers, scene positions and decision points.', 'Đang khôi phục bìa, vị trí cảnh và điểm quyết định.')} locale={locale} /> : null}
@@ -75,13 +84,21 @@ export default function DramaLibraryScreen() {
         </View>
       ) : null}
 
-      {snapshot && !emptyLibrary ? (
+      {filteredEmpty ? (
+        <DramaEmptyStage
+          title={filter === 'paused' ? t('No paused dramas.', 'Chưa có drama tạm dừng.') : t('Nothing on this shelf yet.', 'Kệ này chưa có drama.')}
+          detail={filter === 'paused' ? t('Pause a drama and it will stay here without changing its canonical history.', 'Tạm dừng một drama và nó sẽ nằm ở đây mà không đổi lịch sử chuẩn.') : t('Create a drama or switch shelves.', 'Tạo drama mới hoặc chuyển kệ.')}
+          locale={locale}
+        />
+      ) : null}
+
+      {snapshot && !emptyLibrary && !filteredEmpty ? (
         <>
           {featured ? (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>{t('Now playing', 'Đang phát')}</Text>
-                <Text style={styles.sectionCount}>{String(snapshot.active.length).padStart(2, '0')}</Text>
+                <Text style={styles.sectionCount}>{String(view?.active.length ?? 0).padStart(2, '0')}</Text>
               </View>
               <DramaCoverTile
                 title={featured.title}
@@ -118,10 +135,10 @@ export default function DramaLibraryScreen() {
             />
           ) : null}
 
-          {snapshot.archived.length > 0 ? (
+          {(view?.archived.length ?? 0) > 0 ? (
             <LibraryListSection
               title={t('Paused', 'Đã tạm dừng')}
-              dramas={snapshot.archived}
+              dramas={view?.archived ?? []}
               action="restore"
               busyId={busyId}
               t={t}
@@ -136,6 +153,43 @@ export default function DramaLibraryScreen() {
 }
 
 type Translate = (en: string, vi: string) => string;
+
+function LibraryFilterRail({
+  filter,
+  snapshot,
+  locale,
+  onChange,
+}: {
+  filter: DramaLibraryFilter;
+  snapshot: DramaLibrarySnapshot;
+  locale: 'en' | 'vi';
+  onChange: (filter: DramaLibraryFilter) => void;
+}) {
+  const options: { value: DramaLibraryFilter; label: string; count: number }[] = [
+    { value: 'continue', label: locale === 'vi' ? 'Tiếp tục' : 'Continue', count: snapshot.active.length },
+    { value: 'all', label: locale === 'vi' ? 'Tất cả' : 'All', count: snapshot.active.length + snapshot.archived.length },
+    { value: 'paused', label: locale === 'vi' ? 'Tạm dừng' : 'Paused', count: snapshot.archived.length },
+  ];
+  return (
+    <View style={styles.filterRail} accessibilityRole="tablist">
+      {options.map((option) => {
+        const selected = filter === option.value;
+        return (
+          <Pressable
+            key={option.value}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            onPress={() => onChange(option.value)}
+            style={({ pressed }) => [styles.filterTab, selected && styles.filterTabSelected, pressed && styles.filterTabPressed]}
+          >
+            <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{option.label}</Text>
+            <Text style={[styles.filterCount, selected && styles.filterCountSelected]}>{String(option.count).padStart(2, '0')}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 function LibraryListSection({
   title,
@@ -230,7 +284,17 @@ function LibraryRow({
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   hero: { gap: spacing.xs, paddingTop: spacing.sm, paddingBottom: spacing.xs },
-  title: { color: colors.ink, fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: -0.3 },
+  heroTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  title: { flex: 1, minWidth: 180, color: colors.ink, fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: -0.3 },
+  newDramaAction: { minHeight: 40, paddingHorizontal: spacing.sm },
+  filterRail: { flexDirection: 'row', overflow: 'hidden', borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceQuiet },
+  filterTab: { minHeight: 46, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, backgroundColor: 'transparent' },
+  filterTabSelected: { backgroundColor: colors.surfaceWarmDeep },
+  filterTabPressed: { opacity: 0.76 },
+  filterLabel: { color: colors.inkMuted, fontSize: 11, fontWeight: '800' },
+  filterLabelSelected: { color: colors.ink },
+  filterCount: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900' },
+  filterCountSelected: { color: colors.accentStrong },
   emptyWrap: { gap: spacing.md },
   section: { gap: spacing.md, paddingTop: spacing.lg },
   sectionHeader: {

@@ -7,7 +7,7 @@ import migrationSeven from '../migrations/0007_live_story_integration.sql?raw';
 import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import type { AppEnv } from '../src/env';
 import { D1CharacterPortraitService } from '../src/portrait/d1-character-portrait-service';
-import { CHARACTER_PORTRAIT_MODEL } from '../src/portrait/contracts';
+import { CHARACTER_PORTRAIT_FALLBACK_MODEL, CHARACTER_PORTRAIT_MODEL } from '../src/portrait/contracts';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
 
 const runtimeEnv = env as unknown as AppEnv;
@@ -46,6 +46,18 @@ describe('D1CharacterPortraitService', () => {
     const object = await bucket.get(delivery.value.objectKey);
     expect(object?.httpMetadata?.contentType).toBe('image/jpeg');
     expect((await object?.arrayBuffer())?.byteLength).toBeGreaterThan(256);
+  });
+
+  it('falls back to the hosted text-to-image model when the primary partner model is unavailable', async () => {
+    const ai = fakeImageAi({ failPrimary: true });
+    const service = new D1CharacterPortraitService(db, bucket, ai.value);
+
+    const generated = await service.generate('user-1', 'plot-1');
+
+    expect(generated).toMatchObject({ ok: true, value: { status: 'ready', current: true } });
+    expect(ai.models()).toEqual([CHARACTER_PORTRAIT_MODEL, CHARACTER_PORTRAIT_FALLBACK_MODEL]);
+    const row = await db.prepare("SELECT model, status FROM character_portraits WHERE plot_id = 'plot-1'").first<{ model: string; status: string }>();
+    expect(row).toEqual({ model: CHARACTER_PORTRAIT_FALLBACK_MODEL, status: 'ready' });
   });
 
   it('marks the prior portrait stale after story progression and feeds it back as an identity reference', async () => {
@@ -106,7 +118,7 @@ describe('D1CharacterPortraitService', () => {
   });
 });
 
-function fakeImageAi() {
+function fakeImageAi(options: { failPrimary?: boolean } = {}) {
   let callCount = 0;
   const models: string[] = [];
   const references: number[] = [];
@@ -114,14 +126,21 @@ function fakeImageAi() {
   bytes.set([0xff, 0xd8, 0xff, 0xe0], 0);
   const base64 = btoa(String.fromCharCode(...bytes));
   const value = {
-    async run(model: string, input: { multipart?: { body?: unknown; contentType?: string } }) {
+    async run(model: string, input: { multipart?: { body?: unknown; contentType?: string }; prompt?: string; steps?: number }) {
       callCount += 1;
       models.push(model);
-      const body = input.multipart?.body;
-      let multipartText = '';
-      if (body instanceof ReadableStream) multipartText = await new Response(body).text();
-      references.push(multipartText.includes('name="input_image_0"') ? 1 : 0);
-      expect(input.multipart?.contentType).toMatch(/^multipart\/form-data; boundary=/u);
+      if (model === CHARACTER_PORTRAIT_MODEL) {
+        if (options.failPrimary) throw new Error('primary unavailable');
+        const body = input.multipart?.body;
+        let multipartText = '';
+        if (body instanceof ReadableStream) multipartText = await new Response(body).text();
+        references.push(multipartText.includes('name="input_image_0"') ? 1 : 0);
+        expect(input.multipart?.contentType).toMatch(/^multipart\/form-data; boundary=/u);
+        return { image: base64 };
+      }
+      expect(model).toBe(CHARACTER_PORTRAIT_FALLBACK_MODEL);
+      expect(input.prompt).toContain('Cinematic premium 3D anime character portrait');
+      expect(input.steps).toBe(4);
       return { image: base64 };
     },
   } as unknown as Ai;

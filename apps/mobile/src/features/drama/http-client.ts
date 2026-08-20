@@ -327,7 +327,7 @@ function mapHttpError(status: number, payload: unknown): DramaClientError {
   if (status === 404 || code === 'not_found') return new DramaClientError('not_found', 'This drama could not be found.');
   if (code === 'choice_conflict') return new DramaClientError('choice_conflict', 'Another choice is already canonical for this scene.');
   if (code === 'choice_required' || code === 'stale_state' || code === 'creation_conflict') return new DramaClientError('choice_required', 'The drama changed on the server. Reload before continuing.');
-  if (status === 429 || code === 'quota_exceeded') return new DramaClientError('quota_exceeded', 'Today’s drama generation allowance is exhausted.');
+  if (status === 429 || code === 'quota_exceeded') return new DramaClientError('quota_exceeded', 'Scene generation is temporarily rate limited by the server.');
   if (status === 503 || code === 'provider_unavailable') return new DramaClientError('provider_unavailable', 'Drama generation is temporarily unavailable.');
   if (status === 502 || code === 'invalid_generation') return new DramaClientError('invalid_generation', 'The generated scene did not satisfy the canonical drama contract.');
   if (status === 400 || code === 'invalid_input') return new DramaClientError('invalid_input', 'The drama request is invalid.');

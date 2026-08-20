@@ -6,7 +6,7 @@ type QueueConfig = {
   queues: { consumers: Array<{ queue: string; dead_letter_queue?: string }> };
 };
 
-type WranglerConfig = QueueConfig & { env: { development: QueueConfig } };
+type WranglerConfig = QueueConfig & { env: { development: QueueConfig & { ai: { binding: string } } } };
 
 const config = JSON.parse(wranglerText) as WranglerConfig;
 
@@ -19,5 +19,9 @@ describe('Wrangler queue routing config', () => {
   it('keeps production quotas enforced while development preview is unlimited', () => {
     expect(config.vars.QUOTA_MODE).toBe('enforced');
     expect(config.env.development.vars.QUOTA_MODE).toBe('preview_unlimited');
+  });
+
+  it('binds Workers AI in the development environment where portraits run', () => {
+    expect(config.env.development.ai.binding).toBe('AI');
   });
 });

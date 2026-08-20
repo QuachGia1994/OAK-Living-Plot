@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Share, StyleSheet, Text, View } from 'react-native';
+import { PanResponder, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SceneVoiceCard } from '@/features/audio/scene-voice-card';
 import type { DramaMood } from '@/features/drama/domain';
 import { useDramaPlayback, type DramaFailure } from '@/features/drama/use-drama-playback';
+import { canViewSceneSheet, liveSceneSheet, sceneSheetAfterSwipe, type SceneSheet } from '@/features/drama/scene-sheet-navigation';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeDramaShareText } from '@/features/share/drama-share';
@@ -21,6 +22,32 @@ export default function DramaScreen() {
   const readOnly = useMemo(() => readParam(params.readOnly) === '1', [params.readOnly]);
   const authReady = !auth.configured || (auth.isLoaded && auth.isSignedIn);
   const playback = useDramaPlayback({ dramaId, enabled: authReady });
+  const [sheet, setSheet] = useState<SceneSheet>('scene');
+  const liveSheet = liveSceneSheet(playback.playbackState.phase);
+  const sceneKey = playback.drama?.currentScene.id ?? '';
+  const lastSceneKey = useRef('');
+  const lastLiveSheet = useRef<SceneSheet>('scene');
+
+  useEffect(() => {
+    if (!sceneKey) return;
+    if (lastSceneKey.current !== sceneKey) {
+      lastSceneKey.current = sceneKey;
+      lastLiveSheet.current = liveSheet;
+      setSheet('scene');
+      return;
+    }
+    if (lastLiveSheet.current !== liveSheet) {
+      lastLiveSheet.current = liveSheet;
+      setSheet(liveSheet);
+    }
+  }, [liveSheet, sceneKey]);
+
+  const sheetPanResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > 18 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
+    onPanResponderRelease: (_event, gesture) => {
+      setSheet((current) => sceneSheetAfterSwipe(current, liveSheet, gesture.dx, gesture.dy));
+    },
+  }), [liveSheet]);
 
   if (auth.configured && (!auth.isLoaded || !auth.isSignedIn)) {
     return (
@@ -77,8 +104,8 @@ export default function DramaScreen() {
   const drama = playback.drama;
   const scene = drama.currentScene;
   const consequence = scene.branch.state === 'committed' ? scene.branch.consequence : undefined;
-  const choiceVisible = playback.playbackState.phase === 'choice' || playback.playbackState.phase === 'committing_choice';
-  const consequenceVisible = playback.playbackState.phase === 'consequence' || playback.playbackState.phase === 'continuing';
+  const canonicalChoiceId = scene.branch.state === 'committed' ? scene.branch.choiceId : playback.selectedChoiceId;
+  const canonicalChoice = scene.choices.find((choice) => choice.id === canonicalChoiceId) ?? null;
 
   return (
     <Screen contentStyle={styles.playerScreen}>
@@ -87,18 +114,91 @@ export default function DramaScreen() {
         <ActionButton label={t('My dramas', 'Drama của tôi')} variant="ghost" onPress={() => router.push('/library')} />
       </View>
 
-      <MotionReveal key={`scene-${scene.id}-${scene.branch.state}`}>
-        <DramaSceneStage
-          sceneNumber={scene.number}
-          title={scene.title}
-          body={scene.script}
-          characterName={drama.leadCharacter.name}
-          mood={drama.mood}
-          locale={locale}
-          consequence={consequence}
-          onPlaybackComplete={playback.markSceneComplete}
-        />
-      </MotionReveal>
+      <View style={styles.sheetDeck} {...sheetPanResponder.panHandlers}>
+        <SceneSheetRail current={sheet} live={liveSheet} locale={locale} onSelect={setSheet} />
+        {sheet !== liveSheet ? (
+          <Text style={styles.reviewNote}>{t('Review mode · swipe left to return toward the live step.', 'Chế độ xem lại · vuốt sang trái để trở về bước hiện tại.')}</Text>
+        ) : null}
+
+        {sheet === 'scene' ? (
+          <MotionReveal key={`scene-${scene.id}-${scene.branch.state}`}>
+            <DramaSceneStage
+              sceneNumber={scene.number}
+              title={scene.title}
+              body={scene.script}
+              characterName={drama.leadCharacter.name}
+              mood={drama.mood}
+              locale={locale}
+              onPlaybackComplete={playback.markSceneComplete}
+            />
+          </MotionReveal>
+        ) : null}
+
+        {sheet === 'choice' ? (
+          <MotionReveal key={`choice-${scene.id}-${scene.branch.state}`}>
+            <View style={styles.sheetPanelBody}>
+              <View style={styles.choiceSection}>
+                <View style={styles.choiceHeading}>
+                  <Eyebrow>{scene.branch.state === 'committed' ? t('Choice review', 'Xem lại lựa chọn') : t('Choose the next turn', 'Chọn bước ngoặt tiếp theo')}</Eyebrow>
+                  <Text style={styles.choiceTitle}>{t(`What should ${drama.leadCharacter.name} do next?`, `${drama.leadCharacter.name} nên làm gì tiếp theo?`)}</Text>
+                </View>
+
+                <View style={styles.choiceGrid}>
+                  {scene.choices.map((choice) => (
+                    <DramaChoiceCard
+                      key={choice.id}
+                      choice={choice}
+                      selected={choice.id === canonicalChoiceId}
+                      disabled={readOnly || scene.branch.state === 'committed' || playback.playbackState.phase === 'committing_choice'}
+                      mood={drama.mood}
+                      locale={locale}
+                      onPress={() => playback.selectChoice(choice.id)}
+                    />
+                  ))}
+                </View>
+
+                {scene.branch.state === 'committed' ? (
+                  <View style={styles.commitDock}>
+                    <Text style={styles.commitText} numberOfLines={2}>{canonicalChoice?.label ?? t('Canonical branch locked', 'Nhánh chuẩn đã được chốt')}</Text>
+                    <ActionButton label={t('Review consequence', 'Xem hậu quả')} variant="secondary" onPress={() => setSheet('consequence')} />
+                  </View>
+                ) : !playback.selectedChoice ? (
+                  <Text style={styles.choiceHint}>{t('Pick a branch to continue the drama.', 'Chọn một nhánh để tiếp tục drama.')}</Text>
+                ) : (
+                  <View style={styles.commitDock}>
+                    <Text style={styles.commitText} numberOfLines={1}>{playback.selectedChoice.label}</Text>
+                    <ActionButton
+                      label={t('Lock this choice', 'Chốt lựa chọn')}
+                      busy={playback.playbackState.phase === 'committing_choice'}
+                      onPress={() => void playback.commitChoice()}
+                    />
+                  </View>
+                )}
+              </View>
+            </View>
+          </MotionReveal>
+        ) : null}
+
+        {sheet === 'consequence' && consequence ? (
+          <MotionReveal key={`consequence-${scene.id}`}>
+            <View style={styles.sheetPanelBody}>
+              <View style={styles.nextSection}>
+                <Eyebrow>{t('Branch committed', 'Đã chốt nhánh')}</Eyebrow>
+                <Text style={styles.nextTitle}>{t('Your choice changed what happens next.', 'Lựa chọn của bạn đã thay đổi cảnh tiếp theo.')}</Text>
+                {canonicalChoice ? <Text style={styles.consequenceChoice}>{canonicalChoice.label}</Text> : null}
+                <Text style={styles.consequenceText}>{consequence}</Text>
+                {!readOnly ? (
+                  <ActionButton
+                    label={t(`Continue to scene ${scene.number + 1}`, `Tiếp tục cảnh ${scene.number + 1}`)}
+                    busy={playback.playbackState.phase === 'continuing'}
+                    onPress={() => void playback.continueDrama()}
+                  />
+                ) : null}
+              </View>
+            </View>
+          </MotionReveal>
+        ) : null}
+      </View>
 
       <View style={styles.playerBody}>
         {playback.failure ? (
@@ -123,54 +223,6 @@ export default function DramaScreen() {
             <Text style={styles.readOnlyTitle}>{t('Paused at this scene.', 'Tạm dừng tại cảnh này.')}</Text>
             <ActionButton label={t('Open drama library', 'Mở thư viện drama')} variant="secondary" onPress={() => router.push('/library')} />
           </View>
-        ) : choiceVisible ? (
-          <MotionReveal key={`choice-${scene.id}`}>
-            <View style={styles.choiceSection}>
-              <View style={styles.choiceHeading}>
-                <Eyebrow>{t('Choose the next turn', 'Chọn bước ngoặt tiếp theo')}</Eyebrow>
-                <Text style={styles.choiceTitle}>{t(`What should ${drama.leadCharacter.name} do next?`, `${drama.leadCharacter.name} nên làm gì tiếp theo?`)}</Text>
-              </View>
-
-              <View style={styles.choiceGrid}>
-                {scene.choices.map((choice) => (
-                  <DramaChoiceCard
-                    key={choice.id}
-                    choice={choice}
-                    selected={choice.id === playback.selectedChoiceId}
-                    disabled={playback.playbackState.phase === 'committing_choice'}
-                    mood={drama.mood}
-                    locale={locale}
-                    onPress={() => playback.selectChoice(choice.id)}
-                  />
-                ))}
-              </View>
-
-              {!playback.selectedChoice ? (
-                <Text style={styles.choiceHint}>{t('Pick a branch to continue the drama.', 'Chọn một nhánh để tiếp tục drama.')}</Text>
-              ) : (
-                <View style={styles.commitDock}>
-                  <Text style={styles.commitText} numberOfLines={1}>{playback.selectedChoice.label}</Text>
-                  <ActionButton
-                    label={t('Lock this choice', 'Chốt lựa chọn')}
-                    busy={playback.playbackState.phase === 'committing_choice'}
-                    onPress={() => void playback.commitChoice()}
-                  />
-                </View>
-              )}
-            </View>
-          </MotionReveal>
-        ) : consequenceVisible ? (
-          <MotionReveal key={`consequence-${scene.id}`}>
-            <View style={styles.nextSection}>
-              <Eyebrow>{t('Branch committed', 'Đã chốt nhánh')}</Eyebrow>
-              <Text style={styles.nextTitle}>{t('The next scene starts from this exact consequence.', 'Cảnh tiếp theo bắt đầu chính từ hậu quả này.')}</Text>
-              <ActionButton
-                label={t(`Continue to scene ${scene.number + 1}`, `Tiếp tục cảnh ${scene.number + 1}`)}
-                busy={playback.playbackState.phase === 'continuing'}
-                onPress={() => void playback.continueDrama()}
-              />
-            </View>
-          </MotionReveal>
         ) : null}
 
         <CharacterPortraitCard
@@ -199,6 +251,43 @@ export default function DramaScreen() {
         </View>
       </View>
     </Screen>
+  );
+}
+
+function SceneSheetRail({
+  current,
+  live,
+  locale,
+  onSelect,
+}: {
+  current: SceneSheet;
+  live: SceneSheet;
+  locale: 'en' | 'vi';
+  onSelect: (sheet: SceneSheet) => void;
+}) {
+  const labels: Record<SceneSheet, string> = locale === 'vi'
+    ? { scene: 'CẢNH', choice: 'LỰA CHỌN', consequence: 'HỆ QUẢ' }
+    : { scene: 'SCENE', choice: 'CHOICE', consequence: 'CONSEQUENCE' };
+  return (
+    <View style={styles.sheetRail}>
+      {(['scene', 'choice', 'consequence'] as SceneSheet[]).map((item, index) => {
+        const enabled = canViewSceneSheet(item, live);
+        const selected = item === current;
+        return (
+          <Pressable
+            key={item}
+            accessibilityRole="tab"
+            accessibilityState={{ selected, disabled: !enabled }}
+            disabled={!enabled}
+            onPress={() => onSelect(item)}
+            style={({ pressed }) => [styles.sheetTab, selected && styles.sheetTabSelected, !enabled && styles.sheetTabDisabled, pressed && enabled && styles.sheetTabPressed]}
+          >
+            <Text style={[styles.sheetTabIndex, selected && styles.sheetTabIndexSelected]}>{String(index + 1).padStart(2, '0')}</Text>
+            <Text style={[styles.sheetTabLabel, selected && styles.sheetTabLabelSelected]}>{labels[item]}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -234,7 +323,7 @@ function failureMessage(failure: DramaFailure | null, locale: 'en' | 'vi'): stri
   if (failure.code === 'choice_required') return vi ? 'Cần chốt một lựa chọn trước khi dựng cảnh tiếp theo.' : 'Commit a choice before continuing to the next scene.';
   if (failure.code === 'not_found') return vi ? 'Drama hoặc lựa chọn này không còn khớp trạng thái chuẩn.' : 'This drama or choice no longer matches canonical state.';
   if (failure.code === 'auth_required') return vi ? 'Đăng nhập lại trước khi tiếp tục drama.' : 'Sign in again before continuing this drama.';
-  if (failure.code === 'quota_exceeded') return vi ? 'Bạn đã dùng hết lượt tạo cảnh hôm nay. Hạn mức đặt lại lúc 00:00 UTC.' : 'Today’s scene-generation allowance is exhausted. It resets at 00:00 UTC.';
+  if (failure.code === 'quota_exceeded') return vi ? 'Máy chủ đang giới hạn tạm thời việc tạo cảnh. Cốt truyện hiện tại vẫn được giữ nguyên để bạn thử lại.' : 'The server is temporarily limiting Scene generation. Current story state is unchanged so you can retry.';
   if (failure.code === 'provider_unavailable') return vi ? 'Tạo drama tạm thời không khả dụng. Nhánh đã chốt vẫn được giữ nguyên.' : 'Drama generation is temporarily unavailable. Your committed branch is unchanged.';
   if (failure.code === 'invalid_generation') return vi ? 'Cảnh được tạo không đạt hợp đồng drama chuẩn. Trạng thái hiện tại vẫn được giữ nguyên để bạn thử lại.' : 'The generated scene did not satisfy the canonical drama contract. Current state is unchanged so you can retry.';
   return vi ? 'Thao tác chưa hoàn tất. Trạng thái chuẩn vẫn được giữ nguyên.' : 'The action did not finish. Canonical state is unchanged.';
@@ -255,6 +344,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.background,
   },
+  sheetDeck: {
+    overflow: 'hidden',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.background,
+  },
+  sheetRail: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
+    backgroundColor: colors.surfaceQuiet,
+  },
+  sheetTab: {
+    minHeight: 52,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  sheetTabSelected: { borderBottomColor: colors.accentStrong },
+  sheetTabDisabled: { opacity: 0.32 },
+  sheetTabPressed: { opacity: 0.72 },
+  sheetTabIndex: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
+  sheetTabIndexSelected: { color: colors.accentStrong },
+  sheetTabLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  sheetTabLabelSelected: { color: colors.ink },
+  reviewNote: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, color: colors.quietInk, fontSize: 10, lineHeight: 15, textAlign: 'center' },
+  sheetPanelBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   playerBody: {
     gap: spacing.lg,
     paddingHorizontal: spacing.lg,
@@ -327,6 +449,22 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontFamily: typography.display,
     fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
+  },
+  consequenceChoice: {
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 10,
+    lineHeight: 16,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  consequenceText: {
+    color: colors.narrativeInk,
+    fontFamily: typography.display,
+    fontSize: 19,
     lineHeight: 28,
     fontWeight: '700',
   },

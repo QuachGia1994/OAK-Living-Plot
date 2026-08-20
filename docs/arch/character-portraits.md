@@ -11,7 +11,9 @@ The backend derives a SHA-256 fingerprint from bounded owner-scoped inputs: prot
 A branch commit therefore invalidates the portrait immediately, even before the next Scene is generated. The previous ready portrait remains available as `stale` until the user explicitly requests an update. The mobile card rechecks status when the current Scene/branch revision changes, but the app never regenerates images merely because a screen mounted or foregrounded.
 
 ## Identity continuity
-Development uses the Workers AI FLUX.2 Klein 4B image model behind the `AI` binding. The first portrait is generated from structured protagonist/story context. On later updates the latest ready private portrait is supplied as `input_image_0`; generated portraits are 480×480 so the identity reference remains inside the provider's current sub-512-pixel input constraint. The prompt asks the provider to preserve the same face, apparent age, hair, eye shape, and core identity while adapting expression, wardrobe, and lighting to the current story.
+Development uses Workers AI behind the `AI` binding. The primary path is FLUX.2 Klein 4B: the first portrait is generated from structured protagonist/story context, and later updates supply the latest ready private portrait as `input_image_0`; generated portraits remain 480×480 so the identity reference stays inside the provider input-size boundary. The prompt asks the provider to preserve the same face, apparent age, hair, eye shape, and core identity while adapting expression, wardrobe, and lighting to the current story.
+
+If the primary partner model is unavailable, the service retries once through the Cloudflare-hosted FLUX.1 Schnell text-to-image model. That fallback keeps optional portrait creation available but does not claim reference-image identity continuity; the database records the model that actually produced the winning private image. If both providers fail, the existing ready portrait or bundled fallback remains visible and canonical text story state is untouched.
 
 This is a continuity aid, not a canonical biometric identity guarantee. The text character record remains authority if an image drifts.
 

@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHistory, DramaHistoryItem } from '@/features/drama/contracts';
+import { journeyStats } from '@/features/drama/journey-stats';
 import { DramaEmptyStage, DramaLoadingStage, DramaRecapFrame, DramaUtilityHero } from '@/ui/drama-visuals';
 import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
@@ -74,6 +75,7 @@ export default function DramaHistoryScreen() {
 
       {history && history.items.length > 0 ? (
         <>
+          <JourneyStatsStrip history={history} locale={locale} />
           <BranchJourney items={history.items} locale={locale} />
           <View style={styles.timeline}>
             <View style={styles.timelineRail} />
@@ -108,6 +110,29 @@ export default function DramaHistoryScreen() {
         </>
       ) : null}
     </Screen>
+  );
+}
+
+function JourneyStatsStrip({ history, locale }: { history: DramaHistory; locale: 'en' | 'vi' }) {
+  const stats = journeyStats(history);
+  const labels = locale === 'vi'
+    ? { scenes: 'Cảnh đã đi', choices: 'Nhánh đã chốt', furthest: 'Cảnh xa nhất' }
+    : { scenes: 'Scenes traveled', choices: 'Choices locked', furthest: 'Furthest scene' };
+  return (
+    <View style={styles.statsStrip}>
+      <JourneyMetric label={labels.scenes} value={String(stats.scenes)} />
+      <JourneyMetric label={labels.choices} value={String(stats.committedChoices)} />
+      <JourneyMetric label={labels.furthest} value={String(stats.furthestScene).padStart(2, '0')} />
+    </View>
+  );
+}
+
+function JourneyMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.statMetric}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -148,6 +173,10 @@ function readParam(value: string | string[] | undefined): string | null {
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   emptyState: { gap: spacing.md },
+  statsStrip: { flexDirection: 'row', flexWrap: 'wrap', borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
+  statMetric: { minWidth: 104, flex: 1, gap: 3, paddingHorizontal: spacing.sm, paddingVertical: spacing.md },
+  statValue: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 24, lineHeight: 27, fontWeight: '700' },
+  statLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 13, fontWeight: '900', letterSpacing: 0.55, textTransform: 'uppercase' },
   branchMap: { gap: spacing.md, padding: spacing.md, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceQuiet },
   branchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   branchKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },

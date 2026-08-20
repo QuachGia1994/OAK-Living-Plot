@@ -215,7 +215,7 @@ function generationFailureCode(error: unknown): string {
 function createErrorMessage(error: unknown, locale: 'en' | 'vi'): string {
   const vi = locale === 'vi';
   if (!(error instanceof DramaClientError)) return vi ? 'Không thể chuẩn bị cảnh đầu. Thiết lập vẫn còn để bạn thử lại.' : 'The first scene could not be prepared. Your setup is still here, so you can try again.';
-  if (error.code === 'quota_exceeded') return vi ? 'Bạn đã dùng hết lượt tạo cảnh hôm nay. Thiết lập vẫn được giữ đến khi hạn mức UTC đặt lại.' : 'Today’s scene-generation allowance is exhausted. Your setup is saved here until the UTC reset.';
+  if (error.code === 'quota_exceeded') return vi ? 'Máy chủ đang giới hạn tạm thời việc tạo cảnh. Thiết lập vẫn được giữ để bạn thử lại.' : 'The server is temporarily limiting Scene generation. Your setup is still here so you can retry.';
   if (error.code === 'auth_required') return vi ? 'Phiên đăng nhập đã hết hạn. Đăng nhập lại trước khi tạo drama.' : 'Your session expired. Sign in again before generating this drama.';
   if (error.code === 'provider_unavailable') return vi ? 'Bộ máy tạo drama tạm thời không khả dụng. Thiết lập không thay đổi; hãy thử lại sau.' : 'The drama engine is temporarily unavailable. Your setup is unchanged; try again later.';
   if (error.code === 'choice_required') return vi ? 'Lần tạo này không còn khớp với bản trên máy chủ. Chỉnh thiết lập hoặc về trang chủ để tiếp tục drama hiện có.' : 'This creation attempt no longer matches the server copy. Edit the setup or return home to resume the existing drama.';

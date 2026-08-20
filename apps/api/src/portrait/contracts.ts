@@ -1,4 +1,5 @@
 export const CHARACTER_PORTRAIT_MODEL = '@cf/black-forest-labs/flux-2-klein-4b';
+export const CHARACTER_PORTRAIT_FALLBACK_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 export type CharacterPortraitStatus = 'missing' | 'generating' | 'ready' | 'stale' | 'failed';
 

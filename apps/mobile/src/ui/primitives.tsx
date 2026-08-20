@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -40,8 +41,9 @@ export function Screen({
           automaticallyAdjustKeyboardInsets
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={[styles.screenContent, androidBottomInset === undefined ? null : { paddingBottom: androidBottomInset }, footer ? styles.screenContentWithFooter : null, contentStyle]}
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={() => Keyboard.dismiss()}
           onScroll={Platform.OS === 'android' && androidTabBar ? (event) => androidTabBar.reportScroll(event.nativeEvent.contentOffset.y) : undefined}
           scrollEventThrottle={32}
         >

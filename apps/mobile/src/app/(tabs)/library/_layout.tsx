@@ -13,6 +13,10 @@ export default function LibraryStackLayout() {
         animation: 'fade',
         contentStyle: { backgroundColor: colors.background },
       }}
-    />
+    >
+      <Stack.Screen name="index" />
+      <Stack.Screen name="drama" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="history" />
+    </Stack>
   );
 }
