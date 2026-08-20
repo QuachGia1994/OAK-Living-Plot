@@ -154,10 +154,14 @@ function DramaHud({ snapshot, t }: { snapshot: DramaHomeSnapshot; t: Translate }
     <View style={styles.hud}>
       <HudMetric label={t('Streak', 'Chuỗi')} value={retention.currentStreakDays > 0 ? `${retention.currentStreakDays}D` : '—'} />
       <HudMetric label={t('Choices', 'Lựa chọn')} value={String(retention.choicesMade)} />
-      <HudMetric label={t('Scenes left', 'Cảnh còn lại')} value={`${quota.textRemaining}/${quota.textLimit}`} accent />
       <HudMetric
-        label={t('Voice left', 'Giọng còn lại')}
-        value={`${quota.voiceRemaining}/${quota.voiceLimit}${quota.voiceBonusCredits > 0 ? ` +${quota.voiceBonusCredits}` : ''}`}
+        label={quota.enforced ? t('Scenes left', 'Cảnh còn lại') : t('Preview scenes', 'Cảnh preview')}
+        value={quota.enforced ? `${quota.textRemaining}/${quota.textLimit}` : '∞'}
+        accent
+      />
+      <HudMetric
+        label={quota.enforced ? t('Voice left', 'Giọng còn lại') : t('Preview voices', 'Giọng preview')}
+        value={quota.enforced ? `${quota.voiceRemaining}/${quota.voiceLimit}${quota.voiceBonusCredits > 0 ? ` +${quota.voiceBonusCredits}` : ''}` : '∞'}
       />
     </View>
   );

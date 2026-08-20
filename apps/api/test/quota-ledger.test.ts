@@ -7,7 +7,7 @@ import migrationFour from '../migrations/0004_quota_ledger.sql?raw';
 import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?raw';
 import type { AppEnv } from '../src/env';
 import { D1QuotaLedger } from '../src/quota/d1-quota-ledger';
-import { quotaPolicyFor } from '../src/quota/policy';
+import { quotaModeFromEnv, quotaPolicyFor } from '../src/quota/policy';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
 
 const db = (env as unknown as AppEnv).DB;
@@ -31,6 +31,12 @@ describe('quota policy', () => {
   it('locks the current Free and Plus limits', () => {
     expect(quotaPolicyFor('free')).toEqual({ textEpisodesPerUtcDay: 50, voiceEpisodesPerUtcDay: 1 });
     expect(quotaPolicyFor('plus')).toEqual({ textEpisodesPerUtcDay: 100, voiceEpisodesPerUtcDay: 10 });
+  });
+
+  it('fails closed to enforced quota unless the server explicitly selects preview unlimited', () => {
+    expect(quotaModeFromEnv(undefined)).toBe('enforced');
+    expect(quotaModeFromEnv('store')).toBe('enforced');
+    expect(quotaModeFromEnv('preview_unlimited')).toBe('preview_unlimited');
   });
 });
 
@@ -59,6 +65,18 @@ describe('D1QuotaLedger', () => {
     expect(results.filter((result) => result.ok)).toHaveLength(1);
     expect(results.filter((result) => !result.ok && result.error.code === 'quota_exceeded')).toHaveLength(1);
     expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textReserved: 1, textConsumed: 99 });
+  });
+
+  it('keeps preview work ledgered but does not block after the production daily limit', async () => {
+    await db.prepare(`INSERT INTO daily_usage (user_id, usage_date, text_episodes, voiced_episodes, text_reserved, voice_reserved) VALUES ('user-1', '2026-08-16', 50, 1, 0, 0)`).run();
+    const ledger = new D1QuotaLedger(db, () => nowMs, 'preview_unlimited');
+
+    const text = await ledger.reserve({ userId: 'user-1', reservationKey: 'preview-text-over-limit', resourceType: 'text_episode', tier: 'free' });
+    const voice = await ledger.reserve({ userId: 'user-1', reservationKey: 'preview-voice-over-limit', resourceType: 'voice_episode', tier: 'free' });
+
+    expect(text.ok).toBe(true);
+    expect(voice.ok).toBe(true);
+    expect(await ledger.getDailyUsage('user-1', '2026-08-16')).toMatchObject({ textConsumed: 50, voiceConsumed: 1, textReserved: 1, voiceReserved: 1 });
   });
 
   it('allows voice consumption independently of same-day text consumption', async () => {

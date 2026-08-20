@@ -8,6 +8,7 @@ All notable changes to Living Plot will be documented in this file.
 - Phase 2 narrative quality: consequenceRealization, threadPayoff, pacingRole rhythm, branchCommitment, relationshipProgression, protagonistAgency, arcCoherence, returnPull proxy; shared provider-neutral `validateNarrativePublication` gate for Gemini and Workers AI; required beat/pacingRole on new Scene proposals; material-delta SSoT; long-horizon synthetic fixtures; no new schema migration; no mandatory LLM judge.
 
 ### Fixed
+- Development preview now disables daily Scene/fresh-voice quota rejection only through the server-owned Worker environment while preserving the same D1 ledger and fail-closed Store enforcement; Home also accepts older additive quota projections so missing preview/bonus display fields no longer collapse the entire recent-Drama screen.
 - Publication authority no longer rejects on eval-only dimensions; CRITICAL_THREAD_STALLED is eval-only (not per-thread age); Workers AI now runs the same narrative publication gate as Gemini.
 
 ### Changed

@@ -30,7 +30,10 @@ All three choices render together. A tap selects locally; only a successful serv
 
 Active Drama and History now live inside the Library tab's nested Stack. Home/Create/Library navigation enters `/library/drama` and `/library/history`, so the approved native iOS tab bar and Android bar remain available throughout reading, branching, continuation, and recap progress. Legacy `/drama` and `/history` routes redirect into this tab-owned stack for compatibility.
 
-Loading/error paths preserve the last canonical session. Auth expiry, quota exhaustion, provider unavailability, ownership failure, and stale/conflicting state remain explicit errors or canonical resync paths.
+Loading/error paths preserve the last canonical session. Auth expiry, quota exhaustion, provider unavailability, ownership failure, and stale/conflicting state remain explicit errors or canonical resync paths. Home treats newly added quota-display fields as additive: an older development Worker that omits `voiceBonusCredits` or the preview-mode marker is parsed conservatively as zero bonus + enforced quota instead of making the entire recent-Drama read fail.
+
+## Preview access policy
+Development preview access is selected only by the backend Worker environment. When `/v1/dramas/home` reports quota enforcement disabled, the client renders Scene/voice allowance as `∞`; it still sends the same authenticated requests and cannot choose or elevate this mode itself. Store/production deployments remain server-enforced.
 
 ## Voice UX
 Narration is optional derived media. Text remains readable when audio is absent, queued, processing, failed, or quota-exhausted.

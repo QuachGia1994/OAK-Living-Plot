@@ -124,6 +124,19 @@ describe('media HTTP boundary', () => {
     expect(queue.messages).toHaveLength(1);
   });
 
+  it('keeps fresh cloud narration unblocked in the development preview environment', async () => {
+    await seedOwnerWithScenes(2);
+    const queue = fakeQueue();
+    const previewEnv: AppEnv = { ...testEnv, QUOTA_MODE: 'preview_unlimited' };
+
+    const first = await handleRequest(postVoice('scene-1', 'voice-http-preview-1'), previewEnv, { sessionVerifier: verifier('clerk-owner'), audioQueue: queue });
+    const second = await handleRequest(postVoice('scene-2', 'voice-http-preview-2'), previewEnv, { sessionVerifier: verifier('clerk-owner'), audioQueue: queue });
+
+    expect(first.status).toBe(202);
+    expect(second.status).toBe(202);
+    expect(queue.messages).toHaveLength(2);
+  });
+
   it('uses backend-materialized Plus entitlement instead of trusting client input', async () => {
     const owner = await seedOwnerWithScenes(2);
     await db.prepare(

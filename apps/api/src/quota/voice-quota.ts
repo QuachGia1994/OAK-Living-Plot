@@ -1,5 +1,6 @@
 import { D1QuotaLedger } from './d1-quota-ledger';
 import type { QuotaError, QuotaTier } from './contracts';
+import type { QuotaMode } from './policy';
 import { D1VoiceBonusLedger } from '../referrals/d1-voice-bonus-ledger';
 
 export type VoiceQuotaSource = 'daily' | 'referral_bonus';
@@ -28,8 +29,9 @@ export class D1VoiceQuota implements VoiceQuota {
   constructor(
     private readonly db: D1Database,
     clock: () => number = Date.now,
+    quotaMode: QuotaMode = 'enforced',
   ) {
-    this.daily = new D1QuotaLedger(db, clock);
+    this.daily = new D1QuotaLedger(db, clock, quotaMode);
     this.bonus = new D1VoiceBonusLedger(db, clock);
   }
 

@@ -35,6 +35,7 @@ export interface RetentionDisplay {
 }
 
 export interface QuotaDisplay {
+  enforced: boolean;
   textRemaining: number;
   textLimit: number;
   voiceRemaining: number;

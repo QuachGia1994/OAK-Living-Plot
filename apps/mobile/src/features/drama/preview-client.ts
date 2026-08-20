@@ -37,6 +37,7 @@ export class PreviewDramaExperienceClient implements DramaExperienceClient {
     return {
       recentDramas: active.map((drama) => toSummary(drama, this.uiLocale)).reverse(),
       quota: {
+        enforced: false,
         textRemaining: 49,
         textLimit: 50,
         voiceRemaining: 1,

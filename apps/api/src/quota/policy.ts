@@ -1,5 +1,7 @@
 import type { QuotaPolicy, QuotaResource, QuotaTier } from './contracts';
 
+export type QuotaMode = 'enforced' | 'preview_unlimited';
+
 const POLICIES: Record<QuotaTier, QuotaPolicy> = {
   free: {
     textEpisodesPerUtcDay: 50,
@@ -20,4 +22,12 @@ export function quotaLimitFor(tier: QuotaTier, resourceType: QuotaResource): num
   return resourceType === 'text_episode'
     ? policy.textEpisodesPerUtcDay
     : policy.voiceEpisodesPerUtcDay;
+}
+
+export function quotaModeFromEnv(value: string | undefined): QuotaMode {
+  return value === 'preview_unlimited' ? 'preview_unlimited' : 'enforced';
+}
+
+export function quotaIsEnforced(mode: QuotaMode): boolean {
+  return mode === 'enforced';
 }

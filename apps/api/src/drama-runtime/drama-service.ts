@@ -9,7 +9,7 @@ import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences'
 import { isDramaLocale } from '../preferences/contracts';
 import { D1QuotaLedger } from '../quota/d1-quota-ledger';
 import type { QuotaError } from '../quota/contracts';
-import { quotaPolicyFor } from '../quota/policy';
+import { quotaIsEnforced, quotaPolicyFor, type QuotaMode } from '../quota/policy';
 import { buildRetentionSnapshot } from '../retention/retention';
 import { D1VoiceBonusLedger } from '../referrals/d1-voice-bonus-ledger';
 import type { ProductEventTelemetry, ProductTelemetrySink } from '../telemetry/product-events';
@@ -42,10 +42,11 @@ export class DramaService {
     private readonly generator: SceneGenerator,
     private readonly clock: Clock = Date.now,
     private readonly productTelemetry: ProductTelemetrySink = NOOP_PRODUCT_TELEMETRY,
+    private readonly quotaMode: QuotaMode = 'enforced',
   ) {
     this.dramas = new D1DramaRepository(db);
     this.entitlements = new D1EntitlementRepository(db, clock);
-    this.quota = new D1QuotaLedger(db, clock);
+    this.quota = new D1QuotaLedger(db, clock, quotaMode);
     this.preferences = new D1UserPreferencesRepository(db);
     this.publisher = new D1EpisodePublisher(db);
     this.choices = new D1ChoiceCommitter(db);
@@ -68,6 +69,7 @@ export class DramaService {
       value: {
         recentDramas,
         quota: {
+          enforced: quotaIsEnforced(this.quotaMode),
           textRemaining: remaining(policy.textEpisodesPerUtcDay, usage.textConsumed, usage.textReserved),
           textLimit: policy.textEpisodesPerUtcDay,
           voiceRemaining: remaining(policy.voiceEpisodesPerUtcDay, usage.voiceConsumed, usage.voiceReserved),

@@ -29,6 +29,7 @@ export interface DramaRetention {
 }
 
 export interface DramaQuotaDisplay {
+  enforced: boolean;
   textRemaining: number;
   textLimit: number;
   voiceRemaining: number;

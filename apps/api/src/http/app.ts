@@ -15,6 +15,8 @@ import { DramaService } from '../drama-runtime/drama-service';
 import { D1UserRepository } from '../persistence/d1-user-repository';
 import { D1CharacterPortraitService } from '../portrait/d1-character-portrait-service';
 import { isDramaLocale, isNarratorVariant, isUiLocale } from '../preferences/contracts';
+import { quotaModeFromEnv } from '../quota/policy';
+import { D1VoiceQuota } from '../quota/voice-quota';
 import { D1ReferralService } from '../referrals/d1-referral-service';
 import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences';
 import { CloudflareProductTelemetrySink } from '../telemetry/cloudflare-product-telemetry';
@@ -90,7 +92,12 @@ export async function handleRequest(
   }
 
   const productTelemetry = dependencies.productTelemetry ?? new CloudflareProductTelemetrySink(env.ANALYTICS);
-  const audio = new D1AudioService(env.DB, dependencies.audioQueue ?? env.TTS_QUEUE, undefined, productTelemetry);
+  const audio = new D1AudioService(
+    env.DB,
+    dependencies.audioQueue ?? env.TTS_QUEUE,
+    new D1VoiceQuota(env.DB, dependencies.dramaClock ?? Date.now, quotaModeFromEnv(env.QUOTA_MODE)),
+    productTelemetry,
+  );
   if (route.kind === 'scene_voice') {
     const entitlement = await entitlements.getEntitlement(user.id);
     return handleVoiceRequest(request, audio, user.id, route.sceneId, entitlement.tier);
@@ -219,6 +226,7 @@ async function handleDramaRoute(
     dependencies.sceneGenerator ?? createSceneGenerator(env),
     dependencies.dramaClock,
     dependencies.productTelemetry ?? new CloudflareProductTelemetrySink(env.ANALYTICS),
+    quotaModeFromEnv(env.QUOTA_MODE),
   );
   if (route.kind === 'drama_home') return dramaResponse(await service.loadHome(userId), 'home');
   if (route.kind === 'drama_library') return dramaResponse(await service.loadLibrary(userId), 'library');

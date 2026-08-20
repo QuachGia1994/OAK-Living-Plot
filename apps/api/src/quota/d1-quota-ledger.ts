@@ -9,7 +9,7 @@ import type {
   QuotaResource,
   QuotaResult,
 } from './contracts';
-import { quotaLimitFor } from './policy';
+import { quotaIsEnforced, quotaLimitFor, type QuotaMode } from './policy';
 
 type Clock = () => number;
 
@@ -42,6 +42,7 @@ export class D1QuotaLedger {
   constructor(
     private readonly db: D1Database,
     private readonly clock: Clock = Date.now,
+    private readonly quotaMode: QuotaMode = 'enforced',
   ) {}
 
   async reserve(input: QuotaReserveInput): Promise<QuotaResult> {
@@ -91,6 +92,9 @@ export class D1QuotaLedger {
       return { ok: true, value: await this.snapshot(reservation, reservation.id !== reservationId) };
     }
 
+    if (!quotaIsEnforced(this.quotaMode)) {
+      return { ok: false, error: { code: 'persistence_error', message: 'Preview quota reservation did not materialize.' } };
+    }
     return {
       ok: false,
       error: {
@@ -228,32 +232,32 @@ export class D1QuotaLedger {
     const usageExpression = input.resourceType === 'text_episode'
       ? 'du.text_episodes + du.text_reserved'
       : 'du.voiced_episodes + du.voice_reserved';
-    return this.db
-      .prepare(
-        `INSERT INTO quota_reservations
-           (id, user_id, reservation_key, utc_day, resource_type, status, last_event_id, created_at, updated_at)
-         SELECT ?, ?, ?, ?, ?, 'reserved', ?, ?, ?
-         FROM daily_usage du
-         WHERE du.user_id = ? AND du.usage_date = ? AND ${usageExpression} < ?
-           AND NOT EXISTS (
-             SELECT 1 FROM quota_reservations qr WHERE qr.user_id = ? AND qr.reservation_key = ?
-           )`,
-      )
-      .bind(
-        reservationId,
-        input.userId,
-        input.reservationKey,
-        utcDay,
-        input.resourceType,
-        eventId,
-        now,
-        now,
-        input.userId,
-        utcDay,
-        limit,
-        input.userId,
-        input.reservationKey,
-      );
+    const quotaGuard = quotaIsEnforced(this.quotaMode) ? ` AND ${usageExpression} < ?` : '';
+    const statement = this.db.prepare(
+      `INSERT INTO quota_reservations
+         (id, user_id, reservation_key, utc_day, resource_type, status, last_event_id, created_at, updated_at)
+       SELECT ?, ?, ?, ?, ?, 'reserved', ?, ?, ?
+       FROM daily_usage du
+       WHERE du.user_id = ? AND du.usage_date = ?${quotaGuard}
+         AND NOT EXISTS (
+           SELECT 1 FROM quota_reservations qr WHERE qr.user_id = ? AND qr.reservation_key = ?
+         )`,
+    );
+    const baseBindings = [
+      reservationId,
+      input.userId,
+      input.reservationKey,
+      utcDay,
+      input.resourceType,
+      eventId,
+      now,
+      now,
+      input.userId,
+      utcDay,
+    ];
+    return quotaIsEnforced(this.quotaMode)
+      ? statement.bind(...baseBindings, limit, input.userId, input.reservationKey)
+      : statement.bind(...baseBindings, input.userId, input.reservationKey);
   }
 
   private reserveCounterStatement(
@@ -319,23 +323,26 @@ export class D1QuotaLedger {
       ? 'text_episodes + text_reserved'
       : 'voiced_episodes + voice_reserved';
     const counterColumn = input.resourceType === 'text_episode' ? 'text_reserved' : 'voice_reserved';
+    const quotaGuard = quotaIsEnforced(this.quotaMode) ? ` AND ${usageExpression} < ?` : '';
+    const reactivateStatement = this.db.prepare(
+      `UPDATE quota_reservations
+       SET status = 'reserved', utc_day = ?, resource_id = NULL, last_event_id = ?, updated_at = ?
+       WHERE id = ? AND status = 'released'
+         AND EXISTS (
+           SELECT 1 FROM daily_usage
+           WHERE user_id = ? AND usage_date = ?${quotaGuard}
+         )`,
+    );
+    const boundReactivate = quotaIsEnforced(this.quotaMode)
+      ? reactivateStatement.bind(utcDay, eventId, now, existing.id, input.userId, utcDay, limit)
+      : reactivateStatement.bind(utcDay, eventId, now, existing.id, input.userId, utcDay);
 
     try {
       await this.db.batch([
         this.db
           .prepare('INSERT OR IGNORE INTO daily_usage (user_id, usage_date) VALUES (?, ?)')
           .bind(input.userId, utcDay),
-        this.db
-          .prepare(
-            `UPDATE quota_reservations
-             SET status = 'reserved', utc_day = ?, resource_id = NULL, last_event_id = ?, updated_at = ?
-             WHERE id = ? AND status = 'released'
-               AND EXISTS (
-                 SELECT 1 FROM daily_usage
-                 WHERE user_id = ? AND usage_date = ? AND ${usageExpression} < ?
-               )`,
-          )
-          .bind(utcDay, eventId, now, existing.id, input.userId, utcDay, limit),
+        boundReactivate,
         this.db
           .prepare(
             `INSERT INTO usage_events (id, user_id, utc_day, resource_type, event_type, reservation_key, created_at)
@@ -363,6 +370,9 @@ export class D1QuotaLedger {
 
     const current = await this.loadReservation(input.userId, input.reservationKey);
     if (current?.status === 'reserved') return { ok: true, value: await this.snapshot(current, current.last_event_id !== eventId) };
+    if (!quotaIsEnforced(this.quotaMode)) {
+      return { ok: false, error: { code: 'persistence_error', message: 'Preview quota retry reservation did not materialize.' } };
+    }
     return {
       ok: false,
       error: {

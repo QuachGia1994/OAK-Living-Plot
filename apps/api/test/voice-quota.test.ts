@@ -25,7 +25,7 @@ describe('D1VoiceQuota', () => {
   it('uses persistent referral credits only after the daily voice allowance is exhausted', async () => {
     await db.prepare(`INSERT INTO daily_usage (user_id, usage_date, text_episodes, voiced_episodes) VALUES ('user-1', '2026-08-19', 1, 1)`).run();
     await db.prepare(`INSERT INTO voice_bonus_accounts (user_id, available_credits, earned_credits) VALUES ('user-1', 2, 2)`).run();
-    const quota = new D1VoiceQuota(db);
+    const quota = new D1VoiceQuota(db, () => Date.parse('2026-08-19T10:00:00.000Z'));
 
     const reserved = await quota.reserve({ userId: 'user-1', reservationKey: 'bonus-fallback-001', tier: 'free' });
     expect(reserved).toMatchObject({ ok: true, value: { source: 'referral_bonus', status: 'reserved' } });

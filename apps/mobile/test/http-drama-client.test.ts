@@ -125,6 +125,18 @@ describe('HttpDramaExperienceClient', () => {
     expect(home.quota.resetLabel).toBe('Đặt lại lúc 00:00 UTC');
   });
 
+  it('accepts older home quota projections without optional preview/bonus fields', async () => {
+    const now = Date.parse('2026-08-17T01:00:00.000Z');
+    const client = new HttpDramaExperienceClient('https://api.test', async () => 'token', async () => Response.json({ home: {
+      recentDramas: [summaryPayload(now)],
+      quota: { textRemaining: 49, textLimit: 50, voiceRemaining: 1, voiceLimit: 1, resetAt: '2026-08-18T00:00:00.000Z' },
+      retention: { currentStreakDays: 1, choicesMade: 2, activeDramas: 1, dailyPrompt: { label: 'Daily spark', premise: 'A sufficiently specific daily drama premise appears here.', mood: 'tense', characterName: 'Mina' } },
+    } }), 'en-US', 'en', () => now);
+
+    const home = await client.loadHome();
+    expect(home.quota).toMatchObject({ enforced: true, voiceBonusCredits: 0, textRemaining: 49, voiceRemaining: 1 });
+  });
+
   it('parses home retention independently of canonical drama state', async () => {
     const now = Date.parse('2026-08-17T01:00:00.000Z');
     const client = new HttpDramaExperienceClient(

@@ -169,6 +169,42 @@ describe('authenticated drama HTTP loop', () => {
     expect((await home.json() as HomeEnvelope).home.recentDramas[0]?.id).toBe(drama.id);
   });
 
+  it('keeps Scene continuation unblocked after the Store limit in development preview', async () => {
+    const generator = new FixtureSceneGenerator();
+    const previewEnv: AppEnv = { ...testEnv, QUOTA_MODE: 'preview_unlimited' };
+    const created = await dramaRequest('/v1/dramas', 'POST', createBody(), 'clerk-owner', generator, undefined, previewEnv);
+    const drama = (await created.json() as DramaEnvelope).drama;
+    const choice = drama.currentScene.choices[0];
+    await dramaRequest(
+      `/v1/dramas/${drama.id}/scenes/${drama.currentScene.id}/choices/${choice.id}`,
+      'POST',
+      undefined,
+      'clerk-owner',
+      generator,
+      undefined,
+      previewEnv,
+    );
+    const user = await db.prepare('SELECT id FROM users WHERE auth_subject = ?').bind('clerk-owner').first<{ id: string }>();
+    await db.prepare('UPDATE daily_usage SET text_episodes = 50, text_reserved = 0 WHERE user_id = ? AND usage_date = ?')
+      .bind(user?.id, '2026-08-16')
+      .run();
+
+    const next = await dramaRequest(
+      `/v1/dramas/${drama.id}/scenes`,
+      'POST',
+      { generationKey: 'generation-preview-over-limit' },
+      'clerk-owner',
+      generator,
+      undefined,
+      previewEnv,
+    );
+    expect(next.status).toBe(200);
+    expect((await next.json() as DramaEnvelope).drama.currentScene.number).toBe(2);
+
+    const home = await dramaRequest('/v1/dramas/home', 'GET', undefined, 'clerk-owner', generator, undefined, previewEnv);
+    expect((await home.json() as HomeEnvelope).home.quota).toMatchObject({ enforced: false });
+  });
+
   it('releases generation quota when the provider fails and allows an idempotent retry', async () => {
     let calls = 0;
     const flaky: SceneGenerator = {
@@ -293,8 +329,9 @@ async function dramaRequest(
   subject: string | null,
   generator: SceneGenerator,
   productTelemetry?: ProductTelemetrySink,
+  appEnv: AppEnv = testEnv,
 ): Promise<Response> {
-  return handleRequest(request(path, method, body), testEnv, {
+  return handleRequest(request(path, method, body), appEnv, {
     sessionVerifier: verifier(subject),
     sceneGenerator: generator,
     dramaClock: () => nowMs,
@@ -328,7 +365,7 @@ interface DramaEnvelope {
 }
 
 interface HomeEnvelope {
-  home: { recentDramas: Array<{ id: string }> };
+  home: { recentDramas: Array<{ id: string }>; quota: { enforced: boolean } };
 }
 
 interface LibraryEnvelope {

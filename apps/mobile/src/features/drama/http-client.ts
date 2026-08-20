@@ -214,17 +214,23 @@ function parseChoice(value: unknown): Choice {
 function parseHome(value: Record<string, unknown>, nowMs: number, uiLocale: UiLocale): DramaHomeSnapshot {
   if (!Array.isArray(value.recentDramas) || !isRecord(value.quota)) throw invalidBackendResponse();
   const quota = value.quota;
-  if (![quota.textRemaining, quota.textLimit, quota.voiceRemaining, quota.voiceLimit, quota.voiceBonusCredits].every(Number.isInteger) || typeof quota.resetAt !== 'string') {
+  const voiceBonusCredits = quota.voiceBonusCredits === undefined ? 0 : quota.voiceBonusCredits;
+  const enforced = quota.enforced === undefined ? true : quota.enforced;
+  if (
+    ![quota.textRemaining, quota.textLimit, quota.voiceRemaining, quota.voiceLimit, voiceBonusCredits].every(Number.isInteger) ||
+    typeof quota.resetAt !== 'string' || typeof enforced !== 'boolean'
+  ) {
     throw invalidBackendResponse();
   }
   return {
     recentDramas: value.recentDramas.map((drama) => parseDramaSummary(drama, nowMs, uiLocale)),
     quota: {
+      enforced,
       textRemaining: Number(quota.textRemaining),
       textLimit: Number(quota.textLimit),
       voiceRemaining: Number(quota.voiceRemaining),
       voiceLimit: Number(quota.voiceLimit),
-      voiceBonusCredits: Number(quota.voiceBonusCredits),
+      voiceBonusCredits: Number(voiceBonusCredits),
       resetLabel: resetLabel(quota.resetAt, uiLocale),
     },
     retention: parseRetention(value.retention),

@@ -8,9 +8,10 @@ Current limits remain server-owned:
 - Free: 50 generated Scenes per UTC day, 1 fresh cloud narration per UTC day.
 - Plus: 100 generated Scenes per UTC day, 10 fresh cloud narrations per UTC day.
 - Successful referral rewards may add persistent voice bonus credits; these are not a daily tier and do not raise text quota.
-- No unlimited tier.
+- Store/production runtime keeps those limits enforced.
+- The isolated development preview runtime uses server-owned `QUOTA_MODE=preview_unlimited`: requests still pass through the same D1 reservation/consume/release ledger for observability and idempotency, but the daily limit guard does not reject Scene or fresh-voice work while the product is being tested.
 
-The trusted tier comes from backend entitlement state; clients cannot select their own quota tier. D1 still stores historical resource strings `text_episode` and `voice_episode`; those are persistence vocabulary for generated-scene and fresh-voice usage.
+`preview_unlimited` is an environment/runtime policy, not an entitlement tier and not a client flag. Missing, unknown, or production values fail closed to `enforced`, so a Store client cannot unlock preview access. The trusted tier still comes from backend entitlement state; clients cannot select their own quota tier. D1 stores historical resource strings `text_episode` and `voice_episode`; those are persistence vocabulary for generated-scene and fresh-voice usage.
 
 ## Why reservation exists
 Quota is claimed before an external scene/TTS provider call. `D1QuotaLedger.reserve()` atomically owns one in-flight slot. The caller then makes one transition for that attempt:
