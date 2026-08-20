@@ -6,7 +6,7 @@
 
 Application code generates one drama scene through `SceneGenerator` in `apps/api/src/ai/contracts.ts`. Its input/output are `SceneGenerationInput` and `SceneProposal`; neither contains provider-native response types.
 
-Development currently selects `WorkersAiSceneGenerator` when the Worker `AI` binding exists (`@cf/meta/llama-3.1-8b-instruct-fast`); otherwise `GeminiSceneGenerator` is used. Both adapters share the same post-parse publication decision. Provider selection does not change `DramaService`, `D1DramaRepository`, mobile contracts, or playback state.
+Development uses `WorkersAiSceneGenerator` as the primary adapter when the Worker `AI` binding exists (`@cf/meta/llama-3.1-8b-instruct-fast`). When a Gemini API key is also configured, `FailoverSceneGenerator` invokes `GeminiSceneGenerator` only after the primary ends in `invalid_response` or `provider_unavailable`; invalid canonical input never fans out. Environments without the `AI` binding use Gemini directly. Both adapters share the same structural parser and narrative publication decision, so failover changes provider reliability without weakening canonical validation or changing `DramaService`, D1 state, mobile contracts, or playback state.
 
 ## Canonical input
 
@@ -50,9 +50,9 @@ Offline `evaluateNarrative().passed` (average ≥80 and every dimension ≥60) i
 
 ## Retry/failure
 
-Invalid local input stops before provider use. A successful provider response that fails structural validation or the shared publication gate receives exactly one controlled regeneration with validation feedback. A second failure returns `invalid_response` → HTTP/mobile `invalid_generation`.
+Invalid local input stops before provider use and is never forwarded to another provider. Inside each adapter, a successful provider response that fails structural validation or the shared publication gate receives exactly one controlled regeneration with validation feedback.
 
-Network/non-2xx provider failures normalize to `provider_unavailable` without silent adapter retry. Upstream retries remain explicit and generation-key protected.
+When development has both Workers AI and Gemini configured, exhaustion of the Workers AI adapter (`invalid_response`) or a Workers AI provider failure triggers one provider-level failover to Gemini, which independently applies the same parse/retry/publication gate. Only after the configured provider chain fails does HTTP/mobile receive `invalid_generation` or `provider_unavailable`. Generation-key protection and publication idempotency remain unchanged.
 
 ## Persistence boundary
 
