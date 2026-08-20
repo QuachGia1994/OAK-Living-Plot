@@ -1,3 +1,4 @@
+import { D1EntitlementRepository } from '../billing/d1-entitlement-repository';
 import { D1VoiceQuota, type VoiceQuota } from '../quota/voice-quota';
 import { NOOP_PRODUCT_TELEMETRY, type ProductTelemetrySink } from '../telemetry/product-events';
 import { approvedVoice } from '../tts/voice-registry';
@@ -97,10 +98,11 @@ export class D1AudioService {
       return { ok: true, value: toMediaAsset(canonical) };
     }
 
+    const entitlement = await new D1EntitlementRepository(this.db).getEntitlement(input.userId);
     const reserved = await this.quota.reserve({
       userId: input.userId,
       reservationKey: input.reservationKey,
-      tier: input.tier,
+      tier: entitlement.tier,
     });
     if (!reserved.ok) {
       await this.markReservationFailure(canonical.id, input.reservationKey, reserved.error.code);
@@ -151,7 +153,7 @@ export class D1AudioService {
     }
 
     try {
-      this.productTelemetry.recordProductEvent({ event: 'voice_requested', tier: input.tier });
+      this.productTelemetry.recordProductEvent({ event: 'voice_requested', tier: entitlement.tier });
     } catch {
       // Product analytics is observational and cannot fail a queued voice request.
     }
@@ -266,6 +268,5 @@ function validateInput(input: AudioRequestInput): string | null {
   if (input.reservationKey !== input.reservationKey.trim() || input.reservationKey.length < 8 || input.reservationKey.length > 128) {
     return 'Reservation key must be 8–128 non-padded characters.';
   }
-  if (input.tier !== 'free' && input.tier !== 'plus') return 'Quota tier is invalid.';
   return null;
 }

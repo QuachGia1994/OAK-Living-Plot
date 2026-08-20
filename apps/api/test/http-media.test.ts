@@ -124,6 +124,24 @@ describe('media HTTP boundary', () => {
     expect(queue.messages).toHaveLength(1);
   });
 
+  it('ignores forged Plus and quota fields from the client and keeps server-side Free authority', async () => {
+    await seedOwnerWithScenes(2);
+    const queue = fakeQueue();
+
+    const first = await handleRequest(postVoice('scene-1', 'voice-http-forged-1'), testEnv, { sessionVerifier: verifier('clerk-owner'), audioQueue: queue });
+    const forged = await handleRequest(postVoice('scene-2', 'voice-http-forged-2', {
+      tier: 'plus',
+      plusActive: true,
+      voiceLimit: 10_000,
+      voiceBonusCredits: 10_000,
+    }), testEnv, { sessionVerifier: verifier('clerk-owner'), audioQueue: queue });
+
+    expect(first.status).toBe(202);
+    expect(forged.status).toBe(429);
+    expect(await forged.json()).toMatchObject({ error: 'quota_exceeded', limit: 1 });
+    expect(queue.messages).toHaveLength(1);
+  });
+
   it('keeps fresh cloud narration unblocked in the development preview environment', async () => {
     await seedOwnerWithScenes(2);
     const queue = fakeQueue();
@@ -222,11 +240,11 @@ function successSynthesizer(): SpeechSynthesizer {
   };
 }
 
-function postVoice(sceneId: string, reservationKey: string): Request {
+function postVoice(sceneId: string, reservationKey: string, extra: Record<string, unknown> = {}): Request {
   return new Request(`https://living-plot.test/v1/scenes/${sceneId}/voice`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ voiceVariant: 'vi-narrator-female', reservationKey }),
+    body: JSON.stringify({ voiceVariant: 'vi-narrator-female', reservationKey, ...extra }),
   });
 }
 

@@ -1,6 +1,6 @@
 # Phase 1 RevenueCat entitlement boundary
 
-> updated 2026-08-17 · 0.0.0
+> updated 2026-08-20 · 0.0.0
 
 ## Authority
 RevenueCat is the store/subscription provider boundary; D1 is the application authorization source of truth after provider verification. Mobile `CustomerInfo`, paywall return values, public RevenueCat SDK keys, and client booleans such as `isPlus` are never quota authority.
@@ -44,11 +44,11 @@ Older provider snapshots cannot overwrite newer state. Independently, the read p
 ## Quota and referral integration
 `GET /v1/entitlement` exposes only backend-materialized Free/Plus state to an authenticated owner.
 
-Voice generation resolves the user's tier from D1 immediately before quota reservation. Free receives 1 fresh cloud narration/day; verified Plus receives 10. If that daily allowance is exhausted, a persistent referral voice-credit balance may be used. The client cannot elevate quota by sending a tier or bonus flag.
+Voice generation resolves the user's tier from D1 inside `D1AudioService` immediately before the server quota reservation. Free receives 1 fresh cloud narration/day; verified Plus receives 10. If that daily allowance is exhausted, a persistent referral voice-credit balance may be used. `AudioRequestInput` contains no tier/Plus/limit/bonus field, so even a modified client cannot select the quota tier consumed by the service.
 
 Referral reward authority is also server-side. A referred account may claim exactly one inviter code, but that claim itself grants nothing. The inviter reward is eligible only when a verified RevenueCat `INITIAL_PURCHASE` event for that referred account refreshes to Plus and the referral claim predates that purchase event. The webhook path then grants 50 persistent voice credits exactly once. Renewal-only events do not create a new referral reward, replayed events and later Plus refreshes do not double-grant it, and referral-reward persistence failure returns non-2xx so the provider delivery can retry safely.
 
-Scene generation likewise resolves quota from backend entitlement state. Current text limits are Free 50/day and Plus 100/day.
+Generated Scenes are unlimited for both Free and Plus. Scene continuation remains server-owned and client input cannot select a hidden text quota tier; Plus differentiation is currently fresh cloud narration and referral voice rewards.
 
 ## Mobile boundary
 The Expo client installs `react-native-purchases`, `react-native-purchases-ui`, and `expo-dev-client`.

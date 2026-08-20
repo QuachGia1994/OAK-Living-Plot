@@ -99,8 +99,7 @@ export async function handleRequest(
     productTelemetry,
   );
   if (route.kind === 'scene_voice') {
-    const entitlement = await entitlements.getEntitlement(user.id);
-    return handleVoiceRequest(request, audio, user.id, route.sceneId, entitlement.tier);
+    return handleVoiceRequest(request, audio, user.id, route.sceneId);
   }
   if (route.kind === 'media_status') return handleMediaStatus(audio, user.id, route.assetId);
   return handleMediaRead(env, audio, user.id, route.assetId);
@@ -416,7 +415,6 @@ async function handleVoiceRequest(
   audio: D1AudioService,
   userId: string,
   sceneId: string,
-  tier: 'free' | 'plus',
 ): Promise<Response> {
   const body = await parseJsonObject(request);
   if (!body || typeof body.voiceVariant !== 'string' || typeof body.reservationKey !== 'string') {
@@ -428,7 +426,6 @@ async function handleVoiceRequest(
     sceneId,
     voiceVariant: body.voiceVariant,
     reservationKey: body.reservationKey,
-    tier,
   });
   if (!result.ok) {
     if (result.error.code === 'invalid_input') return json({ error: result.error.code }, 400);

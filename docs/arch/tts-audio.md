@@ -1,6 +1,6 @@
 # Phase 1 TTS and private-audio boundary
 
-> updated 2026-08-19 · 0.0.0
+> updated 2026-08-20 · 0.0.0
 
 ## Responsibility
 Slice 9 adds derived voice generation without making audio part of canonical story state. Text episodes remain canonical and usable when voice is queued, retrying, failed, or unavailable.
@@ -55,11 +55,11 @@ Terminal failure is `failed`.
 3. resolve an approved voice variant;
 4. return an existing non-failed asset immediately (ready cache replay consumes no fresh quota);
 5. atomically claim the unique episode/voice asset as `reserving`;
-6. winner reserves `voice_episode` quota; concurrent losers return the canonical asset without reserving quota;
+6. the winning `D1AudioService` reads effective Free/Plus from D1, then reserves `voice_episode` quota; concurrent losers return the canonical asset without reserving quota;
 7. transition to `queued` and send `{assetId}` only to the Queue;
 8. if enqueue fails, mark failed and release the reservation.
 
-The HTTP boundary resolves Free/Plus from the backend materialized RevenueCat entitlement immediately before voice quota reservation. The client cannot elevate itself by sending a tier flag.
+The HTTP boundary passes only authenticated owner identity, scene, approved voice variant, and reservation key. `D1AudioService` itself resolves effective Free/Plus from the backend materialized RevenueCat entitlement before quota reservation; there is no caller-supplied tier field to trust or accidentally forward.
 
 ## Queue and DLQ
 Wrangler declares:

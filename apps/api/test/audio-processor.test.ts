@@ -5,6 +5,7 @@ import migrationTwo from '../migrations/0002_episode_publication.sql?raw';
 import migrationThree from '../migrations/0003_choice_commit.sql?raw';
 import migrationFour from '../migrations/0004_quota_ledger.sql?raw';
 import migrationFive from '../migrations/0005_tts_audio.sql?raw';
+import migrationSix from '../migrations/0006_revenuecat_entitlements.sql?raw';
 import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import { AudioProcessor } from '../src/audio/audio-processor';
 import { D1AudioService } from '../src/audio/d1-audio-service';
@@ -25,6 +26,7 @@ beforeAll(async () => {
   await applySqlMigration(db, migrationThree);
   await applySqlMigration(db, migrationFour);
   await applySqlMigration(db, migrationFive);
+  await applySqlMigration(db, migrationSix);
   await applySqlMigration(db, migrationTen);
 });
 
@@ -200,7 +202,6 @@ function requestInput(reservationKey: string) {
     sceneId: 'episode-1',
     voiceVariant: 'vi-narrator-female',
     reservationKey,
-    tier: 'free' as const,
   };
 }
 

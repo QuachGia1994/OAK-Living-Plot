@@ -27,7 +27,6 @@ export interface AudioRequestInput {
   sceneId: string;
   voiceVariant: string;
   reservationKey: string;
-  tier: 'free' | 'plus';
 }
 
 export type AudioRequestError =
