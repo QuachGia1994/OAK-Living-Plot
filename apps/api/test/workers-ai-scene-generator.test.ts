@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CreativeSceneProposal, CreativeSceneRepair } from '../src/ai/creative-scene-schema';
+import type { CreativeSceneProposal } from '../src/ai/creative-scene-schema';
 import type { GenerationTelemetrySink } from '../src/telemetry/contracts';
 import { WORKERS_AI_SCENE_MODEL, WorkersAiSceneGenerator } from '../src/ai/workers-ai-scene-generator';
 import { makeGenerationInput, makeValidProposal } from './drama-fixtures';
@@ -31,12 +31,6 @@ function creativeProposal(): CreativeSceneProposal {
       nextTone: choice.stateDelta.nextTone,
     })).slice(0, 3) as unknown as CreativeSceneProposal['choices'],
   };
-}
-
-function repairFrom(creative: CreativeSceneProposal): CreativeSceneRepair {
-  const { script: _omitScript, ...repair } = creative;
-  void _omitScript;
-  return repair;
 }
 
 describe('WorkersAiSceneGenerator', () => {
