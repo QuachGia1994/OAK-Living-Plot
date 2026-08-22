@@ -1,6 +1,6 @@
 # Canonical drama runtime ownership
 
-> updated 2026-08-20 · current application contract
+> updated 2026-08-22 0.0.0
 
 Living Plot has one product vocabulary above persistence: **Drama → Scene → Choice → Branch → next Scene**. The existing D1 schema still stores historical table/column names such as `plots`, `episodes`, `plot_id`, `episode_id`, and `story_locale`. Those names are storage details and must not be projected into new mobile or HTTP contracts.
 
@@ -48,12 +48,12 @@ The mobile selection before commit is provisional playback state, not a canonica
 
 ## Generation boundary
 
-`SceneGenerator` is provider-neutral. The non-production live-development Worker uses the Workers AI binding with `@cf/meta/llama-3.1-8b-instruct-fast`; deployments without that binding retain `GeminiSceneGenerator` as the adapter. `DramaService`, D1 projection, and mobile code depend on neither provider response type.
+`SceneGenerator` is provider-neutral. The non-production live-development Worker uses the Workers AI binding with `@cf/meta/llama-3.3-70b-instruct-fp8-fast`; deployments without that binding retain `GeminiSceneGenerator` as the adapter. `DramaService`, D1 projection, and mobile code depend on neither provider response type.
 
 Provider flow:
 1. `SceneGenerationInput` is assembled only from bounded canonical drama memory.
 2. `scene-prompt.ts` serializes user/drama strings as data inside `DRAMA_CONTEXT_JSON`.
-3. the selected adapter requests structured JSON; the Workers AI adapter constrains output size and removes only provider references that do not exist in the canonical character/fact/thread input.
+3. the selected adapter requests structured JSON from the canonical input shape; a one-character cast forbids relationship deltas and requires a branch-specific fact per choice before generation, and the Workers AI adapter removes only provider references that do not exist in canonical character/fact/thread input.
 4. `scene-schema.ts` parses and validates the proposal, including A/B/C branches, canonical references, score bounds, script envelope, continuation advancement, active-thread duplication, and no unexpected fields. Schema string bounds mirror the domain envelope so incomplete/undersized provider output is rejected before publication.
 5. One controlled regeneration is allowed only for a successful-but-invalid provider proposal.
 6. provider/network failures normalize to `provider_unavailable`; a second invalid proposal normalizes to `invalid_generation` at HTTP/mobile application boundaries.

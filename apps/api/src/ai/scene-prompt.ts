@@ -81,6 +81,7 @@ export function buildScenePrompt(input: SceneGenerationInput, validationErrors: 
       'Advance or resolve at least one high-urgency open thread before opening multiple new mysteries.',
       'Declare pacingRole as one of setup|build|escalate|payoff|breather|cliffhanger; avoid endless escalation or endless breather.',
       'Each of A/B/C must create a durable state effect through a material relationship, fact, or thread change; nextTone alone never counts as durable branch commitment.',
+      'When DRAMA_CONTEXT_JSON contains only one character, every choice stateDelta.relationships must be [] and factsToAdd must contain at least one distinct branch-specific fact.',
       'Prefer paying something off before asking for the next scene, while still leaving a concrete return hook.',
       'If novelty.trajectoryConstraints is present, at least one of A/B/C must either reverse that dimension materially or open an independent fact/thread progression.',
       'If novelty.motifHistory is present, do not recreate those long-range structural motifs.',

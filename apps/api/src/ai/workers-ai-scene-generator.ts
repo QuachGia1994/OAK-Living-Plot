@@ -6,7 +6,7 @@ import type {
   SceneGenerationUsage,
   SceneGenerator,
 } from './contracts';
-import { parseAndValidateSceneProposal, sceneResponseSchema } from './scene-schema';
+import { parseAndValidateSceneProposal, sceneResponseSchemaForInput } from './scene-schema';
 import { buildScenePrompt, validateSceneGenerationInput } from './scene-prompt';
 import { validateNarrativePublication } from '../evals/narrative-evaluator';
 import {
@@ -87,11 +87,9 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
       'Each choice label: at most 8 words; intent: at most 10 words; consequence: at most 18 words.',
       'Each choice stateDelta must be minimal: factsToAdd at most 2 short strings, threadsToOpen at most 1, nextTone at most 4 words.',
       'Every choice must include at least one durable non-tone change: a material valid relationship change, a fact add/resolve, or a thread open/resolve. nextTone alone never satisfies branch commitment.',
-      'With only one canonical character, relationships must stay empty, so give every choice a distinct fact or thread change instead.',
       'For continuations, do not retell the previous scene setup. Start from previous.consequence immediately, make the summary describe only the new development, and never reuse previous.chosenAction as a new choice label.',
       'Do not reopen an active thread under the same title. Advance or resolve an existing thread before opening a genuinely new one.',
       'establishedFacts, factsToAdd, and thread titles must be natural-language phrases in the requested locale, never snake_case, slugs, IDs, or database-like labels.',
-      'If fewer than two characters exist, every stateDelta.relationships must be an empty array.',
       'If activeFacts is empty, every factKeysToResolve must be empty. If openThreads is empty, every resolve/threadKeysToResolve must be empty.',
       'Never repeat the script or explanation outside the required JSON object.',
     ].join(' ');
@@ -104,7 +102,7 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
         ],
         response_format: {
           type: 'json_schema',
-          json_schema: sceneResponseSchema,
+          json_schema: sceneResponseSchemaForInput(input),
         },
         max_tokens: 4096,
         temperature: 0.35,

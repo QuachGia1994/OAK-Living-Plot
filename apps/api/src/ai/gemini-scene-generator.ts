@@ -6,7 +6,7 @@ import type {
   SceneGenerationUsage,
   SceneGenerator,
 } from './contracts';
-import { sceneResponseSchema, parseAndValidateSceneProposal } from './scene-schema';
+import { parseAndValidateSceneProposal, sceneResponseSchemaForInput } from './scene-schema';
 import { buildScenePrompt, validateSceneGenerationInput } from './scene-prompt';
 import { validateNarrativePublication } from '../evals/narrative-evaluator';
 import {
@@ -129,7 +129,7 @@ export class GeminiSceneGenerator implements SceneGenerator {
           response_format: {
             type: 'text',
             mime_type: 'application/json',
-            schema: sceneResponseSchema,
+            schema: sceneResponseSchemaForInput(input),
           },
           store: false,
         }),

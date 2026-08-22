@@ -9,40 +9,48 @@ import type {
 import { isNarrativeBeat, NARRATIVE_BEATS } from '../evals/narrative-novelty';
 import { isPacingRole, PACING_ROLES } from '../evals/narrative-quality';
 
-export const sceneResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['title', 'script', 'summary', 'beat', 'pacingRole', 'establishedFacts', 'threadChanges', 'choices'],
-  properties: {
-    title: { type: 'string', minLength: 1, maxLength: 80 },
-    script: { type: 'string', minLength: 600, maxLength: 2400 },
-    summary: { type: 'string', minLength: 1, maxLength: 240 },
-    beat: {
-      type: 'string',
-      enum: [...NARRATIVE_BEATS],
-    },
-    pacingRole: {
-      type: 'string',
-      enum: [...PACING_ROLES],
-    },
-    establishedFacts: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 160 } },
-    threadChanges: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['open', 'resolve'],
-      properties: {
-        open: { type: 'array', maxItems: 4, items: threadSchema() },
-        resolve: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 120 } },
+export const sceneResponseSchema = buildSceneResponseSchema(false);
+
+export function sceneResponseSchemaForInput(input: Pick<SceneGenerationInput, 'characters'>) {
+  return input.characters.length === 1 ? buildSceneResponseSchema(true) : sceneResponseSchema;
+}
+
+function buildSceneResponseSchema(singleCharacter: boolean) {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['title', 'script', 'summary', 'beat', 'pacingRole', 'establishedFacts', 'threadChanges', 'choices'],
+    properties: {
+      title: { type: 'string', minLength: 1, maxLength: 80 },
+      script: { type: 'string', minLength: 600, maxLength: 2400 },
+      summary: { type: 'string', minLength: 1, maxLength: 240 },
+      beat: {
+        type: 'string',
+        enum: [...NARRATIVE_BEATS],
+      },
+      pacingRole: {
+        type: 'string',
+        enum: [...PACING_ROLES],
+      },
+      establishedFacts: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 160 } },
+      threadChanges: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['open', 'resolve'],
+        properties: {
+          open: { type: 'array', maxItems: 4, items: threadSchema() },
+          resolve: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 120 } },
+        },
+      },
+      choices: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: choiceSchema(singleCharacter),
       },
     },
-    choices: {
-      type: 'array',
-      minItems: 3,
-      maxItems: 3,
-      items: choiceSchema(),
-    },
-  },
-} as const;
+  } as const;
+}
 
 export function parseAndValidateSceneProposal(
   raw: string,
@@ -286,7 +294,7 @@ function validateRecentNovelty(proposal: SceneProposal, input: SceneGenerationIn
   }
 }
 
-function choiceSchema() {
+function choiceSchema(singleCharacter = false) {
   return {
     type: 'object',
     additionalProperties: false,
@@ -301,8 +309,8 @@ function choiceSchema() {
         additionalProperties: false,
         required: ['relationships', 'factsToAdd', 'factKeysToResolve', 'threadsToOpen', 'threadKeysToResolve', 'nextTone'],
         properties: {
-          relationships: { type: 'array', maxItems: 8, items: relationshipSchema() },
-          factsToAdd: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 160 } },
+          relationships: { type: 'array', maxItems: singleCharacter ? 0 : 8, items: relationshipSchema() },
+          factsToAdd: { type: 'array', ...(singleCharacter ? { minItems: 1 } : {}), maxItems: 4, items: { type: 'string', maxLength: 160 } },
           factKeysToResolve: { type: 'array', maxItems: 6, items: { type: 'string', maxLength: 120 } },
           threadsToOpen: { type: 'array', maxItems: 4, items: threadSchema() },
           threadKeysToResolve: { type: 'array', maxItems: 4, items: { type: 'string', maxLength: 120 } },

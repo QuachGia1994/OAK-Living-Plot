@@ -83,6 +83,43 @@ describe('WorkersAiSceneGenerator', () => {
     expect(result.value.proposal.choices[0].stateDelta.relationships).toEqual([]);
   });
 
+  it('constrains one-character structured output to durable fact branches instead of impossible relationships', async () => {
+    const input = makeGenerationInput();
+    input.characters = [input.characters[0]!];
+    input.relationships = [];
+    const proposal = structuredClone(makeValidProposal());
+    for (const choice of proposal.choices) choice.stateDelta.relationships = [];
+    const run = vi.fn().mockResolvedValue({ response: proposal, usage: { prompt_tokens: 10, completion_tokens: 5 } });
+    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
+
+    const result = await generator.generate(input);
+
+    expect(result.ok).toBe(true);
+    const request = run.mock.calls[0][1] as {
+      response_format: {
+        json_schema: {
+          properties: {
+            choices: {
+              items: {
+                properties: {
+                  stateDelta: {
+                    properties: {
+                      relationships: { maxItems: number };
+                      factsToAdd: { minItems?: number };
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+    const stateDelta = request.response_format.json_schema.properties.choices.items.properties.stateDelta.properties;
+    expect(stateDelta.relationships.maxItems).toBe(0);
+    expect(stateDelta.factsToAdd.minItems).toBe(1);
+  });
+
   it('recovers a one-character continuation when tone-only branches fail durable commitment', async () => {
     const input = makeGenerationInput();
     input.characters = [input.characters[0]!];
@@ -106,7 +143,8 @@ describe('WorkersAiSceneGenerator', () => {
     expect(run).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ ok: true, value: { attempts: 2 } });
     const secondRequest = run.mock.calls[1][1] as { messages: Array<{ role: string; content: string }> };
-    expect(secondRequest.messages[0].content).toContain('With only one canonical character');
+    expect(secondRequest.messages[0].content).toContain('only one character');
+    expect(secondRequest.messages[0].content).toContain('factsToAdd');
     expect(secondRequest.messages[0].content).toContain('BRANCH_NO_DURABLE_EFFECT');
   });
 

@@ -1,6 +1,6 @@
 # Scene-generation boundary
 
-> updated 2026-08-20 · current application contract
+> updated 2026-08-22 0.0.0
 
 ## Provider-neutral contract
 
@@ -31,6 +31,7 @@ D1-backed drama state remains the source of truth.
 - required `beat` (NarrativeBeat SSoT from `narrative-novelty.ts`) and `pacingRole` (PacingRole SSoT from `narrative-quality.ts`) on newly generated proposals;
 - materially distinct labels/intents/consequences;
 - valid canonical character/fact/thread references;
+- input-aware branch shape: a one-character drama structurally forbids relationship deltas and requires at least one branch-specific fact per choice, so canonical-reference normalization cannot erase the branch's only durable effect;
 - bounded fields and spoken-length envelope;
 - recent-history material-similarity rejection for recycled titles/summaries/branches.
 
