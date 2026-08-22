@@ -45,7 +45,7 @@ export const creativeSceneResponseSchema = {
   ],
   properties: {
     title: { type: 'string', minLength: 1, maxLength: 80 },
-    // 8B provider often lands 400–700 chars on continuations; spoken-length quality remains advisory.
+    // Provider continuations can land near 400 chars; spoken-length quality remains advisory.
     script: { type: 'string', minLength: 400, maxLength: 2400 },
     summary: { type: 'string', minLength: 1, maxLength: 240 },
     beat: { type: 'string', enum: [...NARRATIVE_BEATS] },
@@ -77,7 +77,6 @@ export const creativeSceneResponseSchema = {
           'label',
           'intent',
           'consequence',
-          'durableFact',
           'factTextsToResolve',
           'threadTitlesToResolve',
           'threadsToOpen',
@@ -88,7 +87,7 @@ export const creativeSceneResponseSchema = {
           label: { type: 'string', minLength: 1, maxLength: 120 },
           intent: { type: 'string', minLength: 1, maxLength: 120 },
           consequence: { type: 'string', minLength: 1, maxLength: 240 },
-          durableFact: { type: 'string', minLength: 1, maxLength: 160 },
+          durableFact: { type: 'string', minLength: 0, maxLength: 160 },
           factTextsToResolve: {
             type: 'array',
             maxItems: 2,
@@ -279,10 +278,9 @@ function isWeakDurableFact(fact: string, consequence: string): boolean {
   const factText = semanticText(fact);
   const tokenOverlap = tokens.some((token) => semanticTokens(consequence).includes(token));
   const phraseOverlap = factText.length >= 8 && consequenceText.includes(factText.slice(0, Math.min(factText.length, 16)));
-  // Weak overlap is OK after normalize; only pure empty/placeholder is forced.
-  void tokenOverlap;
-  void phraseOverlap;
-  return false;
+  // If the proposed fact is not supported by the consequence, derive the canonical fact
+  // from provider-authored consequence/label text instead of rejecting the whole scene.
+  return !tokenOverlap && !phraseOverlap;
 }
 
 function synthesizeDurableFact(choice: CreativeSceneChoice): string {
@@ -308,24 +306,25 @@ export function validateCreativeSceneSemantics(creative: CreativeSceneProposal):
 }
 
 function parseChoice(value: unknown): Result<CreativeSceneChoice, string[]> {
-  const keys = [
+  const requiredKeys = [
     'key',
     'label',
     'intent',
     'consequence',
-    'durableFact',
     'factTextsToResolve',
     'threadTitlesToResolve',
     'threadsToOpen',
     'nextTone',
   ];
-  if (!isRecord(value) || !hasOnlyKeys(value, keys)) return invalid('Creative choice shape is invalid.');
+  if (!isRecord(value) || !hasOnlyKeysWithOptional(value, requiredKeys, ['durableFact'])) {
+    return invalid('Creative choice shape is invalid.');
+  }
   if (value.key !== 'A' && value.key !== 'B' && value.key !== 'C') return invalid('Creative choice key is invalid.');
   if (
     !boundedText(value.label, 1, 240)
     || !boundedText(value.intent, 1, 240)
     || !boundedText(value.consequence, 1, 500)
-    || !boundedText(value.durableFact, 1, 400)
+    || (value.durableFact !== undefined && (typeof value.durableFact !== 'string' || value.durableFact.length > 400))
     || !boundedText(value.nextTone, 1, 80)
   ) {
     return invalid('Creative choice text is invalid.');
@@ -342,7 +341,7 @@ function parseChoice(value: unknown): Result<CreativeSceneChoice, string[]> {
       label: value.label,
       intent: value.intent,
       consequence: value.consequence,
-      durableFact: value.durableFact,
+      durableFact: typeof value.durableFact === 'string' ? value.durableFact : '',
       factTextsToResolve: value.factTextsToResolve,
       threadTitlesToResolve: value.threadTitlesToResolve,
       threadsToOpen: threadsToOpen.value,
@@ -360,7 +359,6 @@ function creativeChoiceSchema() {
       'label',
       'intent',
       'consequence',
-      'durableFact',
       'factTextsToResolve',
       'threadTitlesToResolve',
       'threadsToOpen',
@@ -371,7 +369,7 @@ function creativeChoiceSchema() {
       label: { type: 'string', minLength: 1, maxLength: 120 },
       intent: { type: 'string', minLength: 1, maxLength: 120 },
       consequence: { type: 'string', minLength: 1, maxLength: 240 },
-      durableFact: { type: 'string', minLength: 1, maxLength: 160 },
+      durableFact: { type: 'string', minLength: 0, maxLength: 160 },
       factTextsToResolve: { type: 'array', maxItems: 2, items: { type: 'string', minLength: 1, maxLength: 160 } },
       threadTitlesToResolve: { type: 'array', maxItems: 2, items: { type: 'string', minLength: 1, maxLength: 160 } },
       threadsToOpen: { type: 'array', maxItems: 1, items: threadSchema() },
@@ -409,6 +407,12 @@ function hasOnlyKeys(value: Record<string, unknown>, expected: string[]): boolea
   return expected.every((key) => actual.includes(key)) && actual.every((key) => allowed.has(key));
 }
 
+function hasOnlyKeysWithOptional(value: Record<string, unknown>, required: string[], optional: string[]): boolean {
+  const actual = Object.keys(value);
+  const allowed = new Set([...required, ...optional]);
+  return required.every((key) => actual.includes(key)) && actual.every((key) => allowed.has(key));
+}
+
 function stringArray(value: unknown, maxItems: number, maxLength: number): value is string[] {
   return Array.isArray(value) && value.length <= maxItems && value.every((item) => boundedText(item, 1, maxLength));
 }
@@ -426,21 +430,6 @@ function isPlaceholderDurableFact(value: string): boolean {
   return /^branch [abc]\b/u.test(normalized)
     || /\bcreates? (a )?(distinct )?(immediate )?consequence\b/u.test(normalized)
     || /\bdurable (branch )?effect\b/u.test(normalized);
-}
-
-function hasMateriallySimilarPair(values: string[], threshold: number): boolean {
-  for (let left = 0; left < values.length; left += 1) {
-    for (let right = left + 1; right < values.length; right += 1) {
-      const leftTokens = new Set(semanticTokens(values[left]!));
-      const rightTokens = new Set(semanticTokens(values[right]!));
-      const union = new Set([...leftTokens, ...rightTokens]);
-      if (union.size === 0) return true;
-      let intersection = 0;
-      for (const token of leftTokens) if (rightTokens.has(token)) intersection += 1;
-      if (intersection / union.size >= threshold) return true;
-    }
-  }
-  return false;
 }
 
 function semanticText(value: string): string {

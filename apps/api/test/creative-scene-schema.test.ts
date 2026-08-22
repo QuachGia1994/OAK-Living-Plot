@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  normalizeCreativeProposal,
   parseCreativeSceneProposal,
   validateCreativeSceneSemantics,
   type CreativeSceneProposal,
@@ -52,11 +53,15 @@ describe('creative scene schema', () => {
     expect(parsed.value.choices[0].durableFact).toContain('Người lạ');
   });
 
-  it('rejects missing durable branch facts', () => {
+  it('accepts a missing durable fact and derives it from provider consequence text', () => {
     const value = creative() as unknown as { choices: Array<Record<string, unknown>> };
     delete value.choices[1].durableFact;
     const parsed = parseCreativeSceneProposal(JSON.stringify(value));
-    expect(parsed.ok).toBe(false);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const normalized = normalizeCreativeProposal(parsed.value);
+    expect(normalized.choices[1].durableFact).toBe(normalized.choices[1].consequence);
+    expect(validateCreativeSceneSemantics(normalized)).toEqual([]);
   });
 
   it('rejects choices that are not ordered A/B/C exactly once', () => {
@@ -66,17 +71,17 @@ describe('creative scene schema', () => {
     expect(parsed.ok).toBe(false);
   });
 
-  it('rejects placeholder or consequence-unsupported durable facts before canonical compilation', () => {
+  it('normalizes placeholder or consequence-unsupported durable facts before canonical compilation', () => {
     const placeholder = creative();
     placeholder.choices[0].durableFact = 'Branch A creates a distinct immediate consequence.';
-    expect(validateCreativeSceneSemantics(placeholder)).toContain(
-      'Choice A durableFact is too generic to become canonical story state.',
-    );
+    const normalizedPlaceholder = normalizeCreativeProposal(placeholder);
+    expect(normalizedPlaceholder.choices[0].durableFact).toBe(placeholder.choices[0].consequence);
+    expect(validateCreativeSceneSemantics(normalizedPlaceholder)).toEqual([]);
 
     const unsupported = creative();
     unsupported.choices[1].durableFact = 'Một con tàu bí mật rời cảng lúc bình minh.';
-    expect(validateCreativeSceneSemantics(unsupported)).toContain(
-      'Choice B durableFact is not supported by its consequence.',
-    );
+    const normalizedUnsupported = normalizeCreativeProposal(unsupported);
+    expect(normalizedUnsupported.choices[1].durableFact).toBe(unsupported.choices[1].consequence);
+    expect(validateCreativeSceneSemantics(normalizedUnsupported)).toEqual([]);
   });
 });
