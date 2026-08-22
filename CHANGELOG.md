@@ -5,9 +5,18 @@ All notable changes to Living Plot will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Migration `0011_arc_checkpoints` derived-cache table (`plot_id`, `through_scene_number`, `summary` ≤600, `created_at`, unique on `plot_id,through_scene_number`) with no duplicate canonical story state; fail-open checkpoint writes every 5 committed scenes.
+- Slim `creative-scene-schema.ts` (no `stateDelta`/relationship deltas in provider output) with provider-authored `durableFact` per-branch commitment, plus deterministic `scene-compiler.ts` that exact-maps natural-language fact/thread resolution hints to canonical keys, drops unknown/ambiguous refs, and invents no relationships.
+- Pipeline telemetry (`providerCalls`/`repairs`/`timings`/`outcome`) as observational fail-open analytics alongside existing attempt telemetry.
+- Deterministic 50-scene D1 soak (`long-run-soak.test.ts`) proving plateaued context bytes and bounded generation memory; bounded resolved tombstones (≤24 facts + ≤24 threads, exact-match only).
 - Phase 2 narrative quality: consequenceRealization, threadPayoff, pacingRole rhythm, branchCommitment, relationshipProgression, protagonistAgency, arcCoherence, returnPull proxy; shared provider-neutral `validateNarrativePublication` gate for Gemini and Workers AI; required beat/pacingRole on new Scene proposals; material-delta SSoT; long-horizon synthetic fixtures; no new schema migration; no mandatory LLM judge.
 
 ### Fixed
+- Scene generation now uses one slim 8B creative call (`@cf/meta/llama-3.1-8b-instruct-fast`, 2300 tokens, no `stateDelta` in schema) on the happy path; malformed first output retries with one full creative regeneration, and publication rejections that do not require rewriting `script` use a smaller targeted-repair schema (1200 tokens, no `script`, byte-for-byte script preservation) before `invalid_response`; provider exceptions remain `provider_unavailable`; no server-side invented narrative facts/relationships/threads, and durable branch facts are provider-authored, branch-specific, non-placeholder, and consequence-supported.
+- Resolved fact/thread tombstones now block exact resurrection (normalized) while remaining bounded; old `script_json` rows without `beat`/`pacingRole`/`motifSignature` stay readable.
+- Generation context is strictly bounded (`recentHistory` ≤4, `activeFacts` ≤24, `openThreads` ≤12, `relationships` ≤20, `novelty` ≤4/20/12, `arcMemory` ≤3, `resolvedMemory` ≤24+24) so 50-scene context bytes plateau instead of growing linearly; checkpoint failure never invalidates a successful canonical commit.
+- Telemetry and checkpoint writes are fail-open and never change canonical behavior.
+- Scene create/continue requests now allow the backend’s controlled generation path (one 8B call + at most one repair/regeneration) up to a 120-second defensive client ceiling before abort; timeout copy is defensive-specific (generation key preserved safely) and does not claim expected p50/p95 without live measurement.
 - One-character Scene continuation now constrains structured output to valid durable branches, preventing impossible relationship deltas from being stripped into `invalid_generation` after retry.
 - Scene generation no longer fails after a daily text threshold; generated Scenes remain fully ledgered for idempotency/reconciliation, while fresh-voice limits stay server-enforced outside the development preview. Home exposes resource-specific enforcement so mobile can show unlimited Scenes without misreporting voice quota.
 - Publication authority no longer rejects on eval-only dimensions; CRITICAL_THREAD_STALLED is eval-only (not per-thread age); Workers AI now runs the same narrative publication gate as Gemini.

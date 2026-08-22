@@ -1,5 +1,13 @@
 import { isDramaMood, type Choice, type CharacterIdentity, type Drama, type Scene } from '../domain/drama';
-import { createInitialDramaState, normalizeDramaStateSemantics, parseDramaState } from '../domain/drama-state';
+import { createInitialDramaState, normalizeDramaStateSemantics, parseDramaState, semanticTextKey } from '../domain/drama-state';
+import type { FactState, RelationshipState, ThreadState } from '../domain/drama-state';
+import type { ChoiceStateDelta } from '../ai/contracts';
+import {
+  deriveTrajectoryConstraints,
+  excludedBeatsFromHistory,
+  isNarrativeBeat,
+  type SceneMotifSignature,
+} from '../evals/narrative-novelty';
 import type { RetentionActivityDay } from '../retention/retention';
 import type {
   CreatedDramaRecord,
@@ -71,9 +79,35 @@ interface RecentHistoryRow {
   episode_number: number;
   title: string;
   summary: string;
+  script_json: string;
   chosen_action: string | null;
   intent: string | null;
   consequence: string | null;
+  committed_state_delta_json: string | null;
+  choice_labels_json: string;
+}
+
+interface NoveltyHistoryRow {
+  script_json: string;
+  committed_state_delta_json: string;
+}
+
+interface ArcCheckpointRow {
+  through_scene_number: number;
+  summary: string;
+}
+
+interface ResolvedMemoryRow {
+  sequence: number;
+  script_json: string;
+  committed_state_delta_json: string;
+  previous_state_json: string | null;
+}
+
+interface CheckpointSourceRow {
+  episode_number: number;
+  summary: string;
+  consequence: string;
 }
 
 interface HistoryRow {
@@ -193,9 +227,12 @@ export class D1DramaRepository {
     const characters = await this.loadCharacters(plot.id);
     if (characters.length === 0) return null;
     const state = normalizeDramaStateSemantics(parseDramaState(plot.state_json));
-    const [previous, recentHistory] = await Promise.all([
+    const [previous, recentHistory, novelty, arcMemory, resolvedMemory] = await Promise.all([
       this.loadPrevious(plot.id),
       this.loadRecentHistory(plot.id),
+      this.loadNoveltyMemory(plot.id),
+      this.loadArcMemory(plot.id, Math.max(0, plot.next_episode_number - 5)),
+      this.loadResolvedMemory(plot.id),
     ]);
     return {
       dramaId: plot.id,
@@ -206,11 +243,14 @@ export class D1DramaRepository {
         contentRating: 'teen',
         drama: { premise: plot.premise, mood: state.tone, summary: plot.summary, stateVersion: plot.version },
         characters: characters.map(toGenerationCharacter),
-        relationships: state.relationships,
-        activeFacts: state.facts,
-        openThreads: state.openThreads,
+        relationships: selectBoundedRelationships(state.relationships),
+        activeFacts: selectBoundedFacts(state.facts),
+        openThreads: selectBoundedThreads(state.openThreads),
         recentHistory,
         previous,
+        novelty,
+        arcMemory,
+        resolvedMemory,
       },
     };
   }
@@ -225,6 +265,39 @@ export class D1DramaRepository {
       .bind(sceneId, dramaId, userId)
       .first<{ version: number | null }>();
     return row?.version ?? null;
+  }
+
+  /** Derived cache only. Failure never changes canonical choice-commit success. */
+  async saveArcCheckpoint(userId: string, plotId: string, throughSceneNumber: number): Promise<void> {
+    if (!Number.isInteger(throughSceneNumber) || throughSceneNumber < 5 || throughSceneNumber % 5 !== 0) return;
+    try {
+      const rows = await this.db
+        .prepare(
+          `SELECT e.episode_number, e.summary, cc.consequence
+           FROM episodes e
+           JOIN plots p ON p.id = e.plot_id
+           JOIN choice_commits cc ON cc.episode_id = e.id AND cc.plot_id = e.plot_id
+           WHERE e.plot_id = ? AND p.user_id = ?
+             AND e.episode_number BETWEEN ? AND ?
+           ORDER BY e.episode_number ASC`,
+        )
+        .bind(plotId, userId, throughSceneNumber - 4, throughSceneNumber)
+        .all<CheckpointSourceRow>();
+      if (rows.results.length !== 5) return;
+      const summary = buildArcCheckpointSummary(rows.results);
+      if (!summary) return;
+      await this.db
+        .prepare(
+          `INSERT INTO arc_checkpoints (plot_id, through_scene_number, summary)
+           VALUES (?, ?, ?)
+           ON CONFLICT(plot_id, through_scene_number) DO UPDATE SET
+             summary = excluded.summary, created_at = unixepoch() * 1000`,
+        )
+        .bind(plotId, throughSceneNumber, summary)
+        .run();
+    } catch {
+      // Checkpoints are rebuildable derived memory and must never affect canonical commits.
+    }
   }
 
   private async listOwnedDramasByStatus(
@@ -362,11 +435,19 @@ export class D1DramaRepository {
       .first<CommitRow>();
   }
 
-  private async loadRecentHistory(plotId: string, limit = 12): Promise<SceneGenerationInputRecentHistory> {
+  private async loadRecentHistory(plotId: string, limit = 4): Promise<SceneGenerationInputRecentHistory> {
     const rows = await this.db
       .prepare(
-        `SELECT e.id AS episode_id, e.episode_number, e.title, e.summary,
-                c.label AS chosen_action, cc.intent AS intent, cc.consequence AS consequence
+        `SELECT e.id AS episode_id, e.episode_number, e.title, e.summary, e.script_json,
+                c.label AS chosen_action, cc.intent AS intent, cc.consequence AS consequence,
+                c.state_delta_json AS committed_state_delta_json,
+                COALESCE((
+                  SELECT json_group_array(labels.label)
+                  FROM (
+                    SELECT ec.label AS label FROM episode_choices ec
+                    WHERE ec.episode_id = e.id ORDER BY ec.position
+                  ) labels
+                ), '[]') AS choice_labels_json
          FROM episodes e
          LEFT JOIN choice_commits cc ON cc.episode_id = e.id
          LEFT JOIN episode_choices c ON c.id = cc.choice_id AND c.episode_id = e.id
@@ -376,15 +457,114 @@ export class D1DramaRepository {
       .bind(plotId, limit)
       .all<RecentHistoryRow>();
     const chronological = [...rows.results].reverse();
-    return Promise.all(chronological.map(async (row) => ({
-      sceneNumber: row.episode_number,
-      title: row.title,
-      summary: row.summary,
-      committedChoice: row.chosen_action,
-      choiceIntent: row.intent,
-      consequence: row.consequence,
-      choiceLabels: (await this.loadChoices(row.episode_id)).map((choice) => choice.label),
-    })));
+    return chronological.map((row) => {
+      const metadata = parseStoredGenerationMetadata(row.script_json);
+      const committedDelta = parseChoiceStateDelta(row.committed_state_delta_json);
+      return {
+        sceneNumber: row.episode_number,
+        title: row.title,
+        summary: row.summary,
+        committedChoice: row.chosen_action,
+        choiceIntent: row.intent,
+        consequence: row.consequence,
+        choiceLabels: parseJsonStringArray(row.choice_labels_json),
+        beat: metadata.beat,
+        pacingRole: metadata.pacingRole,
+        motifSignature: metadata.motifSignature,
+        committedRelationshipDeltas: committedDelta?.relationships ?? [],
+      };
+    });
+  }
+
+  private async loadNoveltyMemory(plotId: string): Promise<NonNullable<GenerationContext['input']['novelty']>> {
+    const rows = await this.db
+      .prepare(
+        `SELECT e.script_json, c.state_delta_json AS committed_state_delta_json
+         FROM choice_commits cc
+         JOIN episodes e ON e.id = cc.episode_id AND e.plot_id = cc.plot_id
+         JOIN episode_choices c ON c.id = cc.choice_id AND c.episode_id = cc.episode_id
+         WHERE cc.plot_id = ?
+         ORDER BY cc.sequence DESC LIMIT 12`,
+      )
+      .bind(plotId)
+      .all<NoveltyHistoryRow>();
+    const chronological = [...rows.results].reverse();
+    const metadata = chronological.map((row) => parseStoredGenerationMetadata(row.script_json));
+    const relationshipHistory = chronological.map((row) => ({
+      relationships: parseChoiceStateDelta(row.committed_state_delta_json)?.relationships ?? [],
+    }));
+    return {
+      excludedBeats: excludedBeatsFromHistory(metadata.map((item) => isNarrativeBeat(item.beat) ? item.beat : 'unknown')),
+      trajectoryConstraints: deriveTrajectoryConstraints(relationshipHistory).slice(0, 20),
+      motifHistory: metadata.flatMap((item) => item.motifSignature ? [item.motifSignature] : []).slice(-12),
+    };
+  }
+
+  private async loadArcMemory(
+    plotId: string,
+    maxThroughScene: number,
+  ): Promise<NonNullable<GenerationContext['input']['arcMemory']>> {
+    if (maxThroughScene < 5) return [];
+    try {
+      const rows = await this.db
+        .prepare(
+          `SELECT through_scene_number, summary
+           FROM arc_checkpoints
+           WHERE plot_id = ? AND through_scene_number <= ?
+           ORDER BY through_scene_number DESC LIMIT 3`,
+        )
+        .bind(plotId, maxThroughScene)
+        .all<ArcCheckpointRow>();
+      return [...rows.results].reverse().map((row) => ({
+        throughSceneNumber: row.through_scene_number,
+        summary: row.summary,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  private async loadResolvedMemory(plotId: string): Promise<NonNullable<GenerationContext['input']['resolvedMemory']>> {
+    const rows = await this.db
+      .prepare(
+        `SELECT cc.sequence, e.script_json, c.state_delta_json AS committed_state_delta_json,
+                (SELECT prev.state_json_after
+                 FROM choice_commits prev
+                 WHERE prev.plot_id = cc.plot_id AND prev.sequence = cc.sequence - 1
+                 LIMIT 1) AS previous_state_json
+         FROM choice_commits cc
+         JOIN episodes e ON e.id = cc.episode_id AND e.plot_id = cc.plot_id
+         JOIN episode_choices c ON c.id = cc.choice_id AND c.episode_id = cc.episode_id
+         WHERE cc.plot_id = ?
+         ORDER BY cc.sequence DESC LIMIT 24`,
+      )
+      .bind(plotId)
+      .all<ResolvedMemoryRow>();
+    const factTexts: string[] = [];
+    const threadTitles: string[] = [];
+    for (const row of rows.results) {
+      const previousState = row.previous_state_json ? safeParseDramaState(row.previous_state_json) : createInitialDramaState();
+      const delta = parseChoiceStateDelta(row.committed_state_delta_json);
+      const metadata = parseStoredGenerationMetadata(row.script_json);
+      if (delta) {
+        for (const key of delta.factKeysToResolve) {
+          const fact = previousState.facts.find((item) => item.key === key);
+          if (fact) factTexts.push(fact.text);
+        }
+        for (const key of delta.threadKeysToResolve) {
+          const thread = previousState.openThreads.find((item) => item.key === key);
+          if (thread) threadTitles.push(thread.title);
+        }
+      }
+      for (const key of metadata.resolvedThreadKeys) {
+        const thread = previousState.openThreads.find((item) => item.key === key);
+        if (thread) threadTitles.push(thread.title);
+      }
+    }
+    return {
+      facts: uniqueRecentTexts(factTexts, 24),
+      threads: uniqueRecentTexts(threadTitles, 24),
+    };
   }
 
   private async loadPrevious(plotId: string): Promise<SceneGenerationInputPrevious | null> {
@@ -407,6 +587,131 @@ export class D1DramaRepository {
       consequence: row.consequence,
     };
   }
+}
+
+interface StoredGenerationMetadata {
+  beat: string | null;
+  pacingRole: string | null;
+  motifSignature: SceneMotifSignature | null;
+  resolvedThreadKeys: string[];
+}
+
+function parseStoredGenerationMetadata(raw: string): StoredGenerationMetadata {
+  try {
+    const value = JSON.parse(raw) as Record<string, unknown>;
+    const threadChanges = isRecord(value.threadChanges) ? value.threadChanges : null;
+    return {
+      beat: typeof value.beat === 'string' ? value.beat : null,
+      pacingRole: typeof value.pacingRole === 'string' ? value.pacingRole : null,
+      motifSignature: parseMotifSignature(value.motifSignature),
+      resolvedThreadKeys: threadChanges && Array.isArray(threadChanges.resolve)
+        ? threadChanges.resolve.filter((item): item is string => typeof item === 'string')
+        : [],
+    };
+  } catch {
+    return { beat: null, pacingRole: null, motifSignature: null, resolvedThreadKeys: [] };
+  }
+}
+
+function parseMotifSignature(value: unknown): SceneMotifSignature | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.beat !== 'string'
+    || typeof value.threadCategory !== 'string'
+    || typeof value.dominantRelation !== 'string'
+    || typeof value.intentFamily !== 'string'
+    || typeof value.consequenceFamily !== 'string'
+  ) return null;
+  return value as unknown as SceneMotifSignature;
+}
+
+function parseChoiceStateDelta(raw: string | null): ChoiceStateDelta | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<ChoiceStateDelta>;
+    if (
+      !Array.isArray(value.relationships)
+      || !Array.isArray(value.factsToAdd)
+      || !Array.isArray(value.factKeysToResolve)
+      || !Array.isArray(value.threadsToOpen)
+      || !Array.isArray(value.threadKeysToResolve)
+      || typeof value.nextTone !== 'string'
+    ) return null;
+    return value as ChoiceStateDelta;
+  } catch {
+    return null;
+  }
+}
+
+function safeParseDramaState(raw: string) {
+  try {
+    return parseDramaState(raw);
+  } catch {
+    return createInitialDramaState();
+  }
+}
+
+function parseJsonStringArray(raw: string): string[] {
+  try {
+    const value: unknown = JSON.parse(raw);
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string').slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
+
+function uniqueRecentTexts(values: string[], limit: number): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const text = value.trim();
+    const key = semanticTextKey(text);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(text.slice(0, 240));
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function buildArcCheckpointSummary(rows: CheckpointSourceRow[]): string {
+  const text = rows
+    .map((row) => `S${row.episode_number}: ${row.summary.trim()} -> ${row.consequence.trim()}`)
+    .join(' | ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  return text.length <= 600 ? text : `${text.slice(0, 597).trimEnd()}…`;
+}
+
+function selectBoundedFacts(facts: FactState[], limit = 24): FactState[] {
+  if (facts.length <= limit) return facts.map((item) => ({ ...item }));
+  const foundational = facts.slice(0, 8);
+  const recent = facts.slice(-(limit - foundational.length));
+  const byKey = new Map<string, FactState>();
+  for (const item of [...foundational, ...recent]) byKey.set(item.key, { ...item });
+  return [...byKey.values()].slice(0, limit);
+}
+
+function selectBoundedThreads(threads: ThreadState[], limit = 12): ThreadState[] {
+  return [...threads]
+    .sort((left, right) => right.urgency - left.urgency || left.key.localeCompare(right.key))
+    .slice(0, limit)
+    .map((item) => ({ ...item }));
+}
+
+function selectBoundedRelationships(relationships: RelationshipState[], limit = 20): RelationshipState[] {
+  return [...relationships]
+    .sort((left, right) => relationshipPressure(right) - relationshipPressure(left) || `${left.fromKey}\u0000${left.toKey}`.localeCompare(`${right.fromKey}\u0000${right.toKey}`))
+    .slice(0, limit)
+    .map((item) => ({ ...item }));
+}
+
+function relationshipPressure(value: RelationshipState): number {
+  return Math.max(Math.abs(value.affinity), Math.abs(value.trust), value.tension);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 type SceneGenerationInputPrevious = GenerationContext['input']['previous'] extends infer T ? Exclude<T, null> : never;

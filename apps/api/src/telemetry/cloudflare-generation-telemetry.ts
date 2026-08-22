@@ -1,5 +1,5 @@
 import { calculateAiCost } from './ai-cost';
-import type { GenerationAttemptTelemetry, GenerationTelemetrySink } from './contracts';
+import type { GenerationAttemptTelemetry, GenerationPipelineTelemetry, GenerationTelemetrySink } from './contracts';
 
 export class CloudflareGenerationTelemetrySink implements GenerationTelemetrySink {
   constructor(private readonly dataset?: Pick<AnalyticsEngineDataset, 'writeDataPoint'>) {}
@@ -27,6 +27,24 @@ export class CloudflareGenerationTelemetrySink implements GenerationTelemetrySin
         cost.inputNanoUsd,
         cost.outputNanoUsd,
         cost.totalNanoUsd,
+      ],
+    });
+  }
+
+  recordGenerationPipeline(event: GenerationPipelineTelemetry): void {
+    if (!this.dataset) return;
+    this.dataset.writeDataPoint({
+      indexes: [event.model],
+      blobs: ['scene_generation_pipeline', event.provider, event.model, event.outcome],
+      doubles: [
+        1,
+        event.providerCalls,
+        event.repairs,
+        event.timings.providerMs,
+        event.timings.parseMs,
+        event.timings.compileMs,
+        event.timings.validateMs,
+        event.timings.totalMs,
       ],
     });
   }

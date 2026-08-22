@@ -149,6 +149,9 @@ export class DramaService {
     if (expected === null) return notFound();
     const result = await this.choices.commit({ userId: input.userId, plotId: input.dramaId, episodeId: input.sceneId, choiceId: input.choiceId, expectedStateVersion: expected });
     if (!result.ok) return mapChoiceError(result.error);
+    if (!result.value.replayed && result.value.sequence % 5 === 0) {
+      await this.dramas.saveArcCheckpoint(input.userId, input.dramaId, result.value.sequence);
+    }
     const stored = await this.dramas.loadSession(input.userId, input.dramaId);
     if (!stored) return persistenceError('Committed drama could not be reloaded.');
     if (!result.value.replayed) {

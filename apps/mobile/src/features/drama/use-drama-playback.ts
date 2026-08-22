@@ -16,6 +16,7 @@ export type DramaFailureSource = 'load' | 'refresh' | 'commit_choice' | 'continu
 export interface DramaFailure {
   source: DramaFailureSource;
   code: DramaClientErrorCode | 'unknown';
+  message?: string;
 }
 
 export function useDramaPlayback(input: { dramaId: string | null; enabled: boolean }) {
@@ -147,5 +148,6 @@ function toFailure(source: DramaFailureSource, error: unknown): DramaFailure {
   return {
     source,
     code: error instanceof DramaClientError ? error.code : 'unknown',
+    message: error instanceof Error ? error.message : undefined,
   };
 }

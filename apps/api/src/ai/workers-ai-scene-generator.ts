@@ -5,9 +5,20 @@ import type {
   SceneGenerationSuccess,
   SceneGenerationUsage,
   SceneGenerator,
+  SceneProposal,
 } from './contracts';
-import { parseAndValidateSceneProposal, sceneResponseSchemaForInput } from './scene-schema';
-import { buildScenePrompt, validateSceneGenerationInput } from './scene-prompt';
+import {
+  applyCreativeSceneRepair,
+  creativeSceneRepairResponseSchema,
+  creativeSceneResponseSchema,
+  parseCreativeSceneProposal,
+  parseCreativeSceneRepair,
+  validateCreativeSceneSemantics,
+  type CreativeSceneProposal,
+} from './creative-scene-schema';
+import { compileCreativeScene } from './scene-compiler';
+import { parseAndValidateSceneProposal } from './scene-schema';
+import { buildCreativeScenePrompt, validateSceneGenerationInput } from './scene-prompt';
 import { validateNarrativePublication } from '../evals/narrative-evaluator';
 import {
   NOOP_GENERATION_TELEMETRY,
@@ -15,7 +26,19 @@ import {
   type GenerationTelemetrySink,
 } from '../telemetry/contracts';
 
-export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
+
+interface ProviderResponse {
+  text: string;
+  usage: SceneGenerationUsage;
+}
+
+interface PipelineTimings {
+  providerMs: number;
+  parseMs: number;
+  compileMs: number;
+  validateMs: number;
+}
 
 export class WorkersAiSceneGenerator implements SceneGenerator {
   constructor(
@@ -24,103 +47,189 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
   ) {}
 
   async generate(input: SceneGenerationInput): Promise<Result<SceneGenerationSuccess, SceneGenerationError>> {
+    const startedAt = Date.now();
     const inputValidation = validateSceneGenerationInput(input);
     if (!inputValidation.ok) {
       return { ok: false, error: { code: 'invalid_input', message: inputValidation.error.join(' ') } };
     }
 
-    let validationErrors: string[] = [];
+    const timings: PipelineTimings = { providerMs: 0, parseMs: 0, compileMs: 0, validateMs: 0 };
     const usage: SceneGenerationUsage = { inputTokens: 0, outputTokens: 0 };
+    let providerCalls = 0;
+    let repairs = 0;
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      const provider = await this.requestModel(input, validationErrors);
-      if (!provider.ok) return provider;
+    const first = await this.requestCreative(input, [], timings);
+    providerCalls += 1;
+    if (!first.ok) {
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'provider_error');
+      return first;
+    }
+    addUsage(usage, first.value.usage);
 
-      usage.inputTokens += provider.value.usage.inputTokens;
-      usage.outputTokens += provider.value.usage.outputTokens;
-      const validated = parseAndValidateSceneProposal(normalizeCanonicalReferences(provider.value.text, input), input);
-      if (!validated.ok) {
-        this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
-        validationErrors = validated.error;
-      } else {
-        const publication = validateNarrativePublication(input, validated.value);
-        if (!publication.publishable) {
-          this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
-          validationErrors = publication.rejectionReasons;
-        } else {
-          this.recordAttempt(attempt as 1 | 2, 'accepted', provider.value.usage);
-          return {
-            ok: true,
-            value: {
-              proposal: validated.value,
-              usage,
-              attempts: attempt,
-              provider: 'workers-ai',
-              model: WORKERS_AI_SCENE_MODEL,
-            },
-          };
-        }
+    const firstParsed = timedParse(() => parseCreativeSceneProposal(first.value.text), timings);
+    if (!firstParsed.ok) {
+      this.recordAttempt(1, 'rejected', first.value.usage);
+      const retry = await this.requestCreative(input, firstParsed.error, timings);
+      providerCalls += 1;
+      if (!retry.ok) {
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'provider_error');
+        return retry;
       }
-      if (attempt === 2) {
-        return {
-          ok: false,
-          error: {
-            code: 'invalid_response',
-            message: 'Scene provider returned an invalid structured proposal after one controlled retry.',
-            attempts: 2,
-          },
-        };
+      addUsage(usage, retry.value.usage);
+      const retryParsed = timedParse(() => parseCreativeSceneProposal(retry.value.text), timings);
+      if (!retryParsed.ok) {
+        this.recordAttempt(2, 'rejected', retry.value.usage);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+        return invalidResponse(2);
       }
+      const retryValidated = validateCreative(input, retryParsed.value, timings);
+      if (!retryValidated.ok) {
+        this.recordAttempt(2, 'rejected', retry.value.usage);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+        return invalidResponse(2);
+      }
+      this.recordAttempt(2, 'accepted', retry.value.usage);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted');
+      return success(retryValidated.proposal, usage, 2);
     }
 
-    return { ok: false, error: { code: 'invalid_response', message: 'Scene generation failed.', attempts: 2 } };
+    const firstValidated = validateCreative(input, firstParsed.value, timings);
+    if (firstValidated.ok) {
+      this.recordAttempt(1, 'accepted', first.value.usage);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted');
+      return success(firstValidated.proposal, usage, 1);
+    }
+
+    this.recordAttempt(1, 'rejected', first.value.usage);
+    if (canTargetRepair(firstValidated.errors)) {
+      const repaired = await this.requestRepair(input, firstParsed.value, firstValidated.errors, timings);
+      providerCalls += 1;
+      repairs += 1;
+      if (!repaired.ok) {
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'provider_error');
+        return repaired;
+      }
+      addUsage(usage, repaired.value.usage);
+      const repairParsed = timedParse(() => parseCreativeSceneRepair(repaired.value.text), timings);
+      if (!repairParsed.ok) {
+        this.recordAttempt(2, 'rejected', repaired.value.usage);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+        return invalidResponse(2);
+      }
+      const merged = applyCreativeSceneRepair(firstParsed.value, repairParsed.value);
+      const repairValidated = validateCreative(input, merged, timings);
+      if (!repairValidated.ok) {
+        this.recordAttempt(2, 'rejected', repaired.value.usage);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+        return invalidResponse(2);
+      }
+      this.recordAttempt(2, 'accepted', repaired.value.usage);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted');
+      return success(repairValidated.proposal, usage, 2);
+    }
+
+    // Full regeneration is reserved for failures that cannot be repaired without rewriting the script.
+    const retry = await this.requestCreative(input, firstValidated.errors, timings);
+    providerCalls += 1;
+    if (!retry.ok) {
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'provider_error');
+      return retry;
+    }
+    addUsage(usage, retry.value.usage);
+    const retryParsed = timedParse(() => parseCreativeSceneProposal(retry.value.text), timings);
+    if (!retryParsed.ok) {
+      this.recordAttempt(2, 'rejected', retry.value.usage);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+      return invalidResponse(2);
+    }
+    const retryValidated = validateCreative(input, retryParsed.value, timings);
+    if (!retryValidated.ok) {
+      this.recordAttempt(2, 'rejected', retry.value.usage);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+      return invalidResponse(2);
+    }
+    this.recordAttempt(2, 'accepted', retry.value.usage);
+    this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted');
+    return success(retryValidated.proposal, usage, 2);
   }
 
-  private async requestModel(
+  private async requestCreative(
     input: SceneGenerationInput,
     validationErrors: string[],
-  ): Promise<Result<{ text: string; usage: SceneGenerationUsage }, SceneGenerationError>> {
-    const prompt = buildScenePrompt(input, validationErrors);
-    const compactInstruction = [
-      'Keep the JSON compact. The script must be 130–180 words; all other prose must be brief.',
-      'Summary: one sentence, at most 30 words. establishedFacts: at most 2 short strings. threadChanges.open: at most 1 short thread.',
-      'Each choice label: at most 8 words; intent: at most 10 words; consequence: at most 18 words.',
-      'Each choice stateDelta must be minimal: factsToAdd at most 2 short strings, threadsToOpen at most 1, nextTone at most 4 words.',
-      'Every choice must include at least one durable non-tone change: a material valid relationship change, a fact add/resolve, or a thread open/resolve. nextTone alone never satisfies branch commitment.',
-      'For continuations, do not retell the previous scene setup. Start from previous.consequence immediately, make the summary describe only the new development, and never reuse previous.chosenAction as a new choice label.',
-      'Do not reopen an active thread under the same title. Advance or resolve an existing thread before opening a genuinely new one.',
-      'establishedFacts, factsToAdd, and thread titles must be natural-language phrases in the requested locale, never snake_case, slugs, IDs, or database-like labels.',
-      'If activeFacts is empty, every factKeysToResolve must be empty. If openThreads is empty, every resolve/threadKeysToResolve must be empty.',
-      'Never repeat the script or explanation outside the required JSON object.',
-    ].join(' ');
+    timings: PipelineTimings,
+  ): Promise<Result<ProviderResponse, SceneGenerationError>> {
+    const prompt = buildCreativeScenePrompt(input, validationErrors);
+    const startedAt = Date.now();
     let payload: unknown;
     try {
       payload = await this.ai.run(WORKERS_AI_SCENE_MODEL, {
         messages: [
-          { role: 'system', content: `${prompt.systemInstruction}\n${compactInstruction}` },
+          { role: 'system', content: prompt.systemInstruction },
           { role: 'user', content: prompt.userContent },
         ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: sceneResponseSchemaForInput(input),
-        },
-        max_tokens: 4096,
-        temperature: 0.35,
+        response_format: { type: 'json_schema', json_schema: creativeSceneResponseSchema },
+        max_tokens: 2300,
+        temperature: 0.45,
       });
     } catch {
+      timings.providerMs += Date.now() - startedAt;
       return {
         ok: false,
         error: { code: 'provider_unavailable', message: 'Scene provider request failed.', retryable: true },
       };
     }
+    timings.providerMs += Date.now() - startedAt;
+    return { ok: true, value: { text: extractResponseText(payload), usage: extractUsage(payload) } };
+  }
 
-    return {
-      ok: true,
-      value: {
-        text: extractResponseText(payload),
-        usage: extractUsage(payload),
-      },
+  private async requestRepair(
+    input: SceneGenerationInput,
+    creative: CreativeSceneProposal,
+    validationErrors: string[],
+    timings: PipelineTimings,
+  ): Promise<Result<ProviderResponse, SceneGenerationError>> {
+    const prompt = buildCreativeScenePrompt(input, validationErrors);
+    const repairDraft = {
+      title: creative.title,
+      summary: creative.summary,
+      beat: creative.beat,
+      pacingRole: creative.pacingRole,
+      establishedFacts: creative.establishedFacts,
+      threadsToOpen: creative.threadsToOpen,
+      threadTitlesToResolve: creative.threadTitlesToResolve,
+      choices: creative.choices,
     };
+    const startedAt = Date.now();
+    let payload: unknown;
+    try {
+      payload = await this.ai.run(WORKERS_AI_SCENE_MODEL, {
+        messages: [
+          {
+            role: 'system',
+            content: [
+              prompt.systemInstruction,
+              'Repair metadata and choices only. The original script is immutable and MUST NOT be returned.',
+              'Return the smaller repair schema only. Make each durableFact concrete, branch-specific, and supported by its consequence.',
+            ].join('\n'),
+          },
+          {
+            role: 'user',
+            content: `${prompt.userContent}\nORIGINAL_CREATIVE_DRAFT_JSON\n${JSON.stringify(repairDraft)}\nEND_ORIGINAL_CREATIVE_DRAFT_JSON`,
+          },
+        ],
+        response_format: { type: 'json_schema', json_schema: creativeSceneRepairResponseSchema },
+        max_tokens: 1200,
+        temperature: 0.3,
+      });
+    } catch {
+      timings.providerMs += Date.now() - startedAt;
+      return {
+        ok: false,
+        error: { code: 'provider_unavailable', message: 'Scene provider repair request failed.', retryable: true },
+      };
+    }
+    timings.providerMs += Date.now() - startedAt;
+    return { ok: true, value: { text: extractResponseText(payload), usage: extractUsage(payload) } };
   }
 
   private recordAttempt(
@@ -140,44 +249,108 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
       // Telemetry is observational and must never change scene-generation behavior.
     }
   }
-}
 
-function normalizeCanonicalReferences(raw: string, input: SceneGenerationInput): string {
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    return raw;
-  }
-  if (!isRecord(value)) return raw;
-
-  const characterKeys = new Set(input.characters.map((character) => character.key));
-  const factKeys = new Set(input.activeFacts.map((fact) => fact.key));
-  const threadKeys = new Set(input.openThreads.map((thread) => thread.key));
-
-  if (isRecord(value.threadChanges) && Array.isArray(value.threadChanges.resolve)) {
-    value.threadChanges.resolve = value.threadChanges.resolve.filter((key) => typeof key === 'string' && threadKeys.has(key));
-  }
-  if (Array.isArray(value.choices)) {
-    for (const choice of value.choices) {
-      if (!isRecord(choice) || !isRecord(choice.stateDelta)) continue;
-      const delta = choice.stateDelta;
-      if (Array.isArray(delta.relationships)) {
-        delta.relationships = delta.relationships.filter((relation) => {
-          if (!isRecord(relation) || typeof relation.fromKey !== 'string' || typeof relation.toKey !== 'string') return false;
-          return relation.fromKey !== relation.toKey && characterKeys.has(relation.fromKey) && characterKeys.has(relation.toKey);
-        });
-      }
-      if (Array.isArray(delta.factKeysToResolve)) {
-        delta.factKeysToResolve = delta.factKeysToResolve.filter((key) => typeof key === 'string' && factKeys.has(key));
-      }
-      if (Array.isArray(delta.threadKeysToResolve)) {
-        delta.threadKeysToResolve = delta.threadKeysToResolve.filter((key) => typeof key === 'string' && threadKeys.has(key));
-      }
+  private recordPipeline(
+    timings: PipelineTimings,
+    startedAt: number,
+    providerCalls: number,
+    repairs: number,
+    outcome: 'accepted' | 'invalid_response' | 'provider_error',
+  ): void {
+    try {
+      this.telemetry.recordGenerationPipeline?.({
+        provider: 'workers-ai',
+        model: WORKERS_AI_SCENE_MODEL,
+        providerCalls,
+        repairs,
+        outcome,
+        timings: {
+          providerMs: timings.providerMs,
+          parseMs: timings.parseMs,
+          compileMs: timings.compileMs,
+          validateMs: timings.validateMs,
+          totalMs: Date.now() - startedAt,
+        },
+      });
+    } catch {
+      // Pipeline telemetry is fail-open and contains timing/count metadata only.
     }
   }
+}
 
-  return JSON.stringify(value);
+function validateCreative(
+  input: SceneGenerationInput,
+  creative: CreativeSceneProposal,
+  timings: PipelineTimings,
+): { ok: true; proposal: SceneProposal } | { ok: false; errors: string[] } {
+  const creativeErrors = validateCreativeSceneSemantics(creative);
+  if (creativeErrors.length > 0) return { ok: false, errors: creativeErrors };
+
+  const compileStartedAt = Date.now();
+  const compiled = compileCreativeScene(input, creative);
+  timings.compileMs += Date.now() - compileStartedAt;
+
+  const validateStartedAt = Date.now();
+  const structural = parseAndValidateSceneProposal(JSON.stringify(compiled), input);
+  if (!structural.ok) {
+    timings.validateMs += Date.now() - validateStartedAt;
+    return { ok: false, errors: structural.error };
+  }
+  const publication = validateNarrativePublication(input, structural.value);
+  timings.validateMs += Date.now() - validateStartedAt;
+  return publication.publishable
+    ? { ok: true, proposal: structural.value }
+    : { ok: false, errors: publication.rejectionReasons };
+}
+
+function timedParse<T>(parse: () => T, timings: PipelineTimings): T {
+  const startedAt = Date.now();
+  const result = parse();
+  timings.parseMs += Date.now() - startedAt;
+  return result;
+}
+
+function canTargetRepair(errors: string[]): boolean {
+  return !errors.some((error) =>
+    error.includes('Scene script must stay within')
+    || error.includes('Scene title, script, or summary is invalid')
+    || error.includes('Creative response is not valid JSON'),
+  );
+}
+
+function success(
+  proposal: SceneProposal,
+  usage: SceneGenerationUsage,
+  attempts: 1 | 2,
+): Result<SceneGenerationSuccess, SceneGenerationError> {
+  return {
+    ok: true,
+    value: {
+      proposal,
+      usage,
+      attempts,
+      provider: 'workers-ai',
+      model: WORKERS_AI_SCENE_MODEL,
+    },
+  };
+}
+
+function invalidResponse(attempts: 1 | 2): Result<never, SceneGenerationError> {
+  return {
+    ok: false,
+    error: {
+      code: 'invalid_response',
+      message: attempts === 1
+        ? 'Scene provider returned an invalid creative proposal.'
+        : 'Scene provider returned an invalid proposal after one controlled repair or retry.',
+      attempts,
+    },
+  };
+}
+
+function addUsage(total: SceneGenerationUsage, next: SceneGenerationUsage): void {
+  total.inputTokens += next.inputTokens;
+  total.outputTokens += next.outputTokens;
 }
 
 function extractResponseText(payload: unknown): string {

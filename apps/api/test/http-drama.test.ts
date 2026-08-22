@@ -10,6 +10,7 @@ import migrationSeven from '../migrations/0007_live_story_integration.sql?raw';
 import migrationEight from '../migrations/0008_user_preferences.sql?raw';
 import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?raw';
 import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
+import migrationEleven from '../migrations/0011_arc_checkpoints.sql?raw';
 import type { SceneGenerationInput, SceneGenerator, SceneProposal } from '../src/ai/contracts';
 import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
@@ -32,7 +33,7 @@ const testEnv: AppEnv = {
 const nowMs = Date.parse('2026-08-16T12:00:00.000Z');
 
 beforeAll(async () => {
-  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven, migrationEight, migrationNine, migrationTen]) {
+  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven, migrationEight, migrationNine, migrationTen, migrationEleven]) {
     await applySqlMigration(db, migration);
   }
 });

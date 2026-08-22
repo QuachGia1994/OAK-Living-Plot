@@ -340,6 +340,11 @@ function failureMessage(failure: DramaFailure | null, locale: 'en' | 'vi'): stri
   if (failure.code === 'quota_exceeded') return vi ? 'Máy chủ đang giới hạn tạm thời việc tạo cảnh. Cốt truyện hiện tại vẫn được giữ nguyên để bạn thử lại.' : 'The server is temporarily limiting Scene generation. Current story state is unchanged so you can retry.';
   if (failure.code === 'provider_unavailable') return vi ? 'Tạo drama tạm thời không khả dụng. Nhánh đã chốt vẫn được giữ nguyên.' : 'Drama generation is temporarily unavailable. Your committed branch is unchanged.';
   if (failure.code === 'invalid_generation') return vi ? 'Cảnh được tạo không đạt hợp đồng drama chuẩn. Trạng thái hiện tại vẫn được giữ nguyên để bạn thử lại.' : 'The generated scene did not satisfy the canonical drama contract. Current state is unchanged so you can retry.';
+  if (failure.code === 'backend_unavailable' && failure.message?.includes('too long')) {
+    return vi
+      ? 'Bộ máy tạo cảnh phản hồi quá chậm. Nhánh chuẩn và khóa tạo vẫn được giữ an toàn; thử lại sẽ tiếp tục cùng yêu cầu.'
+      : 'Scene generation took too long to respond. Canonical branch state and the generation key are preserved; retry continues the same request.';
+  }
   return vi ? 'Thao tác chưa hoàn tất. Trạng thái chuẩn vẫn được giữ nguyên.' : 'The action did not finish. Canonical state is unchanged.';
 }
 

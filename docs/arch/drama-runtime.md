@@ -1,6 +1,6 @@
 # Canonical drama runtime ownership
 
-> updated 2026-08-22 0.0.0
+> updated 2026-08-22 · 0.0.0
 
 Living Plot has one product vocabulary above persistence: **Drama → Scene → Choice → Branch → next Scene**. The existing D1 schema still stores historical table/column names such as `plots`, `episodes`, `plot_id`, `episode_id`, and `story_locale`. Those names are storage details and must not be projected into new mobile or HTTP contracts.
 
@@ -10,7 +10,7 @@ Living Plot has one product vocabulary above persistence: **Drama → Scene → 
 | --- | --- | --- |
 | user premise/mood/lead → generation request | mobile `features/drama/setup.ts` + `HttpDramaExperienceClient` | `DramaDraft`, idempotency keys, `DramaLocale` |
 | generation request → provider-neutral scene proposal | API `SceneGenerator` | `SceneGenerationInput` → `SceneProposal` or normalized generation error |
-| provider payload → validated proposal | `SceneGenerator` adapter + `scene-schema.ts` | strict `SceneProposal`; raw provider JSON never reaches domain/UI |
+| provider payload → validated proposal | `SceneGenerator` adapter + `scene-compiler.ts` + `scene-schema.ts` | strict `SceneProposal`; raw provider JSON never reaches domain/UI |
 | validated proposal → persisted current scene | `D1EpisodePublisher` persistence adapter + `DramaService` | D1 write with generation-key/idempotency/version guards, then `D1DramaRepository` projects `Drama` |
 | persisted rows → application drama | `D1DramaRepository` | `Drama`, `Scene`, `CharacterIdentity`, `Branch` |
 | scene → voice request/status/private playback | `D1AudioService` + `AudioProcessor` | public `MediaAsset` lifecycle; R2/provider fields remain private |
@@ -48,16 +48,17 @@ The mobile selection before commit is provisional playback state, not a canonica
 
 ## Generation boundary
 
-`SceneGenerator` is provider-neutral. The non-production live-development Worker uses the Workers AI binding with `@cf/meta/llama-3.3-70b-instruct-fp8-fast`; deployments without that binding retain `GeminiSceneGenerator` as the adapter. `DramaService`, D1 projection, and mobile code depend on neither provider response type.
+`SceneGenerator` is provider-neutral. The non-production live-development Worker uses the Workers AI binding with `@cf/meta/llama-3.1-8b-instruct-fast` (slim creative schema, no `stateDelta` in provider output); deployments without that binding retain `GeminiSceneGenerator` as the adapter. `DramaService`, D1 projection, and mobile code depend on neither provider response type.
 
-Provider flow:
-1. `SceneGenerationInput` is assembled only from bounded canonical drama memory.
-2. `scene-prompt.ts` serializes user/drama strings as data inside `DRAMA_CONTEXT_JSON`.
-3. the selected adapter requests structured JSON from the canonical input shape; a one-character cast forbids relationship deltas and requires a branch-specific fact per choice before generation, and the Workers AI adapter removes only provider references that do not exist in canonical character/fact/thread input.
-4. `scene-schema.ts` parses and validates the proposal, including A/B/C branches, canonical references, score bounds, script envelope, continuation advancement, active-thread duplication, and no unexpected fields. Schema string bounds mirror the domain envelope so incomplete/undersized provider output is rejected before publication.
-5. One controlled regeneration is allowed only for a successful-but-invalid provider proposal.
-6. provider/network failures normalize to `provider_unavailable`; a second invalid proposal normalizes to `invalid_generation` at HTTP/mobile application boundaries.
-7. only validated `SceneProposal` reaches publication. Canonical state application deduplicates semantically identical fact/thread text before and during branch commits, and generation context performs the same normalization so previously polluted development state cannot keep feeding repeated facts/threads back into later Scenes.
+Provider flow is `bounded context -> one 8B creative call -> deterministic compiler -> structural/publication gate -> targeted repair when appropriate -> atomic persistence`:
+
+1. `SceneGenerationInput` is assembled only from bounded canonical drama memory: full canonical D1 history is retained, but generation input is bounded to last 4 scenes, ≤24 facts, ≤12 threads, ≤20 relationships, ≤3 arc checkpoints, bounded resolved tombstones (≤24 fact texts + ≤24 thread titles), and bounded novelty (`excludedBeats` ≤4, `trajectoryConstraints` ≤20, `motifHistory` ≤12). Old `script_json` rows without `beat`/`pacingRole`/`motifSignature` remain readable.
+2. `scene-prompt.ts` serializes user/drama strings as data inside `DRAMA_CONTEXT_JSON`; the creative path strips provider-irrelevant canonical keys/state-version metadata, maps relationship/trajectory endpoints to character names, omits server-only committed relationship deltas, and instructs the provider to emit `durableFact` per choice plus exact natural-language resolution hints rather than canonical keys or relationship deltas.
+3. The selected adapter requests structured JSON via the slim creative schema; on the happy path exactly one 8B provider call is made (`max_tokens: 2300`, `temperature: 0.45`). The adapter never invents narrative facts, relationships, or threads; compilation does exact normalized mapping only.
+4. `scene-compiler.ts` deterministically compiles the creative proposal: `durableFact` text is copied into `factsToAdd`, `factTextsToResolve`/`threadTitlesToResolve` are exact-mapped to canonical keys (unknown/ambiguous dropped, no invented relationships), and `resolvedMemory` tombstones block exact resurrection.
+5. `scene-schema.ts` parses and validates the compiled proposal, including A/B/C branches, canonical references, score bounds, script envelope, continuation advancement, active-thread duplication, and no unexpected fields. Schema string bounds mirror the domain envelope so incomplete/undersized provider output is rejected before publication.
+6. Failures are handled with at most one controlled follow-up: malformed JSON triggers one full regeneration; publication rejections that do not require rewriting `script` trigger one targeted repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation). A second failure normalizes to `invalid_response`; binding/network exceptions normalize to `provider_unavailable`. Telemetry (`providerCalls`/`repairs`/`timings`/`outcome`) is observational and fail-open.
+7. Only validated `SceneProposal` reaches publication. Canonical state application deduplicates semantically identical fact/thread text before and during branch commits, and generation context performs the same normalization so previously polluted development state cannot keep feeding repeated facts/threads back into later Scenes. `arc_checkpoints` (`plot_id`, `through_scene_number`, `summary`, `created_at`, unique on `(plot_id, through_scene_number)`) is a derived cache only; `saveArcCheckpoint` is fail-open and never invalidates a successful canonical commit.
 
 Provider/model names may exist in adapter telemetry and persistence provenance. They are never application state.
 
@@ -115,20 +116,25 @@ Changing UI language may choose matching defaults for a new drama/narrator, but 
 - auth failure: HTTP auth boundary; no canonical mutation.
 - invalid input: setup/HTTP validation; provider not called.
 - provider unavailable: `SceneGenerator` normalized failure; reserved generation ledger entry released.
-- invalid provider proposal after controlled retry: `invalid_generation`; no publication.
+- invalid provider proposal after controlled retry/repair: `invalid_generation`; no publication.
 - stale/conflicting branch: choice/version boundary; mobile reloads canonical drama.
 - media queue/provider failure: explicit `MediaAsset.failed` plus failure code; narrative scene remains readable.
 - private R2 cleanup failure: staged metadata is retained and retried; no silent orphaning.
 - lost network response after POST: stable idempotency key + canonical reload, never local success inference.
+- checkpoint write failure: derived-cache only, fail-open; canonical commit remains valid.
+- telemetry write failure: observational only, fail-open; never changes generation behavior.
 
 ## Verification map
 
 Behavioral proof is intentionally attached to business transitions:
 - `apps/api/test/http-drama.test.ts` — create, persisted restore, owner isolation, branch commit/conflict, next-scene consequence, idempotent retry, generation failure/quota release.
+- `apps/api/test/creative-scene-schema.test.ts` + `apps/api/test/scene-compiler.test.ts` — slim creative schema, durableFact quality, exact-map compilation, no invented relationships, resolved tombstone blocking.
+- `apps/api/test/workers-ai-scene-generator.test.ts` — one 8B happy-path call, no `stateDelta` in primary schema, targeted repair with immutable script, malformed→`invalid_response`, exception→`provider_unavailable`, pipeline telemetry and fail-open behavior.
+- `apps/api/test/long-run-soak.test.ts` — 50-scene deterministic D1 soak with bounded memory and plateaued context bytes, old episode rows readable.
 - `apps/api/test/scene-schema.test.ts` — provider normalization and invalid references/shape rejection.
 - `apps/api/test/gemini-scene-generator.test.ts` + `workers-ai-scene-generator.test.ts` — provider adapters, Worker-safe fetch binding, structured output, canonical-reference normalization, controlled validation retry, normalized failures.
 - `apps/api/test/gemini-tts-synthesizer.test.ts` + `audio-service.test.ts` + `audio-processor.test.ts` + `http-media.test.ts` — Gemini TTS normalization plus media ownership, quota/idempotency, internal/partial/ready/failure states, private delivery.
-- `apps/mobile/test/http-drama-client.test.ts` — HTTP normalization, conflict resync, stable continuation key, malformed branch rejection.
+- `apps/mobile/test/http-drama-client.test.ts` — HTTP normalization, conflict resync, stable continuation key, malformed branch rejection, 120s defensive timeout.
 - `apps/mobile/test/drama-domain.test.ts` — player phase transitions.
 - `apps/mobile/test/drama-preview-client.test.ts` — branch rules, continuation, restore, locale integrity.
 - `apps/mobile/test/media-polling.test.ts` + `http-scene-voice-client.test.ts` — bounded polling and public media contract.

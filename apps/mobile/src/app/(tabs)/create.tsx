@@ -231,7 +231,14 @@ function createErrorMessage(error: unknown, locale: 'en' | 'vi'): string {
   if (error.code === 'auth_required') return vi ? 'Phiên đăng nhập đã hết hạn. Đăng nhập lại trước khi tạo drama.' : 'Your session expired. Sign in again before generating this drama.';
   if (error.code === 'provider_unavailable') return vi ? 'Bộ máy tạo drama tạm thời không khả dụng. Thiết lập không thay đổi; hãy thử lại sau.' : 'The drama engine is temporarily unavailable. Your setup is unchanged; try again later.';
   if (error.code === 'choice_required') return vi ? 'Lần tạo này không còn khớp với bản trên máy chủ. Chỉnh thiết lập hoặc về trang chủ để tiếp tục drama hiện có.' : 'This creation attempt no longer matches the server copy. Edit the setup or return home to resume the existing drama.';
-  if (error.code === 'backend_unavailable') return vi ? 'Không thể kết nối dịch vụ Living Plot. Thiết lập vẫn được giữ để bạn thử lại.' : 'Living Plot could not reach the server. Your setup is still here so you can retry.';
+  if (error.code === 'backend_unavailable') {
+    if (error.message.includes('too long')) {
+      return vi
+        ? 'Bộ máy tạo cảnh phản hồi quá chậm. Thiết lập và khóa tạo vẫn được giữ an toàn; hãy thử lại để tiếp tục cùng yêu cầu.'
+        : 'Scene generation took too long to respond. Your setup and generation key are preserved safely; retry to continue the same request.';
+    }
+    return vi ? 'Dịch vụ Living Plot không hoàn tất được yêu cầu. Thiết lập vẫn được giữ để bạn thử lại.' : 'Living Plot could not complete the request. Your setup is still here so you can retry.';
+  }
   if (error.code === 'invalid_generation') return vi ? 'Cảnh được tạo chưa đạt hợp đồng drama. Thiết lập vẫn được giữ để thử lại.' : 'The generated scene did not satisfy the drama contract. Your setup is still here so you can retry.';
   if (error.code === 'invalid_input') return vi ? 'Thiết lập cảnh chưa hợp lệ. Kiểm tra mầm drama và tên nhân vật rồi thử lại.' : 'The scene setup is invalid. Check the drama spark and lead name, then retry.';
   return error.message;

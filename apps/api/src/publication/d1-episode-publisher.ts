@@ -1,4 +1,5 @@
 import type { SceneChoiceProposal } from '../ai/contracts';
+import { buildMotifSignature, type SceneMotifSignature } from '../evals/narrative-novelty';
 import type {
   EpisodePublicationInput,
   EpisodePublicationResult,
@@ -41,6 +42,9 @@ interface StoredEpisodeContent {
   script: string;
   establishedFacts: string[];
   threadChanges: EpisodePublicationInput['proposal']['threadChanges'];
+  beat: string | null;
+  pacingRole: string | null;
+  motifSignature: SceneMotifSignature;
 }
 
 export class D1EpisodePublisher {
@@ -77,6 +81,9 @@ export class D1EpisodePublisher {
       script: input.proposal.script,
       establishedFacts: input.proposal.establishedFacts,
       threadChanges: input.proposal.threadChanges,
+      beat: input.proposal.beat ?? null,
+      pacingRole: input.proposal.pacingRole ?? null,
+      motifSignature: buildMotifSignature(input.proposal),
     };
 
     try {

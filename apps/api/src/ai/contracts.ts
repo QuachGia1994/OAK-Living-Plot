@@ -78,6 +78,16 @@ export interface SceneGenerationInput {
       consequenceFamily: string;
     }>;
   };
+  /** Rebuildable, bounded long-range memory derived from committed canonical history. */
+  arcMemory?: Array<{
+    throughSceneNumber: number;
+    summary: string;
+  }>;
+  /** Recent resolved-state tombstones derived from canonical commits; never provider authority. */
+  resolvedMemory?: {
+    facts: string[];
+    threads: string[];
+  };
 }
 
 export interface RelationshipDelta {

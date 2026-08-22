@@ -27,6 +27,30 @@ describe('HttpDramaExperienceClient', () => {
     expect(typeof body.generationKey).toBe('string');
   });
 
+  it('allows slow AI mutations beyond 60 seconds without aborting the canonical request', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn<TestFetch>(async (_input, init) => new Promise<Response>((resolve, reject) => {
+        const timer = setTimeout(() => resolve(Response.json({ drama: dramaPayload() }, { status: 201 })), 90_000);
+        init?.signal?.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new Error('aborted'));
+        });
+      }));
+      const client = new HttpDramaExperienceClient('https://api.test', async () => 'token', fetcher);
+
+      const pending = client.createDrama(
+        { premise: 'Mina receives an impossible message and must decide whom to trust tonight.', mood: 'mysterious', characterName: 'Mina' },
+        'creation-slow-001',
+      );
+      await vi.advanceTimersByTimeAsync(90_000);
+
+      await expect(pending).resolves.toMatchObject({ id: 'drama-1' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reuses the continuation generation key after a lost response', async () => {
     const bodies: Record<string, unknown>[] = [];
     let attempt = 0;

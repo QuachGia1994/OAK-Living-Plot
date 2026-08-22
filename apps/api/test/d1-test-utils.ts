@@ -23,6 +23,7 @@ export async function resetStoryData(db: D1Database): Promise<void> {
     'usage_events',
     'quota_reservations',
     'audio_assets',
+    'arc_checkpoints',
     'choice_commits',
     'episode_choices',
     'episodes',
