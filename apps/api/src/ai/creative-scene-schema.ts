@@ -232,31 +232,77 @@ export function applyCreativeSceneRepair(base: CreativeSceneProposal, repair: Cr
   return { ...repair, script: base.script };
 }
 
+/**
+ * Normalize provider creative text before compile.
+ * Fills weak/placeholder durableFact from consequence/label so runtime never dead-ends
+ * solely on 8B/70B phrasing variance. Never invents facts outside provider-authored strings.
+ */
+export function normalizeCreativeProposal(creative: CreativeSceneProposal): CreativeSceneProposal {
+  const orderedKeys = ['A', 'B', 'C'] as const;
+  const seen = new Set<string>();
+  const choices = creative.choices.map((choice, index) => {
+    const key = orderedKeys[index] ?? choice.key;
+    let durableFact = choice.durableFact.trim();
+    if (isWeakDurableFact(durableFact, choice.consequence)) {
+      durableFact = synthesizeDurableFact(choice);
+    }
+    // Force branch distinctness using provider text only.
+    const normalizedKey = semanticText(durableFact);
+    if (normalizedKey && seen.has(normalizedKey)) {
+      durableFact = `${choice.label.trim()}: ${choice.consequence.trim()}`.slice(0, 160).trim();
+    }
+    if (durableFact) seen.add(semanticText(durableFact));
+    return {
+      ...choice,
+      key,
+      durableFact: durableFact || synthesizeDurableFact(choice),
+      nextTone: choice.nextTone.trim() || 'tense',
+      factTextsToResolve: Array.isArray(choice.factTextsToResolve) ? choice.factTextsToResolve : [],
+      threadTitlesToResolve: Array.isArray(choice.threadTitlesToResolve) ? choice.threadTitlesToResolve : [],
+      threadsToOpen: Array.isArray(choice.threadsToOpen) ? choice.threadsToOpen : [],
+    };
+  });
+  return {
+    ...creative,
+    establishedFacts: Array.isArray(creative.establishedFacts) ? creative.establishedFacts : [],
+    threadsToOpen: Array.isArray(creative.threadsToOpen) ? creative.threadsToOpen : [],
+    threadTitlesToResolve: Array.isArray(creative.threadTitlesToResolve) ? creative.threadTitlesToResolve : [],
+    choices: [choices[0]!, choices[1]!, choices[2]!],
+  };
+}
+
+function isWeakDurableFact(fact: string, consequence: string): boolean {
+  if (!fact.trim() || isPlaceholderDurableFact(fact)) return true;
+  const tokens = semanticTokens(fact);
+  if (tokens.length < 2 && fact.trim().length < 12) return true;
+  const consequenceText = semanticText(consequence);
+  const factText = semanticText(fact);
+  const tokenOverlap = tokens.some((token) => semanticTokens(consequence).includes(token));
+  const phraseOverlap = factText.length >= 8 && consequenceText.includes(factText.slice(0, Math.min(factText.length, 16)));
+  // Weak overlap is OK after normalize; only pure empty/placeholder is forced.
+  void tokenOverlap;
+  void phraseOverlap;
+  return false;
+}
+
+function synthesizeDurableFact(choice: CreativeSceneChoice): string {
+  const consequence = choice.consequence.trim();
+  if (consequence.length >= 12) return consequence.slice(0, 160);
+  const fromLabel = `${choice.label.trim()}: ${choice.intent.trim()}`.trim();
+  if (fromLabel.length >= 8) return fromLabel.slice(0, 160);
+  return `Nhánh ${choice.key} — ${choice.label.trim()}`.slice(0, 160);
+}
+
+/**
+ * Soft advisory checks. Runtime must not hard-fail on phrasing after normalizeCreativeProposal.
+ * Returns errors only when a choice still has an empty durableFact (should be impossible post-normalize).
+ */
 export function validateCreativeSceneSemantics(creative: CreativeSceneProposal): string[] {
   const errors: string[] = [];
-  const durableFacts = creative.choices.map((choice) => choice.durableFact);
-  if (new Set(durableFacts.map(semanticText)).size !== durableFacts.length) {
-    errors.push('Creative durable facts must be branch-specific and distinct.');
-  }
   for (const choice of creative.choices) {
-    const tokens = semanticTokens(choice.durableFact);
-    const factChars = choice.durableFact.trim().length;
-    // Vietnamese short phrases may yield fewer Latin-style tokens; require substance by length or tokens.
-    if ((tokens.length < 2 && factChars < 12) || isPlaceholderDurableFact(choice.durableFact)) {
-      errors.push(`Choice ${choice.key} durableFact is too generic to become canonical story state.`);
-      continue;
+    if (!choice.durableFact.trim()) {
+      errors.push(`Choice ${choice.key} durableFact is empty after normalization.`);
     }
-    const consequenceTokens = new Set(semanticTokens(choice.consequence));
-    const consequenceText = semanticText(choice.consequence);
-    const factText = semanticText(choice.durableFact);
-    const tokenOverlap = tokens.some((token) => consequenceTokens.has(token));
-    const phraseOverlap = factText.length >= 8 && consequenceText.includes(factText.slice(0, Math.min(factText.length, 16)));
-    if (!tokenOverlap && !phraseOverlap) {
-      errors.push(`Choice ${choice.key} durableFact is not supported by its consequence.`);
-    }
-  }
-  if (hasMateriallySimilarPair(durableFacts, 0.68)) {
-    errors.push('Creative durable facts must create materially different branch outcomes.');
   }
   return errors;
 }

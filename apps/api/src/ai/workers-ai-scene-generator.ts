@@ -11,6 +11,7 @@ import {
   applyCreativeSceneRepair,
   creativeSceneRepairResponseSchema,
   creativeSceneResponseSchema,
+  normalizeCreativeProposal,
   parseCreativeSceneProposal,
   parseCreativeSceneRepair,
   validateCreativeSceneSemantics,
@@ -26,7 +27,8 @@ import {
   type GenerationTelemetrySink,
 } from '../telemetry/contracts';
 
-export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
+/** Primary creative model: stronger structured JSON + branch text than 8B-fast. */
+export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 interface ProviderResponse {
   text: string;
@@ -283,11 +285,12 @@ function validateCreative(
   creative: CreativeSceneProposal,
   timings: PipelineTimings,
 ): { ok: true; proposal: SceneProposal } | { ok: false; errors: string[] } {
-  const creativeErrors = validateCreativeSceneSemantics(creative);
+  const normalized = normalizeCreativeProposal(creative);
+  const creativeErrors = validateCreativeSceneSemantics(normalized);
   if (creativeErrors.length > 0) return { ok: false, errors: creativeErrors };
 
   const compileStartedAt = Date.now();
-  const compiled = compileCreativeScene(input, creative);
+  const compiled = compileCreativeScene(input, normalized);
   timings.compileMs += Date.now() - compileStartedAt;
 
   const validateStartedAt = Date.now();

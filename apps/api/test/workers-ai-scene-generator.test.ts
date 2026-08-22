@@ -34,7 +34,7 @@ function creativeProposal(): CreativeSceneProposal {
 }
 
 describe('WorkersAiSceneGenerator', () => {
-  it('uses one slim 8B creative call on the happy path', async () => {
+  it('uses one primary creative call on the happy path', async () => {
     const run = vi.fn().mockResolvedValue({
       response: creativeProposal(),
       usage: { prompt_tokens: 120, completion_tokens: 80 },
@@ -54,7 +54,7 @@ describe('WorkersAiSceneGenerator', () => {
     });
     expect(run).toHaveBeenCalledTimes(1);
     const [model, request] = run.mock.calls[0] as [string, Record<string, unknown>];
-    expect(model).toBe('@cf/meta/llama-3.1-8b-instruct-fast');
+    expect(model).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
     expect(request).toMatchObject({ response_format: { type: 'json_schema' }, max_tokens: 2300, temperature: 0.45 });
     const responseFormat = request.response_format as { json_schema: Record<string, unknown> };
     expect(responseFormat.json_schema.type).toBe('object');
