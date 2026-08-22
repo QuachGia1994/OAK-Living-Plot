@@ -6,6 +6,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHistory, DramaHistoryItem } from '@/features/drama/contracts';
 import { journeyStats } from '@/features/drama/journey-stats';
 import { DramaEmptyStage, DramaLoadingStage, DramaRecapFrame, DramaUtilityHero } from '@/ui/drama-visuals';
+import { conceptFlowLabels, conceptFlowStep } from '@/ui/concept-flow';
 import { ActionButton, BrandMark, ErrorState, Pill, Screen, StoryFlowRail } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
@@ -15,6 +16,8 @@ export default function DramaHistoryScreen() {
   const params = useLocalSearchParams<{ dramaId?: string | string[] }>();
   const dramaId = useMemo(() => readParam(params.dramaId), [params.dramaId]);
   const client = useDramaExperienceClient();
+  const flowSteps = conceptFlowLabels(locale);
+  const timelineStep = conceptFlowStep(locale, 'timeline');
   const [history, setHistory] = useState<DramaHistory | null>(null);
   const [error, setError] = useState<string | null>(dramaId ? null : t('This history link is missing its drama identifier.', 'Liên kết lịch sử thiếu mã drama.'));
 
@@ -56,24 +59,14 @@ export default function DramaHistoryScreen() {
       </View>
 
       <DramaUtilityHero
-        kicker={t('06 · PREVIOUSLY ON LIVING PLOT', '06 · TRƯỚC ĐÓ TRÊN LIVING PLOT')}
+        kicker={`${String(timelineStep.number).padStart(2, '0')} · ${timelineStep.kicker}`}
         title={history?.title ?? t('Drama so far', 'Drama đến đây')}
         detail={history ? t(`${history.items.length} scenes preserved in canonical order.`, `${history.items.length} cảnh được giữ theo thứ tự chuẩn.`) : t('Restoring the choices that brought this drama here.', 'Đang khôi phục các lựa chọn đã đưa drama tới đây.')}
         mood="mysterious"
         characterName="Recap"
       />
 
-      <StoryFlowRail
-        activeStep={6}
-        steps={[
-          t('Create world', 'Tạo thế giới'),
-          t('Write scene', 'Viết cảnh'),
-          t('Choose', 'Lựa chọn'),
-          t('Consequence', 'Hệ quả'),
-          t('Living cast', 'Nhân vật sống'),
-          t('Timeline', 'Dòng lịch sử'),
-        ]}
-      />
+      <StoryFlowRail activeStep={timelineStep.number} steps={flowSteps} />
 
       {error ? <ErrorState title={t('Recap unavailable', 'Tóm tắt không khả dụng')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
       {!history && !error ? <DramaLoadingStage label={t('Building your drama recap…', 'Đang dựng lại tóm tắt drama…')} detail={t('Restoring each scene, committed branch and consequence.', 'Đang khôi phục từng cảnh, nhánh đã chốt và hậu quả.')} locale={locale} /> : null}

@@ -10,6 +10,7 @@ import { useUiCopy } from '@/features/localization/ui-copy';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch, DramaUtilityHero } from '@/ui/drama-visuals';
+import { conceptFlowLabels, conceptFlowStep } from '@/ui/concept-flow';
 import { ActionButton, BrandMark, Eyebrow, Screen, StoryFlowRail } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
 
@@ -25,6 +26,8 @@ export default function CreateDramaScreen() {
   const auth = useMobileAuth();
   const { locale, t } = useUiCopy();
   const dramaExperienceClient = useDramaExperienceClient();
+  const flowSteps = conceptFlowLabels(locale);
+  const worldStep = conceptFlowStep(locale, 'world');
   const creationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
   const submitting = useRef(false);
   const initialLaunchKey = readParam(params.launchKey);
@@ -107,22 +110,12 @@ export default function CreateDramaScreen() {
       <BrandMark />
 
       <View style={styles.intro}>
-        <Eyebrow>{t('Direct a new mini-drama', 'Dựng một mini-drama mới')}</Eyebrow>
+        <Eyebrow>{`${String(worldStep.number).padStart(2, '0')} · ${worldStep.kicker}`}</Eyebrow>
         <Text style={styles.title}>{t('Build the world. Light the first scene.', 'Dựng thế giới. Thắp sáng cảnh đầu tiên.')}</Text>
         <Text style={styles.subtitle}>{t('One spark. One lead. One mood. Living Plot turns it into a branchable scene.', 'Một tia lửa. Một nhân vật. Một không khí. Living Plot biến nó thành cảnh có thể rẽ nhánh.')}</Text>
       </View>
 
-      <StoryFlowRail
-        activeStep={1}
-        steps={[
-          t('Create world', 'Tạo thế giới'),
-          t('Write scene', 'Viết cảnh'),
-          t('Choose', 'Lựa chọn'),
-          t('Consequence', 'Hệ quả'),
-          t('Living cast', 'Nhân vật sống'),
-          t('Timeline', 'Dòng lịch sử'),
-        ]}
-      />
+      <StoryFlowRail activeStep={worldStep.number} steps={flowSteps} />
 
       <DramaComposerPreview
         premise={draft.premise}

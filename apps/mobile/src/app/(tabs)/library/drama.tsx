@@ -10,6 +10,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeDramaShareText } from '@/features/share/drama-share';
 import { CharacterPortraitCard } from '@/features/portrait/character-portrait-card';
 import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
+import { conceptFlowLabels, conceptFlowStep } from '@/ui/concept-flow';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, MotionReveal, Screen, StoryFlowRail } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
 
@@ -24,6 +25,8 @@ export default function DramaScreen() {
   const playback = useDramaPlayback({ dramaId, enabled: authReady });
   const [sheet, setSheet] = useState<SceneSheet>('scene');
   const liveSheet = liveSceneSheet(playback.playbackState.phase);
+  const flowSteps = conceptFlowLabels(locale);
+  const activeConceptStep = conceptFlowStep(locale, sheet === 'scene' ? 'scene' : sheet === 'choice' ? 'choice' : 'consequence');
   const sceneKey = playback.drama?.currentScene.id ?? '';
   const lastSceneKey = useRef('');
   const lastLiveSheet = useRef<SceneSheet>('scene');
@@ -115,17 +118,7 @@ export default function DramaScreen() {
       </View>
 
       <View style={styles.flowWrap}>
-        <StoryFlowRail
-          activeStep={sheet === 'scene' ? 2 : sheet === 'choice' ? 3 : 4}
-          steps={[
-            t('Create world', 'Tạo thế giới'),
-            t('Write scene', 'Viết cảnh'),
-            t('Choose', 'Lựa chọn'),
-            t('Consequence', 'Hệ quả'),
-            t('Living cast', 'Nhân vật sống'),
-            t('Timeline', 'Dòng lịch sử'),
-          ]}
-        />
+        <StoryFlowRail activeStep={activeConceptStep.number} steps={flowSteps} />
       </View>
 
       <View style={styles.sheetDeck} {...sheetPanResponder.panHandlers}>

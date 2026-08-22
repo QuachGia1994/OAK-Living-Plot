@@ -7,6 +7,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHomeSnapshot, DramaSummary } from '@/features/drama/contracts';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { DramaCoverTile, DramaLoadingStage, DramaPoster, DramaUtilityHero } from '@/ui/drama-visuals';
+import { conceptFlowLabels } from '@/ui/concept-flow';
 import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen, StoryFlowRail } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
@@ -15,6 +16,7 @@ export default function HomeScreen() {
   const auth = useMobileAuth();
   const { locale, t } = useUiCopy();
   const dramaClient = useDramaExperienceClient();
+  const flowSteps = conceptFlowLabels(locale);
   const [snapshot, setSnapshot] = useState<DramaHomeSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,16 +109,7 @@ export default function HomeScreen() {
         <Text style={styles.conceptSubtitle}>{t('Build the world, direct the turn, then watch characters and history remember what you changed.', 'Dựng thế giới, điều khiển bước ngoặt, rồi xem nhân vật và lịch sử ghi nhớ điều bạn đã thay đổi.')}</Text>
       </View>
 
-      <StoryFlowRail
-        steps={[
-          t('Create world', 'Tạo thế giới'),
-          t('Write scene', 'Viết cảnh'),
-          t('Choose', 'Lựa chọn'),
-          t('Consequence', 'Hệ quả'),
-          t('Living cast', 'Nhân vật sống'),
-          t('Timeline', 'Dòng lịch sử'),
-        ]}
-      />
+      <StoryFlowRail steps={flowSteps} />
 
       {snapshot && dailyPrompt ? (
         <DramaPoster
