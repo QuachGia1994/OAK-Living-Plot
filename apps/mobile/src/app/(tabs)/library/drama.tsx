@@ -10,7 +10,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeDramaShareText } from '@/features/share/drama-share';
 import { CharacterPortraitCard } from '@/features/portrait/character-portrait-card';
 import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, ErrorState, Eyebrow, MotionReveal, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, ErrorState, Eyebrow, MotionReveal, Screen, StoryFlowRail } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
 
 export default function DramaScreen() {
@@ -112,6 +112,20 @@ export default function DramaScreen() {
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={t('My dramas', 'Drama của tôi')} variant="ghost" onPress={() => router.push('/library')} />
+      </View>
+
+      <View style={styles.flowWrap}>
+        <StoryFlowRail
+          activeStep={sheet === 'scene' ? 2 : sheet === 'choice' ? 3 : 4}
+          steps={[
+            t('Create world', 'Tạo thế giới'),
+            t('Write scene', 'Viết cảnh'),
+            t('Choose', 'Lựa chọn'),
+            t('Consequence', 'Hệ quả'),
+            t('Living cast', 'Nhân vật sống'),
+            t('Timeline', 'Dòng lịch sử'),
+          ]}
+        />
       </View>
 
       <View style={styles.sheetDeck} {...sheetPanResponder.panHandlers}>
@@ -342,14 +356,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
+  flowWrap: { paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
   sheetDeck: {
     overflow: 'hidden',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.background,
+    marginHorizontal: spacing.sm,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderGlow,
+    backgroundColor: colors.surfaceGlass,
   },
   sheetRail: {
     flexDirection: 'row',
@@ -357,7 +373,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderStrong,
-    backgroundColor: colors.surfaceQuiet,
+    backgroundColor: colors.surfaceGlass,
   },
   sheetTab: {
     minHeight: 52,
@@ -368,11 +384,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  sheetTabSelected: { borderBottomColor: colors.accentStrong },
+  sheetTabSelected: { borderBottomColor: colors.violetStrong, backgroundColor: 'rgba(139, 77, 255, 0.08)' },
   sheetTabDisabled: { opacity: 0.32 },
   sheetTabPressed: { opacity: 0.72 },
   sheetTabIndex: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
-  sheetTabIndexSelected: { color: colors.accentStrong },
+  sheetTabIndexSelected: { color: colors.violetStrong },
   sheetTabLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
   sheetTabLabelSelected: { color: colors.ink },
   reviewNote: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, color: colors.quietInk, fontSize: 10, lineHeight: 15, textAlign: 'center' },
@@ -426,11 +442,11 @@ const styles = StyleSheet.create({
   },
   commitDock: {
     gap: spacing.sm,
-    padding: spacing.sm,
+    padding: spacing.md,
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.accentSoft,
-    backgroundColor: colors.surfaceWarmDeep,
+    borderColor: colors.violetSoft,
+    backgroundColor: colors.surfaceGlass,
   },
   commitText: {
     color: colors.ink,
@@ -441,9 +457,12 @@ const styles = StyleSheet.create({
   },
   nextSection: {
     gap: spacing.md,
-    paddingVertical: spacing.xl,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderStrong,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.violetSoft,
+    backgroundColor: colors.surfaceGlass,
   },
   nextTitle: {
     color: colors.ink,
@@ -453,7 +472,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   consequenceChoice: {
-    color: colors.accentStrong,
+    color: colors.violetStrong,
     fontFamily: typography.mono,
     fontSize: 10,
     lineHeight: 16,
@@ -473,8 +492,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceQuiet,
+    borderColor: colors.borderGlow,
+    backgroundColor: colors.surfaceGlass,
   },
   readOnlyHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   readOnlyStatus: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },

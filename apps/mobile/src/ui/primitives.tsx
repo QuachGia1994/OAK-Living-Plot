@@ -36,6 +36,10 @@ export function Screen({
     : undefined;
   return (
     <SafeAreaView style={styles.safeArea} edges={footer ? ['top', 'right', 'bottom', 'left'] : ['top', 'right', 'left']}>
+      <View pointerEvents="none" style={styles.screenAtmosphere}>
+        <View style={[styles.screenGlow, styles.screenGlowViolet]} />
+        <View style={[styles.screenGlow, styles.screenGlowGold]} />
+      </View>
       <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           automaticallyAdjustKeyboardInsets
@@ -121,6 +125,32 @@ export function BrandMark() {
 
 export function Eyebrow({ children }: { children: ReactNode }) {
   return <Text style={styles.eyebrow}>{children}</Text>;
+}
+
+export function StoryFlowRail({
+  steps,
+  activeStep = 0,
+}: {
+  steps: string[];
+  activeStep?: number;
+}) {
+  return (
+    <View style={styles.flowRail} accessibilityRole="summary">
+      {steps.map((label, index) => {
+        const step = index + 1;
+        const active = step === activeStep;
+        const complete = activeStep > 0 && step < activeStep;
+        return (
+          <View key={`${step}-${label}`} style={[styles.flowStep, active && styles.flowStepActive]}>
+            <View style={[styles.flowNumber, complete && styles.flowNumberComplete, active && styles.flowNumberActive]}>
+              <Text style={[styles.flowNumberText, (complete || active) && styles.flowNumberTextActive]}>{step}</Text>
+            </View>
+            <Text style={[styles.flowLabel, active && styles.flowLabelActive]} numberOfLines={2}>{label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
 }
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
@@ -250,7 +280,34 @@ export function ErrorState({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    overflow: 'hidden',
     backgroundColor: colors.background,
+  },
+  screenAtmosphere: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    overflow: 'hidden',
+  },
+  screenGlow: {
+    position: 'absolute',
+    borderRadius: 999,
+  },
+  screenGlowViolet: {
+    width: 420,
+    height: 420,
+    top: -250,
+    right: -190,
+    backgroundColor: 'rgba(139, 77, 255, 0.11)',
+  },
+  screenGlowGold: {
+    width: 340,
+    height: 340,
+    bottom: -230,
+    left: -180,
+    backgroundColor: 'rgba(227, 178, 95, 0.07)',
   },
   keyboardArea: {
     flex: 1,
@@ -289,7 +346,7 @@ const styles = StyleSheet.create({
   sectionIndex: {
     width: 28,
     flexShrink: 0,
-    color: colors.accentStrong,
+    color: colors.violetStrong,
     fontFamily: typography.mono,
     fontSize: 9,
     lineHeight: 17,
@@ -332,10 +389,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceGlass,
   },
   settingsRowCopy: {
     flex: 1,
@@ -370,27 +427,95 @@ const styles = StyleSheet.create({
     height: 36,
   },
   brandText: {
-    color: colors.ink,
-    fontFamily: typography.mono,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 2.8,
+    color: colors.accentStrong,
+    fontFamily: typography.display,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 2.1,
   },
   eyebrow: {
     color: colors.accentStrong,
     fontFamily: typography.mono,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 1.7,
     textTransform: 'uppercase',
   },
+  flowRail: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderGlow,
+    backgroundColor: colors.surfaceGlass,
+  },
+  flowStep: {
+    minWidth: 88,
+    flex: 1,
+    flexBasis: '30%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
+  },
+  flowStepActive: {
+    borderColor: colors.violetSoft,
+    backgroundColor: 'rgba(139, 77, 255, 0.11)',
+  },
+  flowNumber: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceQuiet,
+  },
+  flowNumberComplete: {
+    borderColor: colors.accentSoft,
+    backgroundColor: colors.surfaceAccentPill,
+  },
+  flowNumberActive: {
+    borderColor: colors.violetStrong,
+    backgroundColor: colors.violet,
+    shadowColor: colors.violetStrong,
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  flowNumberText: {
+    color: colors.quietInk,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  flowNumberTextActive: { color: colors.ink },
+  flowLabel: {
+    flex: 1,
+    color: colors.inkMuted,
+    fontFamily: typography.mono,
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '800',
+    letterSpacing: 0.35,
+    textTransform: 'uppercase',
+  },
+  flowLabelActive: { color: colors.ink },
   card: {
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.surface,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceGlass,
   },
   pill: {
     alignSelf: 'flex-start',
@@ -421,16 +546,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
   },
   buttonPrimary: {
-    borderColor: colors.accent,
+    borderColor: colors.accentStrong,
     backgroundColor: colors.accent,
+    shadowColor: colors.accentStrong,
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   buttonSecondary: {
-    borderColor: colors.borderStrong,
-    backgroundColor: 'transparent',
+    borderColor: colors.violetSoft,
+    backgroundColor: colors.surfaceGlass,
   },
   buttonGhost: {
     minHeight: 44,

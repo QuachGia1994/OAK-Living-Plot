@@ -75,7 +75,7 @@ export function CharacterPortraitCard({ dramaId, characterName, storyRevision }:
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Eyebrow>{t('Living character', 'Nhân vật sống')}</Eyebrow>
+          <Eyebrow>{t('05 · Living character', '05 · Nhân vật sống')}</Eyebrow>
           <Text style={styles.name}>{characterName}</Text>
         </View>
         <Pill tone={snapshot?.status === 'ready' && !mediaFailed ? 'success' : 'neutral'}>{statusLabel}</Pill>
@@ -124,11 +124,11 @@ function portraitMessage(error: unknown, t: Translate): string {
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceQuiet },
+  card: { gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGlow, backgroundColor: colors.surfaceGlass, shadowColor: colors.violetStrong, shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 2 },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   headerCopy: { flex: 1, gap: spacing.xs },
   name: { color: colors.ink, fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700' },
-  portrait: { width: '100%', aspectRatio: 1.45, borderRadius: radius.lg, backgroundColor: colors.surfaceWarmDeep },
+  portrait: { width: '100%', aspectRatio: 1.35, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.violetSoft, backgroundColor: colors.surfaceWarmDeep },
   detail: { color: colors.inkMuted, fontSize: 12, lineHeight: 18 },
   message: { color: colors.quietInk, fontSize: 11, lineHeight: 17 },
 });

@@ -1,6 +1,6 @@
 # Phase 1 mobile core loop
 
-> updated 2026-08-19 · 0.0.0
+> updated 2026-08-22 · 0.0.0
 
 ## Responsibility
 The Expo client owns presentation, transient selection/loading state, native audio playback, and navigation. Canonical Drama, Scene, Branch/Choice, quota, entitlement, media lifecycle, and retention history remain backend-owned.
@@ -56,11 +56,15 @@ The saved `uiLocale` (`en`/`vi`) drives core native product copy independently f
 The four top-level destinations remain one tab navigation owner. iOS continues using system `NativeTabs` with `minimizeBehavior="onScrollDown"`. Expo's native minimize API is iOS-only, so Android uses the Expo Router JavaScript Tabs navigator with one custom tab-bar renderer for the same four routes. The shared `Screen` scroll owner reports thresholded intent to one ref-backed Android controller: meaningful downward travel replaces the full-width labeled bar with a centered 46dp icon-only rail capped at 248dp, while meaningful upward travel, returning to the top, or changing route restores the expanded bar. Navigator route state remains the SSOT, keyboard visibility hides the Android renderer, bottom content padding follows the active rail height plus safe-area inset, and React state changes only when compact/expanded mode changes.
 
 ## Visual system
-The mobile design stays dependency-light and token-driven:
-- cinematic dark surfaces and warm decision accent;
-- high-contrast long-form reading typography;
-- reusable Screen/Card/Pill/ActionButton/loading/error primitives;
-- semantic theme tokens rather than raw values in TSX;
+The mobile design stays dependency-light and token-driven while matching the approved concept-preview direction:
+- near-black cinematic canvas with gold primary actions and violet selection/glow states;
+- glass-like panels use opaque/alpha theme tokens rather than a new blur dependency, keeping Android/iOS behavior predictable;
+- a shared six-step story-flow rail maps Create world → Write scene → Choose → Consequence → Living cast → Timeline across the core native journey without changing route or canonical state semantics;
+- Scene/Choice/Consequence keep the existing player contract but use stronger luminous borders, denser editorial hierarchy, and clearer active-step emphasis;
+- Living Character and History use the same purple/gold hierarchy while avoiding invented character stats or non-canonical story data;
+- high-contrast long-form reading typography remains prioritized over decorative glass effects;
+- reusable Screen/Card/Pill/ActionButton/loading/error primitives remain the presentation base;
+- semantic theme tokens rather than raw product state in TSX;
 - short entrance motion through the shared primitive, automatically disabled when the OS Reduce Motion setting is enabled;
 - Safe Area handling at the root and screen level.
 

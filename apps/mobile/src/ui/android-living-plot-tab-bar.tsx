@@ -102,8 +102,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderStrong,
-    backgroundColor: colors.background,
+    borderTopColor: colors.borderGlow,
+    backgroundColor: colors.surfaceGlass,
   },
   compactRail: {
     height: ANDROID_MINI_NAV_METRICS.compactRailHeight,
@@ -111,9 +111,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 4,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    borderColor: colors.borderGlow,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: colors.surfaceGlass,
   },
   item: {
     flex: 1,
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   expandedItemSelected: {
-    backgroundColor: colors.surfaceAccentPill,
+    backgroundColor: 'rgba(139, 77, 255, 0.14)',
   },
   compactItem: {
     minHeight: ANDROID_MINI_NAV_METRICS.minimumTapTarget,
@@ -142,9 +142,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 34,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.accentSoft,
+    borderColor: colors.violetSoft,
     borderRadius: 17,
-    backgroundColor: colors.surfaceAccentPill,
+    backgroundColor: 'rgba(139, 77, 255, 0.16)',
   },
   glyph: {
     color: colors.quietInk,

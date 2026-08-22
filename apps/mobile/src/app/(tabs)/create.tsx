@@ -10,7 +10,7 @@ import { useUiCopy } from '@/features/localization/ui-copy';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch, DramaUtilityHero } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, Eyebrow, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, Eyebrow, Screen, StoryFlowRail } from '@/ui/primitives';
 import { colors, radius, spacing, typography } from '@/ui/theme';
 
 const initialDraft: DramaDraft = {
@@ -108,9 +108,21 @@ export default function CreateDramaScreen() {
 
       <View style={styles.intro}>
         <Eyebrow>{t('Direct a new mini-drama', 'Dựng một mini-drama mới')}</Eyebrow>
-        <Text style={styles.title}>{t('Frame the first scene.', 'Dựng cảnh đầu tiên.')}</Text>
-        <Text style={styles.subtitle}>{t('One spark. One lead. One mood.', 'Một tia lửa. Một nhân vật. Một không khí.')}</Text>
+        <Text style={styles.title}>{t('Build the world. Light the first scene.', 'Dựng thế giới. Thắp sáng cảnh đầu tiên.')}</Text>
+        <Text style={styles.subtitle}>{t('One spark. One lead. One mood. Living Plot turns it into a branchable scene.', 'Một tia lửa. Một nhân vật. Một không khí. Living Plot biến nó thành cảnh có thể rẽ nhánh.')}</Text>
       </View>
+
+      <StoryFlowRail
+        activeStep={1}
+        steps={[
+          t('Create world', 'Tạo thế giới'),
+          t('Write scene', 'Viết cảnh'),
+          t('Choose', 'Lựa chọn'),
+          t('Consequence', 'Hệ quả'),
+          t('Living cast', 'Nhân vật sống'),
+          t('Timeline', 'Dòng lịch sử'),
+        ]}
+      />
 
       <DramaComposerPreview
         premise={draft.premise}
@@ -269,8 +281,6 @@ const styles = StyleSheet.create({
   composerSection: {
     gap: spacing.md,
     paddingTop: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderStrong,
   },
   fieldHeader: {
     gap: spacing.sm,
@@ -304,8 +314,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceQuiet,
+    borderColor: colors.borderGlow,
+    backgroundColor: colors.surfaceGlass,
   },
   composerError: {
     borderColor: colors.danger,
@@ -350,11 +360,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderStrong,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderGlow,
+    backgroundColor: colors.surfaceGlass,
   },
   castInputError: {
-    borderBottomColor: colors.danger,
+    borderColor: colors.danger,
   },
   castInputLabel: {
     color: colors.accentStrong,
@@ -374,7 +386,9 @@ const styles = StyleSheet.create({
   submitError: {
     gap: spacing.xs,
     padding: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.danger,
     backgroundColor: colors.surfaceDanger,
   },
   submitErrorTitle: {

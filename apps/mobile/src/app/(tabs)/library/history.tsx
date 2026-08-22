@@ -6,7 +6,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHistory, DramaHistoryItem } from '@/features/drama/contracts';
 import { journeyStats } from '@/features/drama/journey-stats';
 import { DramaEmptyStage, DramaLoadingStage, DramaRecapFrame, DramaUtilityHero } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, ErrorState, Pill, Screen, StoryFlowRail } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
 export default function DramaHistoryScreen() {
@@ -56,11 +56,23 @@ export default function DramaHistoryScreen() {
       </View>
 
       <DramaUtilityHero
-        kicker={t('PREVIOUSLY ON LIVING PLOT', 'TRƯỚC ĐÓ TRÊN LIVING PLOT')}
+        kicker={t('06 · PREVIOUSLY ON LIVING PLOT', '06 · TRƯỚC ĐÓ TRÊN LIVING PLOT')}
         title={history?.title ?? t('Drama so far', 'Drama đến đây')}
         detail={history ? t(`${history.items.length} scenes preserved in canonical order.`, `${history.items.length} cảnh được giữ theo thứ tự chuẩn.`) : t('Restoring the choices that brought this drama here.', 'Đang khôi phục các lựa chọn đã đưa drama tới đây.')}
         mood="mysterious"
         characterName="Recap"
+      />
+
+      <StoryFlowRail
+        activeStep={6}
+        steps={[
+          t('Create world', 'Tạo thế giới'),
+          t('Write scene', 'Viết cảnh'),
+          t('Choose', 'Lựa chọn'),
+          t('Consequence', 'Hệ quả'),
+          t('Living cast', 'Nhân vật sống'),
+          t('Timeline', 'Dòng lịch sử'),
+        ]}
       />
 
       {error ? <ErrorState title={t('Recap unavailable', 'Tóm tắt không khả dụng')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
@@ -173,33 +185,33 @@ function readParam(value: string | string[] | undefined): string | null {
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   emptyState: { gap: spacing.md },
-  statsStrip: { flexDirection: 'row', flexWrap: 'wrap', borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
-  statMetric: { minWidth: 104, flex: 1, gap: 3, paddingHorizontal: spacing.sm, paddingVertical: spacing.md },
-  statValue: { color: colors.accentStrong, fontFamily: typography.display, fontSize: 24, lineHeight: 27, fontWeight: '700' },
+  statsStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  statMetric: { minWidth: 104, flex: 1, gap: 3, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGlow, backgroundColor: colors.surfaceGlass },
+  statValue: { color: colors.violetStrong, fontFamily: typography.display, fontSize: 24, lineHeight: 27, fontWeight: '700' },
   statLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 13, fontWeight: '900', letterSpacing: 0.55, textTransform: 'uppercase' },
-  branchMap: { gap: spacing.md, padding: spacing.md, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceQuiet },
+  branchMap: { gap: spacing.md, padding: spacing.md, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGlow, backgroundColor: colors.surfaceGlass },
   branchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   branchKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   branchMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
   branchPath: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
   branchStep: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  branchNode: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, borderWidth: 1, borderColor: colors.accentSoft, backgroundColor: colors.background },
+  branchNode: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, borderWidth: 1, borderColor: colors.violetSoft, backgroundColor: colors.surfaceQuiet },
   branchNodeLocked: { borderColor: colors.success, backgroundColor: colors.surfaceSuccess },
   branchNodeText: { color: colors.ink, fontFamily: typography.mono, fontSize: 10, fontWeight: '900' },
-  branchChoice: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 11, fontWeight: '900' },
-  branchConnector: { width: 28, height: 1, backgroundColor: colors.borderStrong },
+  branchChoice: { color: colors.violetStrong, fontFamily: typography.mono, fontSize: 11, fontWeight: '900' },
+  branchConnector: { width: 28, height: 1, backgroundColor: colors.violetSoft },
   branchFuture: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
   branchFutureLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
   branchFutureChoices: { flexDirection: 'row', gap: spacing.xs },
-  branchGhost: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.accentSoft, backgroundColor: colors.surfaceWarmDeep },
-  branchGhostText: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900' },
+  branchGhost: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.violetSoft, backgroundColor: 'rgba(139, 77, 255, 0.14)' },
+  branchGhostText: { color: colors.violetStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900' },
   timeline: { position: 'relative', gap: spacing.lg, paddingTop: spacing.sm },
-  timelineRail: { position: 'absolute', top: spacing.md, bottom: spacing.xl, left: 17, width: 1, backgroundColor: colors.borderStrong },
+  timelineRail: { position: 'absolute', top: spacing.md, bottom: spacing.xl, left: 17, width: 1, backgroundColor: colors.violetSoft },
   timelineItem: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   timelineMarkerColumn: { width: 36, alignItems: 'center', paddingTop: 2 },
-  timelineNode: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.accentSoft, backgroundColor: colors.background },
+  timelineNode: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.violetSoft, backgroundColor: colors.surfaceQuiet },
   timelineNodeLocked: { borderColor: colors.borderSuccess, backgroundColor: colors.surfaceSuccess },
-  timelineNodeText: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  timelineNodeText: { color: colors.violetStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   timelineNodeTextLocked: { color: colors.success },
   timelineContent: { flex: 1, gap: spacing.sm, minWidth: 0 },
   itemHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },

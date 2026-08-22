@@ -7,7 +7,7 @@ import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHomeSnapshot, DramaSummary } from '@/features/drama/contracts';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
 import { DramaCoverTile, DramaLoadingStage, DramaPoster, DramaUtilityHero } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen, StoryFlowRail } from '@/ui/primitives';
 import { colors, spacing, typography } from '@/ui/theme';
 
 export default function HomeScreen() {
@@ -100,6 +100,23 @@ export default function HomeScreen() {
         <BrandMark />
         {auth.configured && auth.isSignedIn ? <ActionButton label={sharedUiCopy.signOut[locale]} variant="ghost" onPress={() => void auth.signOut()} /> : null}
       </View>
+
+      <View style={styles.conceptIntro}>
+        <Eyebrow>{t('WRITE → CHOOSE → SEE CONSEQUENCE', 'VIẾT → CHỌN → XEM HỆ QUẢ')}</Eyebrow>
+        <Text style={styles.conceptTitle}>{t('Your story is a living timeline.', 'Câu chuyện của bạn là một dòng thời gian sống.')}</Text>
+        <Text style={styles.conceptSubtitle}>{t('Build the world, direct the turn, then watch characters and history remember what you changed.', 'Dựng thế giới, điều khiển bước ngoặt, rồi xem nhân vật và lịch sử ghi nhớ điều bạn đã thay đổi.')}</Text>
+      </View>
+
+      <StoryFlowRail
+        steps={[
+          t('Create world', 'Tạo thế giới'),
+          t('Write scene', 'Viết cảnh'),
+          t('Choose', 'Lựa chọn'),
+          t('Consequence', 'Hệ quả'),
+          t('Living cast', 'Nhân vật sống'),
+          t('Timeline', 'Dòng lịch sử'),
+        ]}
+      />
 
       {snapshot && dailyPrompt ? (
         <DramaPoster
@@ -218,11 +235,14 @@ function UpNextShelf({ snapshot, featuredDramaId, t, onOpenDrama, onOpenSpark }:
 
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  conceptIntro: { gap: spacing.sm, paddingTop: spacing.sm },
+  conceptTitle: { maxWidth: 620, color: colors.ink, fontFamily: typography.display, fontSize: 30, lineHeight: 35, fontWeight: '700', letterSpacing: -0.7 },
+  conceptSubtitle: { maxWidth: 620, color: colors.inkMuted, fontSize: 13, lineHeight: 20 },
   heroPoster: { marginHorizontal: -spacing.lg, borderRadius: 0 },
-  hud: { flexDirection: 'row', flexWrap: 'wrap', gap: 0, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
-  hudMetric: { minWidth: 128, flexGrow: 1, flexBasis: '46%', gap: 2, paddingVertical: spacing.md, paddingHorizontal: spacing.sm },
+  hud: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  hudMetric: { minWidth: 128, flexGrow: 1, flexBasis: '46%', gap: 3, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, backgroundColor: colors.surfaceGlass },
   hudValue: { color: colors.ink, fontFamily: typography.mono, fontSize: 15, fontWeight: '900', letterSpacing: -0.2 },
-  hudValueAccent: { color: colors.accentStrong },
+  hudValueAccent: { color: colors.violetStrong },
   hudLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 12, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
   firstRunCue: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
   firstRunTitle: { color: colors.ink, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 1 },
@@ -233,7 +253,7 @@ const styles = StyleSheet.create({
   shelfCount: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
   coverGrid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.sm },
   coverItem: { minWidth: 148, flexGrow: 1, flexBasis: '46%' },
-  plusRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
+  plusRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, padding: spacing.md, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.violetSoft, backgroundColor: colors.surfaceGlass },
   plusCopy: { flex: 1, minWidth: 190 },
   plusKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900', letterSpacing: 0.9 },
   previewNote: { color: colors.quietInk, fontSize: 10, lineHeight: 16, textAlign: 'center', paddingHorizontal: spacing.md },

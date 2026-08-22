@@ -13,6 +13,7 @@ All notable changes to Living Plot will be documented in this file.
 - Publication authority no longer rejects on eval-only dimensions; CRITICAL_THREAD_STALLED is eval-only (not per-thread age); Workers AI now runs the same narrative publication gate as Gemini.
 
 ### Changed
+- Remade the native mobile presentation around the approved concept-preview language: near-black cinematic canvas, gold primary actions, violet glow/selection states, glass-like panels, a reusable six-step story-flow rail, richer scene/choice/consequence surfaces, premium Living Character framing, and a luminous branch timeline without changing canonical drama behavior.
 - Phase 1 long-run narrative novelty: trajectory diversity, structural beat rotation (`BEAT_COOLDOWN_SCENES`), long-range motif signatures, evaluator dimensions, and Gemini publication reject/retry gate without Vector DB.
 - Raised owner-data export to schema v3 so referral/bonus-credit state and privacy-safe portrait metadata travel with account export while internal IDs, reward events, reservation keys, portrait fingerprints, private R2 keys, and generated media bytes remain excluded.
 - Made generated Scenes unlimited for Free and Plus while keeping fresh cloud narration at Free 1 / Plus 10; referral voice credits remain persistent bonus inventory rather than a client-selected tier.
