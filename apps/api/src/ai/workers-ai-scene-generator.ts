@@ -298,9 +298,16 @@ function validateCreative(
   }
   const publication = validateNarrativePublication(input, structural.value);
   timings.validateMs += Date.now() - validateStartedAt;
-  return publication.publishable
-    ? { ok: true, proposal: structural.value }
-    : { ok: false, errors: publication.rejectionReasons };
+  // Runtime authority: structural/canonical failures only.
+  // Novelty + Phase-2 publication scores stay observable but must not dead-end continuation
+  // with invalid_generation after a committed branch (scene 2+).
+  const structuralRejections = publication.rejectionReasons.filter((reason) =>
+    reason.includes('STRUCTURAL_OR_CANONICAL_FAILURE'),
+  );
+  if (structuralRejections.length > 0) {
+    return { ok: false, errors: structuralRejections };
+  }
+  return { ok: true, proposal: structural.value };
 }
 
 function timedParse<T>(parse: () => T, timings: PipelineTimings): T {

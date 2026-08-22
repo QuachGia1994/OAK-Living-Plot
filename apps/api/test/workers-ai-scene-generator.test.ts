@@ -90,7 +90,7 @@ describe('WorkersAiSceneGenerator', () => {
     expect(second.messages[0].content).toContain('prior draft was rejected');
   });
 
-  it('uses the smaller targeted repair schema for a publication rejection', async () => {
+  it('accepts a structurally valid creative draft without a second call for novelty-only publication scores', async () => {
     const input = makeGenerationInput();
     input.recentHistory = [
       { sceneNumber: 1, title: 'Một', summary: 'Một biến cố cũ.', committedChoice: 'Đi tiếp', choiceIntent: 'tiếp cận', consequence: 'Cửa đã mở.', choiceLabels: ['Đi', 'Dừng', 'Chờ'], beat: 'revelation' },
@@ -100,24 +100,14 @@ describe('WorkersAiSceneGenerator', () => {
     input.novelty = { excludedBeats: ['revelation', 'dilemma', 'pursuit'], trajectoryConstraints: [], motifHistory: [] };
     const recycled = creativeProposal();
     recycled.beat = 'revelation';
-    const fixed = repairFrom(recycled);
-    fixed.beat = 'alliance';
-    const run = vi
-      .fn()
-      .mockResolvedValueOnce({ response: recycled, usage: { prompt_tokens: 10, completion_tokens: 5 } })
-      .mockResolvedValueOnce({ response: fixed, usage: { prompt_tokens: 12, completion_tokens: 7 } });
+    const run = vi.fn().mockResolvedValue({ response: recycled, usage: { prompt_tokens: 10, completion_tokens: 5 } });
     const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
 
     const result = await generator.generate(input);
 
-    expect(result).toMatchObject({ ok: true, value: { attempts: 2 } });
-    expect(run).toHaveBeenCalledTimes(2);
-    const repairRequest = run.mock.calls[1][1] as { max_tokens: number; response_format: { json_schema: unknown }; messages: Array<{ content: string }> };
-    expect(repairRequest.max_tokens).toBe(1200);
-    expect(JSON.stringify(repairRequest.response_format.json_schema)).not.toContain('"script"');
-    expect(repairRequest.messages[0].content).toContain('script is immutable');
-    expect(repairRequest.messages[1].content).not.toContain(recycled.script.slice(0, 80));
-    if (result.ok) expect(result.value.proposal.beat).toBe('alliance');
+    expect(result).toMatchObject({ ok: true, value: { attempts: 1 } });
+    expect(run).toHaveBeenCalledTimes(1);
+    if (result.ok) expect(result.value.proposal.beat).toBe('revelation');
   });
 
   it('canonicalizes only exact natural-language resolution hints and never creates relationship deltas', async () => {
@@ -163,24 +153,14 @@ describe('WorkersAiSceneGenerator', () => {
     });
   });
 
-  it('returns invalid_response after one targeted repair still violates the publication gate', async () => {
-    const input = makeGenerationInput();
-    input.recentHistory = [
-      { sceneNumber: 1, title: 'Một', summary: 'Một biến cố cũ.', committedChoice: 'Đi tiếp', choiceIntent: 'tiếp cận', consequence: 'Cửa đã mở.', choiceLabels: ['Đi', 'Dừng', 'Chờ'], beat: 'revelation' },
-      { sceneNumber: 2, title: 'Hai', summary: 'Một biến cố khác.', committedChoice: 'Rẽ trái', choiceIntent: 'né tránh', consequence: 'Lối cũ bị khóa.', choiceLabels: ['Trái', 'Phải', 'Lùi'], beat: 'dilemma' },
-      { sceneNumber: 3, title: 'Ba', summary: 'Tình thế chuyển hướng.', committedChoice: 'Chạy', choiceIntent: 'thoát thân', consequence: 'Họ đến căn hộ.', choiceLabels: ['Chạy', 'Ẩn', 'Gọi'], beat: 'pursuit' },
-    ];
-    input.novelty = { excludedBeats: ['revelation', 'dilemma', 'pursuit'], trajectoryConstraints: [], motifHistory: [] };
-    const recycled = creativeProposal();
-    recycled.beat = 'revelation';
-    const badRepair = repairFrom(recycled);
+  it('returns invalid_response only when creative parse still fails after one controlled retry', async () => {
     const run = vi
       .fn()
-      .mockResolvedValueOnce({ response: recycled, usage: { prompt_tokens: 10, completion_tokens: 5 } })
-      .mockResolvedValueOnce({ response: badRepair, usage: { prompt_tokens: 10, completion_tokens: 5 } });
+      .mockResolvedValueOnce({ response: { title: 'broken' }, usage: { prompt_tokens: 10, completion_tokens: 5 } })
+      .mockResolvedValueOnce({ response: { title: 'still-broken' }, usage: { prompt_tokens: 10, completion_tokens: 5 } });
     const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
 
-    const result = await generator.generate(input);
+    const result = await generator.generate(makeGenerationInput());
 
     expect(run).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ ok: false, error: { code: 'invalid_response', attempts: 2 } });

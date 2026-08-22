@@ -45,7 +45,8 @@ export const creativeSceneResponseSchema = {
   ],
   properties: {
     title: { type: 'string', minLength: 1, maxLength: 80 },
-    script: { type: 'string', minLength: 600, maxLength: 2400 },
+    // 8B provider often lands 400–700 chars on continuations; spoken-length quality remains advisory.
+    script: { type: 'string', minLength: 400, maxLength: 2400 },
     summary: { type: 'string', minLength: 1, maxLength: 240 },
     beat: { type: 'string', enum: [...NARRATIVE_BEATS] },
     pacingRole: { type: 'string', enum: [...PACING_ROLES] },
@@ -239,12 +240,18 @@ export function validateCreativeSceneSemantics(creative: CreativeSceneProposal):
   }
   for (const choice of creative.choices) {
     const tokens = semanticTokens(choice.durableFact);
-    if (tokens.length < 3 || isPlaceholderDurableFact(choice.durableFact)) {
+    const factChars = choice.durableFact.trim().length;
+    // Vietnamese short phrases may yield fewer Latin-style tokens; require substance by length or tokens.
+    if ((tokens.length < 2 && factChars < 12) || isPlaceholderDurableFact(choice.durableFact)) {
       errors.push(`Choice ${choice.key} durableFact is too generic to become canonical story state.`);
       continue;
     }
     const consequenceTokens = new Set(semanticTokens(choice.consequence));
-    if (!tokens.some((token) => consequenceTokens.has(token))) {
+    const consequenceText = semanticText(choice.consequence);
+    const factText = semanticText(choice.durableFact);
+    const tokenOverlap = tokens.some((token) => consequenceTokens.has(token));
+    const phraseOverlap = factText.length >= 8 && consequenceText.includes(factText.slice(0, Math.min(factText.length, 16)));
+    if (!tokenOverlap && !phraseOverlap) {
       errors.push(`Choice ${choice.key} durableFact is not supported by its consequence.`);
     }
   }
