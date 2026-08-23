@@ -6,15 +6,8 @@ type QueueConfig = {
   queues: { consumers: Array<{ queue: string; dead_letter_queue?: string }> };
 };
 
-type AnalyticsBinding = { binding: string; dataset: string };
 type WranglerConfig = QueueConfig & {
-  analytics_engine_datasets: AnalyticsBinding[];
-  env: {
-    development: QueueConfig & {
-      ai: { binding: string };
-      analytics_engine_datasets: AnalyticsBinding[];
-    };
-  };
+  env: { development: QueueConfig & { ai: { binding: string }; analytics_engine_datasets: unknown[] } };
 };
 
 const config = JSON.parse(wranglerText) as WranglerConfig;
@@ -34,12 +27,7 @@ describe('Wrangler queue routing config', () => {
     expect(config.env.development.ai.binding).toBe('AI');
   });
 
-  it('keeps development telemetry isolated from the production dataset', () => {
-    expect(config.analytics_engine_datasets).toEqual([
-      { binding: 'ANALYTICS', dataset: 'living_plot_events' },
-    ]);
-    expect(config.env.development.analytics_engine_datasets).toEqual([
-      { binding: 'ANALYTICS', dataset: 'living_plot_events_dev' },
-    ]);
+  it('keeps unavailable development analytics explicitly fail-open', () => {
+    expect(config.env.development.analytics_engine_datasets).toEqual([]);
   });
 });

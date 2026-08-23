@@ -75,12 +75,7 @@
           "bucket_name": "living-plot-audio-dev"
         }
       ],
-      "analytics_engine_datasets": [
-        {
-          "binding": "ANALYTICS",
-          "dataset": "living_plot_events_dev"
-        }
-      ],
+      "analytics_engine_datasets": [],
       "queues": {
         "producers": [
           {
