@@ -65,10 +65,43 @@ describe('scene prompt', () => {
 
   it('rejects unbounded canonical context before provider use', () => {
     const input = makeGenerationInput();
-    input.activeFacts = Array.from({ length: 41 }, (_, index) => ({ key: `fact-${index}`, text: 'fact' }));
+    input.activeFacts = Array.from({ length: 25 }, (_, index) => ({ key: `fact-${index}`, text: 'fact' }));
 
     const result = validateSceneGenerationInput(input);
 
     expect(result.ok).toBe(false);
+  });
+
+  it('enforces the same recent-history/thread/relationship ceilings used by the D1 selector', () => {
+    const input = makeGenerationInput();
+    input.recentHistory = Array.from({ length: 5 }, (_, index) => ({
+      sceneNumber: index + 1,
+      title: `Scene ${index + 1}`,
+      summary: `Summary ${index + 1}`,
+      committedChoice: null,
+      choiceIntent: null,
+      consequence: null,
+      choiceLabels: [],
+    }));
+    input.openThreads = Array.from({ length: 13 }, (_, index) => ({
+      key: `thread-${index}`,
+      title: `Thread ${index}`,
+      urgency: index,
+    }));
+    input.relationships = Array.from({ length: 21 }, (_, index) => ({
+      fromKey: 'hero',
+      toKey: `character-${index}`,
+      affinity: 0,
+      trust: 0,
+      tension: 0,
+      status: 'neutral',
+    }));
+
+    const result = validateSceneGenerationInput(input);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.arrayContaining(['Canonical drama context exceeds configured generation bounds.']),
+    });
   });
 });

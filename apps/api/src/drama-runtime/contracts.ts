@@ -4,6 +4,7 @@ import type { DramaLocale } from '../preferences/contracts';
 
 export interface DramaSummary {
   id: string;
+  sceneId: string;
   title: string;
   premise: string;
   mood: DramaMood;

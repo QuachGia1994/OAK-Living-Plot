@@ -1,13 +1,63 @@
 import { env } from 'cloudflare:workers';
-import { beforeEach, describe, expect, it } from 'vitest';
-import migrationSql from '../migrations/0001_initial.sql?raw';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import migrationOne from '../migrations/0001_initial.sql?raw';
+import migrationTwo from '../migrations/0002_episode_publication.sql?raw';
+import migrationThree from '../migrations/0003_choice_commit.sql?raw';
+import migrationFour from '../migrations/0004_quota_ledger.sql?raw';
+import migrationFive from '../migrations/0005_tts_audio.sql?raw';
+import migrationSix from '../migrations/0006_revenuecat_entitlements.sql?raw';
+import migrationSeven from '../migrations/0007_live_story_integration.sql?raw';
+import migrationEight from '../migrations/0008_user_preferences.sql?raw';
+import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?raw';
+import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
+import migrationEleven from '../migrations/0011_arc_checkpoints.sql?raw';
+import migrationTwelve from '../migrations/0012_scene_artworks.sql?raw';
 import type { AppEnv } from '../src/env';
+import { D1DramaRepository } from '../src/drama-runtime/d1-drama-repository';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
 
 const db = (env as unknown as AppEnv).DB;
+let legacyRowsPreserved = false;
+
+beforeAll(async () => {
+  await applySqlMigration(db, migrationOne);
+  await db.prepare('INSERT INTO users (id) VALUES (?)').bind('legacy-user').run();
+  await db
+    .prepare('INSERT INTO plots (id, user_id, title, premise) VALUES (?, ?, ?, ?)')
+    .bind('legacy-plot', 'legacy-user', 'Legacy title', 'Legacy premise')
+    .run();
+  await db
+    .prepare('INSERT INTO daily_usage (user_id, usage_date, text_episodes, voiced_episodes) VALUES (?, ?, ?, ?)')
+    .bind('legacy-user', '2026-08-22', 1, 0)
+    .run();
+  for (const migration of [
+    migrationTwo,
+    migrationThree,
+    migrationFour,
+    migrationFive,
+    migrationSix,
+    migrationSeven,
+    migrationEight,
+    migrationNine,
+    migrationTen,
+    migrationEleven,
+    migrationTwelve,
+  ]) {
+    await applySqlMigration(db, migration);
+  }
+  const legacyUser = await db.prepare('SELECT id FROM users WHERE id = ?').bind('legacy-user').first<{ id: string }>();
+  const legacyPlot = await db.prepare('SELECT id FROM plots WHERE id = ?').bind('legacy-plot').first<{ id: string }>();
+  const legacyUsage = await db
+    .prepare('SELECT text_episodes FROM daily_usage WHERE user_id = ?')
+    .bind('legacy-user')
+    .first<{ text_episodes: number }>();
+  legacyRowsPreserved = legacyUser?.id === 'legacy-user'
+    && legacyPlot?.id === 'legacy-plot'
+    && legacyUsage?.text_episodes === 1;
+  await resetStoryData(db);
+});
 
 beforeEach(async () => {
-  await applySqlMigration(db, migrationSql);
   await resetStoryData(db);
 });
 
@@ -27,6 +77,8 @@ describe('D1 schema', () => {
         'episode_choices',
         'choice_commits',
         'daily_usage',
+        'arc_checkpoints',
+        'scene_artworks',
       ]),
     );
 
@@ -34,6 +86,96 @@ describe('D1 schema', () => {
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_choice_commits_plot_sequence'")
       .first<{ name: string }>();
     expect(index?.name).toBe('idx_choice_commits_plot_sequence');
+    const checkpointIndex = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_arc_checkpoints_plot_scene'")
+      .first<{ name: string }>();
+    expect(checkpointIndex?.name).toBe('idx_arc_checkpoints_plot_scene');
+  });
+
+  it('applies migrations 0001 through 0012 without losing legacy rows', () => {
+    expect(legacyRowsPreserved).toBe(true);
+  });
+
+  it('writes and reads compact derived arc checkpoints', async () => {
+    await seedUser();
+    await db
+      .prepare('INSERT INTO plots (id, user_id, title, premise) VALUES (?, ?, ?, ?)')
+      .bind('plot-checkpoint', 'user-1', 'Checkpoint story', 'A long-running checkpoint story.')
+      .run();
+    await db
+      .prepare('INSERT INTO arc_checkpoints (plot_id, through_scene_number, summary) VALUES (?, ?, ?)')
+      .bind('plot-checkpoint', 5, 'S1–S5: Mina follows the signal and commits to the eastern route.')
+      .run();
+
+    const checkpoint = await db
+      .prepare('SELECT through_scene_number, summary FROM arc_checkpoints WHERE plot_id = ?')
+      .bind('plot-checkpoint')
+      .first<{ through_scene_number: number; summary: string }>();
+
+    expect(checkpoint).toEqual({
+      through_scene_number: 5,
+      summary: 'S1–S5: Mina follows the signal and commits to the eastern route.',
+    });
+  });
+
+  it('loads generation context without arc memory before migration 0011 exists', async () => {
+    await seedUser();
+    await db
+      .prepare('INSERT INTO plots (id, user_id, title, premise, next_episode_number) VALUES (?, ?, ?, ?, ?)')
+      .bind('plot-pre-0011', 'user-1', 'Pre-migration story', 'A story created before arc checkpoints.', 10)
+      .run();
+    await db
+      .prepare('INSERT INTO characters (id, plot_id, name, role) VALUES (?, ?, ?, ?)')
+      .bind('character-pre-0011', 'plot-pre-0011', 'Mina', 'protagonist')
+      .run();
+    await db.prepare('DROP TABLE arc_checkpoints').run();
+
+    try {
+      const repository = new D1DramaRepository(db);
+      const context = await repository.loadGenerationContext('user-1', 'plot-pre-0011');
+      expect(context?.input.arcMemory).toEqual([]);
+    } finally {
+      await applySqlMigration(db, migrationEleven);
+    }
+  });
+
+  it('writes derived Scene artwork metadata and cascades it with the canonical Scene', async () => {
+    await seedEpisode('episode-artwork');
+    await db
+      .prepare(
+        `INSERT INTO scene_artworks
+           (scene_id, plot_id, content_fingerprint, status, generation_token, attempts)
+         VALUES (?, ?, ?, 'generating', ?, 1)`,
+      )
+      .bind('episode-artwork', 'plot-1', 'fingerprint-001', 'generation-token')
+      .run();
+    await db
+      .prepare(
+        `UPDATE scene_artworks
+         SET status = 'ready', generation_token = NULL, object_key = ?, ready_at = ?
+         WHERE scene_id = ? AND content_fingerprint = ?`,
+      )
+      .bind('scene-artworks/plot-1/episode-artwork/private.jpg', 1234, 'episode-artwork', 'fingerprint-001')
+      .run();
+
+    expect(await db.prepare("SELECT status, attempts, ready_at FROM scene_artworks WHERE scene_id = 'episode-artwork'").first()).toEqual({
+      status: 'ready',
+      attempts: 1,
+      ready_at: 1234,
+    });
+    await db.prepare("DELETE FROM episodes WHERE id = 'episode-artwork'").run();
+    expect(await db.prepare("SELECT COUNT(*) AS count FROM scene_artworks WHERE scene_id = 'episode-artwork'").first()).toEqual({ count: 0 });
+  });
+
+  it('rejects impossible Scene artwork lifecycle rows', async () => {
+    await seedEpisode('episode-artwork-invalid');
+    await expect(
+      db.prepare(
+        `INSERT INTO scene_artworks
+           (scene_id, plot_id, content_fingerprint, status, attempts)
+         VALUES (?, ?, ?, 'generating', 1)`,
+      ).bind('episode-artwork-invalid', 'plot-1', 'fingerprint-invalid').run(),
+    ).rejects.toThrow();
   });
 
   it('rejects a fourth choice position', async () => {
@@ -64,13 +206,13 @@ describe('D1 schema', () => {
     await expect(commitChoice('commit-invalid', 'episode-1', 'choice-other', 1)).rejects.toThrow();
   });
 
-  it('prevents voiced usage from exceeding text usage', async () => {
+  it('prevents negative usage counters in the current quota schema', async () => {
     await seedUser();
 
     await expect(
       db
         .prepare('INSERT INTO daily_usage (user_id, usage_date, text_episodes, voiced_episodes) VALUES (?, ?, ?, ?)')
-        .bind('user-1', '2026-08-16', 1, 2)
+        .bind('user-1', '2026-08-16', -1, 0)
         .run(),
     ).rejects.toThrow();
   });

@@ -11,7 +11,11 @@ import migrationEight from '../migrations/0008_user_preferences.sql?raw';
 import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?raw';
 import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import migrationEleven from '../migrations/0011_arc_checkpoints.sql?raw';
-import type { SceneGenerationInput, SceneGenerator, SceneProposal } from '../src/ai/contracts';
+import migrationTwelve from '../migrations/0012_scene_artworks.sql?raw';
+import type { SceneGenerationInput, SceneGenerator } from '../src/ai/contracts';
+import type { CreativeSceneProposal } from '../src/ai/creative-scene-schema';
+import { compileCreativeScene } from '../src/ai/scene-compiler';
+import { buildCreativeScenePrompt } from '../src/ai/scene-prompt';
 import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
 import { handleRequest } from '../src/http/app';
@@ -42,6 +46,7 @@ const migrations = [
   migrationNine,
   migrationTen,
   migrationEleven,
+  migrationTwelve,
 ];
 
 beforeAll(async () => {
@@ -113,10 +118,17 @@ describe('50-scene canonical soak', () => {
     expect(generator.resolvedFactText).toBeTruthy();
     expect(generator.resolvedThreadTitle).toBeTruthy();
     const sceneTenInput = generator.inputs[9]!;
+    const sceneFiftyInput = generator.inputs[49]!;
     expect(sceneTenInput.resolvedMemory?.facts).toContain(generator.resolvedFactText);
     expect(sceneTenInput.resolvedMemory?.threads).toContain(generator.resolvedThreadTitle);
+    expect(sceneFiftyInput.resolvedMemory?.facts).toContain(generator.resolvedFactText);
+    expect(sceneFiftyInput.resolvedMemory?.threads).toContain(generator.resolvedThreadTitle);
     expect(sceneTenInput.activeFacts.some((fact) => fact.text === generator.resolvedFactText)).toBe(false);
     expect(sceneTenInput.openThreads.some((thread) => thread.title === generator.resolvedThreadTitle)).toBe(false);
+    expect(sceneFiftyInput.activeFacts.some((fact) => fact.text === generator.resolvedFactText)).toBe(false);
+    expect(sceneFiftyInput.openThreads.some((thread) => thread.title === generator.resolvedThreadTitle)).toBe(false);
+    expect(generator.factResurrectionBlocked).toBe(true);
+    expect(generator.threadResurrectionBlocked).toBe(true);
 
     const episodes = await db.prepare(
       'SELECT episode_number, status FROM episodes WHERE plot_id = ? ORDER BY episode_number ASC',
@@ -138,9 +150,14 @@ describe('50-scene canonical soak', () => {
       .first<{ version: number; next_episode_number: number; state_json: string }>();
     expect(plot).not.toBeNull();
     expect(plot).toMatchObject({ version: 99, next_episode_number: 51 });
-    const canonicalState = JSON.parse(plot!.state_json) as { facts: unknown[]; openThreads: unknown[] };
+    const canonicalState = JSON.parse(plot!.state_json) as {
+      facts: Array<{ text: string }>;
+      openThreads: Array<{ title: string }>;
+    };
     expect(canonicalState.facts.length).toBeGreaterThan(24);
     expect(canonicalState.openThreads.length).toBeGreaterThan(12);
+    expect(canonicalState.facts.some((fact) => fact.text === generator.resolvedFactText)).toBe(false);
+    expect(canonicalState.openThreads.some((thread) => thread.title === generator.resolvedThreadTitle)).toBe(false);
 
     const checkpoints = await db.prepare(
       'SELECT through_scene_number FROM arc_checkpoints WHERE plot_id = ? ORDER BY through_scene_number ASC',
@@ -177,7 +194,10 @@ describe('50-scene canonical soak', () => {
     };
     expect(contextBytes.scene50).toBeLessThanOrEqual(Math.ceil(contextBytes.scene25 * 1.25));
     expect(contextBytes.scene50).toBeLessThanOrEqual(Math.ceil(contextBytes.scene10 * 1.6));
-    expect(contextBytes.scene50).toBeLessThan(contextBytes.scene1 * 25);
+    // Scene 1 has almost no memory yet; even after every bounded tier is saturated,
+    // Scene 50 must remain below 40% of linear 50x growth and under a fixed byte ceiling.
+    expect(contextBytes.scene50).toBeLessThan(contextBytes.scene1 * 20);
+    expect(contextBytes.scene50).toBeLessThan(20_000);
 
     console.info('SOAK_METRICS', JSON.stringify({
       scenes: episodes.results.length,
@@ -192,6 +212,8 @@ describe('50-scene canonical soak', () => {
       maxExcludedBeats,
       maxResolvedFacts,
       maxResolvedThreads,
+      continuityFailures: 0,
+      resurrectionFailures: 0,
       canonicalFacts: canonicalState.facts.length,
       canonicalThreads: canonicalState.openThreads.length,
       checkpoints: checkpoints.results.map((row) => row.through_scene_number),
@@ -203,6 +225,8 @@ class SoakSceneGenerator implements SceneGenerator {
   readonly inputs: SceneGenerationInput[] = [];
   resolvedFactText: string | undefined;
   resolvedThreadTitle: string | undefined;
+  factResurrectionBlocked = false;
+  threadResurrectionBlocked = false;
 
   async generate(input: SceneGenerationInput) {
     const sceneNumber = this.inputs.length + 1;
@@ -213,10 +237,24 @@ class SoakSceneGenerator implements SceneGenerator {
     if (factToResolve) this.resolvedFactText = factToResolve.text;
     if (threadToResolve) this.resolvedThreadTitle = threadToResolve.title;
 
+    const proposal = compileCreativeScene(input, creativeFor(
+      sceneNumber,
+      factToResolve?.text,
+      threadToResolve?.title,
+      sceneNumber === 50 ? this.resolvedFactText : undefined,
+      sceneNumber === 50 ? this.resolvedThreadTitle : undefined,
+    ));
+    if (sceneNumber === 50) {
+      this.factResurrectionBlocked = !proposal.establishedFacts.includes(this.resolvedFactText ?? '');
+      this.threadResurrectionBlocked = !proposal.threadChanges.open.some(
+        (thread) => thread.title === this.resolvedThreadTitle,
+      );
+    }
+
     return {
       ok: true as const,
       value: {
-        proposal: proposalFor(sceneNumber, factToResolve?.key, threadToResolve?.key),
+        proposal,
         usage: { inputTokens: 100, outputTokens: 80 },
         attempts: 1,
         provider: 'soak-fixture',
@@ -226,7 +264,13 @@ class SoakSceneGenerator implements SceneGenerator {
   }
 }
 
-function proposalFor(sceneNumber: number, factKeyToResolve?: string, threadKeyToResolve?: string): SceneProposal {
+function creativeFor(
+  sceneNumber: number,
+  factTextToResolve?: string,
+  threadTitleToResolve?: string,
+  factTextToResurrect?: string,
+  threadTitleToResurrect?: string,
+): CreativeSceneProposal {
   const beatCycle = [
     'confrontation', 'revelation', 'betrayal', 'alliance', 'pursuit', 'dilemma',
     'sacrifice', 'discovery', 'reversal', 'separation', 'rescue', 'deadline',
@@ -240,11 +284,15 @@ function proposalFor(sceneNumber: number, factKeyToResolve?: string, threadKeyTo
     pacingRole,
     script: Array.from({ length: 130 }, (_, index) => `mina-scene-${sceneNumber}-word-${index}`).join(' '),
     summary: `Mina advances canonical marker ${sceneNumber} while the long-running mystery changes in a distinct way.`,
-    establishedFacts: [`Canonical scene fact ${sceneNumber} belongs to Mina's continuing investigation.`],
-    threadChanges: {
-      open: [{ title: `Open mystery thread ${sceneNumber} for Mina`, urgency: 50 + (sceneNumber % 50) }],
-      resolve: [],
-    },
+    establishedFacts: [
+      `Canonical scene fact ${sceneNumber} belongs to Mina's continuing investigation.`,
+      ...(factTextToResurrect ? [factTextToResurrect] : []),
+    ],
+    threadsToOpen: [
+      { title: `Open mystery thread ${sceneNumber} for Mina`, urgency: 50 + (sceneNumber % 50) },
+      ...(threadTitleToResurrect ? [{ title: threadTitleToResurrect, urgency: 99 }] : []),
+    ],
+    threadTitlesToResolve: [],
     choices: [
       choice(
         'A',
@@ -252,8 +300,8 @@ function proposalFor(sceneNumber: number, factKeyToResolve?: string, threadKeyTo
         `pursue clue ${sceneNumber}`,
         consequenceFor(sceneNumber),
         `Committed branch A fact ${sceneNumber} now shapes Mina's next scene.`,
-        factKeyToResolve ? [factKeyToResolve] : [],
-        threadKeyToResolve ? [threadKeyToResolve] : [],
+        factTextToResolve ? [factTextToResolve] : [],
+        threadTitleToResolve ? [threadTitleToResolve] : [],
         'focused',
       ),
       choice(
@@ -286,8 +334,8 @@ function choice(
   intent: string,
   consequence: string,
   durableFact: string,
-  factKeysToResolve: string[],
-  threadKeysToResolve: string[],
+  factTextsToResolve: string[],
+  threadTitlesToResolve: string[],
   nextTone: string,
 ) {
   return {
@@ -295,14 +343,11 @@ function choice(
     label,
     intent,
     consequence,
-    stateDelta: {
-      relationships: [],
-      factsToAdd: [durableFact],
-      factKeysToResolve,
-      threadsToOpen: [],
-      threadKeysToResolve,
-      nextTone,
-    },
+    durableFact,
+    factTextsToResolve,
+    threadTitlesToResolve,
+    threadsToOpen: [],
+    nextTone,
   };
 }
 
@@ -311,7 +356,8 @@ function consequenceFor(sceneNumber: number): string {
 }
 
 function byteLength(input: SceneGenerationInput): number {
-  return new TextEncoder().encode(JSON.stringify(input)).byteLength;
+  const prompt = buildCreativeScenePrompt(input);
+  return new TextEncoder().encode(prompt.userContent).byteLength;
 }
 
 function createBody() {

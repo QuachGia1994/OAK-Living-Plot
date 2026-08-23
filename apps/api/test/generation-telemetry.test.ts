@@ -42,6 +42,37 @@ describe('scene generation cost telemetry', () => {
     expect(serialized).not.toContain('user');
   });
 
+  it('records provider calls, repairs, outcomes, and every pipeline timing stage', () => {
+    const writeDataPoint = vi.fn();
+    const sink = new CloudflareGenerationTelemetrySink({ writeDataPoint });
+
+    sink.recordGenerationPipeline({
+      provider: 'workers-ai',
+      model: '@cf/meta/llama-3.1-8b-instruct-fast',
+      providerCalls: 2,
+      repairs: 1,
+      outcome: 'accepted',
+      timings: {
+        providerMs: 8100,
+        parseMs: 5,
+        compileMs: 3,
+        validateMs: 9,
+        totalMs: 8120,
+      },
+    });
+
+    expect(writeDataPoint).toHaveBeenCalledWith({
+      indexes: ['@cf/meta/llama-3.1-8b-instruct-fast'],
+      blobs: [
+        'scene_generation_pipeline',
+        'workers-ai',
+        '@cf/meta/llama-3.1-8b-instruct-fast',
+        'accepted',
+      ],
+      doubles: [1, 2, 1, 8100, 5, 3, 9, 8120],
+    });
+  });
+
   it('records rejected and accepted provider attempts separately so retries are fully costed', async () => {
     const events: Parameters<GenerationTelemetrySink['recordGenerationAttempt']>[0][] = [];
     const telemetry: GenerationTelemetrySink = {

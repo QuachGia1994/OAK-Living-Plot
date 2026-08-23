@@ -109,6 +109,7 @@ describe('preferences and account data boundary', () => {
     await db.prepare(`INSERT INTO character_portraits (plot_id, character_id, story_fingerprint, object_key, status, ready_at) VALUES ('plot-export', 'character-export', 'portrait-fingerprint-001', 'portraits/plot-export/portrait.jpg', 'ready', ?)`).bind(Date.now()).run();
     await runtimeEnv.AUDIO_BUCKET.put('portraits/plot-export/portrait.jpg', new TextEncoder().encode('portrait'));
     await runtimeEnv.AUDIO_BUCKET.put('portraits/plot-export/orphan-from-race.jpg', new TextEncoder().encode('orphan portrait'));
+    await runtimeEnv.AUDIO_BUCKET.put('scene-artworks/plot-export/episode-export/private.jpg', new TextEncoder().encode('scene artwork'));
 
     const wrong = await call('/v1/account/delete', 'POST', { confirmation: 'DELETE' }, 'owner-auth-subject');
     expect(wrong.status).toBe(400);
@@ -120,6 +121,7 @@ describe('preferences and account data boundary', () => {
     expect(await runtimeEnv.AUDIO_BUCKET.get('private/audio/object.mp3')).toBeNull();
     expect(await runtimeEnv.AUDIO_BUCKET.get('portraits/plot-export/portrait.jpg')).toBeNull();
     expect(await runtimeEnv.AUDIO_BUCKET.get('portraits/plot-export/orphan-from-race.jpg')).toBeNull();
+    expect(await runtimeEnv.AUDIO_BUCKET.get('scene-artworks/plot-export/episode-export/private.jpg')).toBeNull();
     expect(await db.prepare('SELECT id FROM users WHERE id = ?').bind(owner.id).first()).toBeNull();
     expect(await db.prepare('SELECT id FROM plots WHERE user_id = ?').bind(owner.id).first()).toBeNull();
     expect(await db.prepare('SELECT user_id FROM user_preferences WHERE user_id = ?').bind(owner.id).first()).toBeNull();

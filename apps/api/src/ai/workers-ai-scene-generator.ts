@@ -11,7 +11,6 @@ import {
   applyCreativeSceneRepair,
   creativeSceneRepairResponseSchema,
   creativeSceneResponseSchema,
-  normalizeCreativeProposal,
   parseCreativeSceneProposal,
   parseCreativeSceneRepair,
   validateCreativeSceneSemantics,
@@ -27,8 +26,8 @@ import {
   type GenerationTelemetrySink,
 } from '../telemetry/contracts';
 
-/** Primary creative model: stronger structured JSON + branch text than 8B-fast. */
-export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+/** Fast primary model; the slim schema leaves canonical state compilation to the server. */
+export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
 
 interface ProviderResponse {
   text: string;
@@ -285,12 +284,11 @@ function validateCreative(
   creative: CreativeSceneProposal,
   timings: PipelineTimings,
 ): { ok: true; proposal: SceneProposal } | { ok: false; errors: string[] } {
-  const normalized = normalizeCreativeProposal(creative);
-  const creativeErrors = validateCreativeSceneSemantics(normalized);
+  const creativeErrors = validateCreativeSceneSemantics(creative);
   if (creativeErrors.length > 0) return { ok: false, errors: creativeErrors };
 
   const compileStartedAt = Date.now();
-  const compiled = compileCreativeScene(input, normalized);
+  const compiled = compileCreativeScene(input, creative);
   timings.compileMs += Date.now() - compileStartedAt;
 
   const validateStartedAt = Date.now();
@@ -301,16 +299,9 @@ function validateCreative(
   }
   const publication = validateNarrativePublication(input, structural.value);
   timings.validateMs += Date.now() - validateStartedAt;
-  // Runtime authority: structural/canonical failures only.
-  // Novelty + Phase-2 publication scores stay observable but must not dead-end continuation
-  // with invalid_generation after a committed branch (scene 2+).
-  const structuralRejections = publication.rejectionReasons.filter((reason) =>
-    reason.includes('STRUCTURAL_OR_CANONICAL_FAILURE'),
-  );
-  if (structuralRejections.length > 0) {
-    return { ok: false, errors: structuralRejections };
-  }
-  return { ok: true, proposal: structural.value };
+  return publication.publishable
+    ? { ok: true, proposal: structural.value }
+    : { ok: false, errors: publication.rejectionReasons };
 }
 
 function timedParse<T>(parse: () => T, timings: PipelineTimings): T {
@@ -324,7 +315,8 @@ function canTargetRepair(errors: string[]): boolean {
   return !errors.some((error) =>
     error.includes('Scene script must stay within')
     || error.includes('Scene title, script, or summary is invalid')
-    || error.includes('Creative response is not valid JSON'),
+    || error.includes('Creative response is not valid JSON')
+    || error.includes('CONSEQUENCE_NOT_REALIZED'),
   );
 }
 

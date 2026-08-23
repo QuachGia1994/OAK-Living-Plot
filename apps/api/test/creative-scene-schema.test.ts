@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  normalizeCreativeProposal,
+  creativeSceneRepairResponseSchema,
+  creativeSceneResponseSchema,
   parseCreativeSceneProposal,
+  parseCreativeSceneRepair,
   validateCreativeSceneSemantics,
   type CreativeSceneProposal,
 } from '../src/ai/creative-scene-schema';
@@ -53,15 +55,38 @@ describe('creative scene schema', () => {
     expect(parsed.value.choices[0].durableFact).toContain('Người lạ');
   });
 
-  it('accepts a missing durable fact and derives it from provider consequence text', () => {
+  it('keeps durableFact required in both provider schemas', () => {
+    const primaryText = JSON.stringify(creativeSceneResponseSchema);
+    const repairText = JSON.stringify(creativeSceneRepairResponseSchema);
+    expect(primaryText).toContain('"durableFact"');
+    expect(repairText).toContain('"durableFact"');
+    const primaryChoice = creativeSceneResponseSchema.properties.choices.items;
+    const repairChoice = creativeSceneRepairResponseSchema.properties.choices.items;
+    expect(primaryChoice.required).toContain('durableFact');
+    expect(repairChoice.required).toContain('durableFact');
+    expect(primaryChoice.properties.durableFact.minLength).toBe(1);
+    expect(repairChoice.properties.durableFact.minLength).toBe(1);
+    expect(creativeSceneResponseSchema.properties.script.minLength).toBe(500);
+    expect(creativeSceneResponseSchema.properties.script.maxLength).toBe(2400);
+  });
+
+  it('tolerates a missing primary durable fact only as an incomplete repairable draft and never invents one', () => {
     const value = creative() as unknown as { choices: Array<Record<string, unknown>> };
     delete value.choices[1].durableFact;
     const parsed = parseCreativeSceneProposal(JSON.stringify(value));
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    const normalized = normalizeCreativeProposal(parsed.value);
-    expect(normalized.choices[1].durableFact).toBe(normalized.choices[1].consequence);
-    expect(validateCreativeSceneSemantics(normalized)).toEqual([]);
+    expect(parsed.value.choices[1].durableFact).toBe('');
+    expect(validateCreativeSceneSemantics(parsed.value)).toContain(
+      'Choice B durableFact is missing provider-authored story material.',
+    );
+  });
+
+  it('requires provider-authored durable facts in targeted repair responses', () => {
+    const value = creative() as unknown as { script?: string; choices: Array<Record<string, unknown>> };
+    delete value.script;
+    delete value.choices[1].durableFact;
+    expect(parseCreativeSceneRepair(JSON.stringify(value)).ok).toBe(false);
   });
 
   it('rejects choices that are not ordered A/B/C exactly once', () => {
@@ -71,17 +96,37 @@ describe('creative scene schema', () => {
     expect(parsed.ok).toBe(false);
   });
 
-  it('normalizes placeholder or consequence-unsupported durable facts before canonical compilation', () => {
+  it('rejects placeholder or consequence-unsupported durable facts before canonical compilation', () => {
     const placeholder = creative();
     placeholder.choices[0].durableFact = 'Branch A creates a distinct immediate consequence.';
-    const normalizedPlaceholder = normalizeCreativeProposal(placeholder);
-    expect(normalizedPlaceholder.choices[0].durableFact).toBe(placeholder.choices[0].consequence);
-    expect(validateCreativeSceneSemantics(normalizedPlaceholder)).toEqual([]);
+    expect(validateCreativeSceneSemantics(placeholder)).toContain(
+      'Choice A durableFact is too generic to become canonical story state.',
+    );
 
     const unsupported = creative();
     unsupported.choices[1].durableFact = 'Một con tàu bí mật rời cảng lúc bình minh.';
-    const normalizedUnsupported = normalizeCreativeProposal(unsupported);
-    expect(normalizedUnsupported.choices[1].durableFact).toBe(unsupported.choices[1].consequence);
-    expect(validateCreativeSceneSemantics(normalizedUnsupported)).toEqual([]);
+    expect(validateCreativeSceneSemantics(unsupported)).toContain(
+      'Choice B durableFact is not supported by its consequence.',
+    );
+  });
+
+  it('rejects duplicate branch facts instead of rewriting them from labels or consequences', () => {
+    const value = creative();
+    value.choices[2].durableFact = value.choices[0].durableFact;
+    expect(validateCreativeSceneSemantics(value)).toContain(
+      'Creative durable facts must be branch-specific and distinct.',
+    );
+  });
+
+  it('allows shared character/topic context when branch predicates remain materially different', () => {
+    const value = creative();
+    value.choices[0].consequence = 'An tiết lộ toàn bộ sự thật về tin nhắn.';
+    value.choices[0].durableFact = 'An đã nói rõ về tin nhắn mà An đã giấu.';
+    value.choices[1].consequence = 'An từ chối nói toàn bộ sự thật về tin nhắn.';
+    value.choices[1].durableFact = 'An đã từ chối nói rõ về tin nhắn mà An đã giấu.';
+    value.choices[2].consequence = 'An đề nghị Linh tìm hiểu thêm về tin nhắn.';
+    value.choices[2].durableFact = 'An đã đề nghị Linh tìm hiểu thêm về tin nhắn.';
+
+    expect(validateCreativeSceneSemantics(value)).toEqual([]);
   });
 });

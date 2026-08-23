@@ -66,6 +66,18 @@ describe('compileCreativeScene', () => {
     expect(compiled.choices[0].stateDelta.threadKeysToResolve).toEqual([]);
   });
 
+  it('drops ambiguous exact references instead of selecting an arbitrary canonical key', () => {
+    const input = makeGenerationInput();
+    input.activeFacts.push({ key: 'fact-hidden-message-duplicate', text: input.activeFacts[0]!.text });
+    input.openThreads.push({ key: 'thread-trust-duplicate', title: input.openThreads[0]!.title, urgency: 50 });
+
+    const compiled = compileCreativeScene(input, creative());
+
+    expect(compiled.threadChanges.resolve).toEqual([]);
+    expect(compiled.choices[0].stateDelta.factKeysToResolve).toEqual([]);
+    expect(compiled.choices[0].stateDelta.threadKeysToResolve).toEqual([]);
+  });
+
   it('keeps one-character branches durable using only provider-authored fact text', () => {
     const input = makeGenerationInput();
     input.characters = [input.characters[0]];
@@ -89,5 +101,12 @@ describe('compileCreativeScene', () => {
     expect(compiled.threadChanges.open).toEqual([]);
     expect(compiled.choices[0].stateDelta.factsToAdd).toEqual([]);
     expect(compiled.choices[0].stateDelta.threadsToOpen).toEqual([]);
+  });
+
+  it('never turns missing provider story material into an empty or fabricated canonical fact', () => {
+    const proposal = creative();
+    proposal.choices[1].durableFact = '';
+    const compiled = compileCreativeScene(makeGenerationInput(), proposal);
+    expect(compiled.choices[1].stateDelta.factsToAdd).toEqual([]);
   });
 });

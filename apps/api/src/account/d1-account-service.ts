@@ -8,6 +8,7 @@ interface EpisodeRow { id: string; plot_id: string; episode_number: number; titl
 interface ChoiceRow { episode_id: string; choice_key: string; label: string; intent: string | null; consequence: string | null; committed_choice_id: string | null; id: string }
 interface AudioRow { episode_id: string; voice_variant: string; status: string; input_characters: number; attempts: number; ready_at: number | null }
 interface PortraitRow { plot_id: string; status: string; attempts: number; created_at: number; ready_at: number | null }
+interface ArtworkRow { episode_id: string; status: string; attempts: number; created_at: number; ready_at: number | null }
 
 export class D1AccountService {
   constructor(
@@ -17,7 +18,7 @@ export class D1AccountService {
   ) {}
 
   async export(userId: string): Promise<AccountExportSnapshot> {
-    const [preferences, entitlement, usage, referral, plots, characters, portraits, episodes, choices, audio] = await Promise.all([
+    const [preferences, entitlement, usage, referral, plots, characters, portraits, episodes, choices, audio, artworks] = await Promise.all([
       new D1UserPreferencesRepository(this.db).get(userId),
       this.loadEntitlement(userId),
       this.loadUsage(userId),
@@ -28,6 +29,7 @@ export class D1AccountService {
       this.loadEpisodes(userId),
       this.loadChoices(userId),
       this.loadAudio(userId),
+      this.loadArtworks(userId),
     ]);
     return {
       schemaVersion: 3,
@@ -36,7 +38,7 @@ export class D1AccountService {
       entitlement,
       usage,
       referral,
-      dramas: assembleDramas(plots, characters, portraits, episodes, choices, audio),
+      dramas: assembleDramas(plots, characters, portraits, episodes, choices, audio, artworks),
     };
   }
 
@@ -57,8 +59,8 @@ export class D1AccountService {
         .all<{ id: string }>(),
     ]);
     try {
-      const portraitObjectKeys = await this.listPortraitObjects(plots.results.map((plot) => plot.id));
-      for (const objectKey of new Set([...audioObjects.results.map((row) => row.object_key), ...portraitObjectKeys])) {
+      const derivedImageObjectKeys = await this.listDerivedImageObjects(plots.results.map((plot) => plot.id));
+      for (const objectKey of new Set([...audioObjects.results.map((row) => row.object_key), ...derivedImageObjectKeys])) {
         await this.audioBucket.delete(objectKey);
       }
     } catch {
@@ -72,15 +74,17 @@ export class D1AccountService {
     }
   }
 
-  private async listPortraitObjects(plotIds: string[]): Promise<string[]> {
+  private async listDerivedImageObjects(plotIds: string[]): Promise<string[]> {
     const objectKeys: string[] = [];
     for (const plotId of plotIds) {
-      let cursor: string | undefined;
-      do {
-        const listed = await this.audioBucket.list({ prefix: `portraits/${plotId}/`, cursor });
-        objectKeys.push(...listed.objects.map((object) => object.key));
-        cursor = listed.truncated ? listed.cursor : undefined;
-      } while (cursor);
+      for (const prefix of [`portraits/${plotId}/`, `scene-artworks/${plotId}/`]) {
+        let cursor: string | undefined;
+        do {
+          const listed = await this.audioBucket.list({ prefix, cursor });
+          objectKeys.push(...listed.objects.map((object) => object.key));
+          cursor = listed.truncated ? listed.cursor : undefined;
+        } while (cursor);
+      }
     }
     return objectKeys;
   }
@@ -185,6 +189,23 @@ export class D1AccountService {
       .bind(userId)
       .all<AudioRow>()).results;
   }
+
+  private async loadArtworks(userId: string) {
+    try {
+      return (await this.db
+        .prepare(
+          `SELECT sa.scene_id AS episode_id, sa.status, sa.attempts, sa.created_at, sa.ready_at
+           FROM scene_artworks sa
+           JOIN episodes e ON e.id = sa.scene_id JOIN plots p ON p.id = e.plot_id
+           WHERE p.user_id = ? ORDER BY sa.created_at, sa.scene_id, sa.content_fingerprint`,
+        )
+        .bind(userId)
+        .all<ArtworkRow>()).results;
+    } catch {
+      // Artwork is a derived cache. Account export must remain available during migration skew.
+      return [];
+    }
+  }
 }
 
 function assembleDramas(
@@ -194,6 +215,7 @@ function assembleDramas(
   episodes: EpisodeRow[],
   choices: ChoiceRow[],
   audio: AudioRow[],
+  artworks: ArtworkRow[],
 ): AccountExportDrama[] {
   return plots.map((plot) => ({
     title: plot.title,
@@ -209,11 +231,11 @@ function assembleDramas(
       createdAt: new Date(row.created_at).toISOString(),
       readyAt: row.ready_at === null ? null : new Date(row.ready_at).toISOString(),
     })),
-    scenes: episodes.filter((row) => row.plot_id === plot.id).map((row) => assembleScene(row, choices, audio)),
+    scenes: episodes.filter((row) => row.plot_id === plot.id).map((row) => assembleScene(row, choices, audio, artworks)),
   }));
 }
 
-function assembleScene(row: EpisodeRow, choices: ChoiceRow[], audio: AudioRow[]): AccountExportScene {
+function assembleScene(row: EpisodeRow, choices: ChoiceRow[], audio: AudioRow[], artworks: ArtworkRow[]): AccountExportScene {
   return {
     number: row.episode_number,
     title: row.title,
@@ -226,6 +248,12 @@ function assembleScene(row: EpisodeRow, choices: ChoiceRow[], audio: AudioRow[])
       intent: choice.intent ?? '',
       consequence: choice.consequence ?? '',
       committed: choice.committed_choice_id === choice.id,
+    })),
+    artworks: artworks.filter((artwork) => artwork.episode_id === row.id).map((artwork) => ({
+      status: artwork.status,
+      attempts: artwork.attempts,
+      createdAt: new Date(artwork.created_at).toISOString(),
+      readyAt: artwork.ready_at ? new Date(artwork.ready_at).toISOString() : null,
     })),
     media: audio.filter((asset) => asset.episode_id === row.id).map((asset) => ({
       kind: 'voice' as const,

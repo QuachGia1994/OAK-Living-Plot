@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CreativeSceneProposal } from '../src/ai/creative-scene-schema';
+import type { CreativeSceneProposal, CreativeSceneRepair } from '../src/ai/creative-scene-schema';
 import type { GenerationTelemetrySink } from '../src/telemetry/contracts';
 import { WORKERS_AI_SCENE_MODEL, WorkersAiSceneGenerator } from '../src/ai/workers-ai-scene-generator';
 import { makeGenerationInput, makeValidProposal } from './drama-fixtures';
@@ -33,8 +33,14 @@ function creativeProposal(): CreativeSceneProposal {
   };
 }
 
+function repairFrom(creative: CreativeSceneProposal): CreativeSceneRepair {
+  const { script: _omitScript, ...repair } = creative;
+  void _omitScript;
+  return repair;
+}
+
 describe('WorkersAiSceneGenerator', () => {
-  it('uses one primary creative call on the happy path', async () => {
+  it('uses one slim 8B creative call on the happy path', async () => {
     const run = vi.fn().mockResolvedValue({
       response: creativeProposal(),
       usage: { prompt_tokens: 120, completion_tokens: 80 },
@@ -54,7 +60,7 @@ describe('WorkersAiSceneGenerator', () => {
     });
     expect(run).toHaveBeenCalledTimes(1);
     const [model, request] = run.mock.calls[0] as [string, Record<string, unknown>];
-    expect(model).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
+    expect(model).toBe('@cf/meta/llama-3.1-8b-instruct-fast');
     expect(request).toMatchObject({ response_format: { type: 'json_schema' }, max_tokens: 2300, temperature: 0.45 });
     const responseFormat = request.response_format as { json_schema: Record<string, unknown> };
     expect(responseFormat.json_schema.type).toBe('object');
@@ -84,7 +90,7 @@ describe('WorkersAiSceneGenerator', () => {
     expect(second.messages[0].content).toContain('prior draft was rejected');
   });
 
-  it('accepts a structurally valid creative draft without a second call for novelty-only publication scores', async () => {
+  it('uses the smaller targeted repair schema for a publication rejection and preserves the script', async () => {
     const input = makeGenerationInput();
     input.recentHistory = [
       { sceneNumber: 1, title: 'Một', summary: 'Một biến cố cũ.', committedChoice: 'Đi tiếp', choiceIntent: 'tiếp cận', consequence: 'Cửa đã mở.', choiceLabels: ['Đi', 'Dừng', 'Chờ'], beat: 'revelation' },
@@ -94,14 +100,66 @@ describe('WorkersAiSceneGenerator', () => {
     input.novelty = { excludedBeats: ['revelation', 'dilemma', 'pursuit'], trajectoryConstraints: [], motifHistory: [] };
     const recycled = creativeProposal();
     recycled.beat = 'revelation';
-    const run = vi.fn().mockResolvedValue({ response: recycled, usage: { prompt_tokens: 10, completion_tokens: 5 } });
+    const fixed = repairFrom(recycled);
+    fixed.beat = 'alliance';
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: recycled, usage: { prompt_tokens: 10, completion_tokens: 5 } })
+      .mockResolvedValueOnce({ response: fixed, usage: { prompt_tokens: 12, completion_tokens: 7 } });
     const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
 
     const result = await generator.generate(input);
 
-    expect(result).toMatchObject({ ok: true, value: { attempts: 1 } });
-    expect(run).toHaveBeenCalledTimes(1);
-    if (result.ok) expect(result.value.proposal.beat).toBe('revelation');
+    expect(result).toMatchObject({ ok: true, value: { attempts: 2 } });
+    expect(run).toHaveBeenCalledTimes(2);
+    const repairRequest = run.mock.calls[1][1] as {
+      max_tokens: number;
+      response_format: { json_schema: unknown };
+      messages: Array<{ content: string }>;
+    };
+    expect(repairRequest.max_tokens).toBe(1200);
+    expect(JSON.stringify(repairRequest.response_format.json_schema)).not.toContain('"script"');
+    expect(repairRequest.messages[0].content).toContain('script is immutable');
+    expect(repairRequest.messages[1].content).not.toContain(recycled.script.slice(0, 80));
+    if (result.ok) {
+      expect(result.value.proposal.beat).toBe('alliance');
+      expect(result.value.proposal.script).toBe(recycled.script);
+    }
+  });
+
+  it('routes a missing primary durable fact to repair without deriving canonical story truth on the server', async () => {
+    const incomplete = creativeProposal() as unknown as { choices: Array<Record<string, unknown>>; script: string };
+    delete incomplete.choices[1].durableFact;
+    const repaired = repairFrom(creativeProposal());
+    repaired.choices[1].durableFact = 'Bảo vệ đã niêm phong lối vào căn hộ.';
+    repaired.choices[1].consequence = 'Bảo vệ niêm phong lối vào, buộc Linh phải tìm đường khác.';
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: incomplete, usage: { prompt_tokens: 10, completion_tokens: 5 } })
+      .mockResolvedValueOnce({ response: repaired, usage: { prompt_tokens: 12, completion_tokens: 7 } });
+    const telemetry: GenerationTelemetrySink = {
+      recordGenerationAttempt: vi.fn(),
+      recordGenerationPipeline: vi.fn(),
+    };
+    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai, telemetry);
+
+    const result = await generator.generate(makeGenerationInput());
+
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ ok: true, value: { attempts: 2 } });
+    if (!result.ok) return;
+    expect(result.value.proposal.script).toBe(incomplete.script);
+    expect(result.value.proposal.choices[1].stateDelta.factsToAdd).toEqual([
+      'Bảo vệ đã niêm phong lối vào căn hộ.',
+    ]);
+    expect(result.value.proposal.choices[1].stateDelta.factsToAdd).not.toContain(
+      incomplete.choices[1].consequence,
+    );
+    expect(telemetry.recordGenerationPipeline).toHaveBeenCalledWith(expect.objectContaining({
+      providerCalls: 2,
+      repairs: 1,
+      outcome: 'accepted',
+    }));
   });
 
   it('canonicalizes only exact natural-language resolution hints and never creates relationship deltas', async () => {
@@ -160,6 +218,28 @@ describe('WorkersAiSceneGenerator', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'invalid_response', attempts: 2 } });
   });
 
+  it('returns invalid_response when targeted repair still violates the publication gate', async () => {
+    const input = makeGenerationInput();
+    input.recentHistory = [
+      { sceneNumber: 1, title: 'Một', summary: 'Một biến cố cũ.', committedChoice: 'Đi tiếp', choiceIntent: 'tiếp cận', consequence: 'Cửa đã mở.', choiceLabels: ['Đi', 'Dừng', 'Chờ'], beat: 'revelation' },
+      { sceneNumber: 2, title: 'Hai', summary: 'Một biến cố khác.', committedChoice: 'Rẽ trái', choiceIntent: 'né tránh', consequence: 'Lối cũ bị khóa.', choiceLabels: ['Trái', 'Phải', 'Lùi'], beat: 'dilemma' },
+      { sceneNumber: 3, title: 'Ba', summary: 'Tình thế chuyển hướng.', committedChoice: 'Chạy', choiceIntent: 'thoát thân', consequence: 'Họ đến căn hộ.', choiceLabels: ['Chạy', 'Ẩn', 'Gọi'], beat: 'pursuit' },
+    ];
+    input.novelty = { excludedBeats: ['revelation', 'dilemma', 'pursuit'], trajectoryConstraints: [], motifHistory: [] };
+    const recycled = creativeProposal();
+    recycled.beat = 'revelation';
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: recycled, usage: { prompt_tokens: 10, completion_tokens: 5 } })
+      .mockResolvedValueOnce({ response: repairFrom(recycled), usage: { prompt_tokens: 10, completion_tokens: 5 } });
+    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
+
+    const result = await generator.generate(input);
+
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ ok: false, error: { code: 'invalid_response', attempts: 2 } });
+  });
+
   it('emits privacy-safe pipeline timings and provider-call counts', async () => {
     const telemetry: GenerationTelemetrySink = {
       recordGenerationAttempt: vi.fn(),
@@ -184,5 +264,19 @@ describe('WorkersAiSceneGenerator', () => {
         totalMs: expect.any(Number),
       }),
     }));
+  });
+
+  it('keeps canonical generation behavior unchanged when telemetry throws', async () => {
+    const telemetry: GenerationTelemetrySink = {
+      recordGenerationAttempt: vi.fn(() => { throw new Error('telemetry unavailable'); }),
+      recordGenerationPipeline: vi.fn(() => { throw new Error('telemetry unavailable'); }),
+    };
+    const run = vi.fn().mockResolvedValue({ response: creativeProposal(), usage: { prompt_tokens: 10, completion_tokens: 5 } });
+    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai, telemetry);
+
+    const result = await generator.generate(makeGenerationInput());
+
+    expect(result.ok).toBe(true);
+    expect(run).toHaveBeenCalledTimes(1);
   });
 });

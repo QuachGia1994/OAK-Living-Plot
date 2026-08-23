@@ -1,6 +1,6 @@
 # Scene-generation boundary
 
-> updated 2026-08-22 · 0.0.0
+> updated 2026-08-23 · 0.0.0
 
 ## Provider-neutral contract
 
@@ -19,7 +19,7 @@ Bounded canonical context only:
 - `recentHistory` capped at the last 4 scenes with beat/pacingRole/motifSignature and committed relationship deltas where available;
 - a bounded novelty window (`novelty.excludedBeats` ≤4, `trajectoryConstraints` ≤20, `motifHistory` ≤12);
 - bounded `arcMemory` ≤3 checkpoints (derived cache, throughSceneNumber 5,10,...);
-- bounded `resolvedMemory` (fact/thread tombstones ≤24 each, blocking exact resurrection but pruning oldest beyond bound).
+- bounded `resolvedMemory` (latest unique fact/thread tombstones ≤24 each, rebuilt from canonical committed history and blocking exact resurrection).
 
 Old persisted `episode.script_json` rows that lack `beat`/`pacingRole`/`motifSignature` remain readable: `D1DramaRepository` parses those fields as nullable and treats missing values as null without failing the load.
 
@@ -39,10 +39,11 @@ D1-backed drama state remains the source of truth. No unbounded generation conte
 - if resolving an existing fact/thread, the provider copies its supplied natural-language text/title exactly into `factTextsToResolve`/`threadTitlesToResolve`; no database keys are ever emitted;
 - the creative context also strips provider-irrelevant canonical keys/state-version metadata, maps relationship and trajectory endpoints to character names, and omits server-only committed relationship deltas; no relationship keys or canonical IDs are emitted back by the model; server code owns canonical mapping.
 
-## Structured normalization
+## Deterministic compilation
 
 `creative-scene-schema.ts` is the slim provider schema (no `stateDelta` or relationship deltas). `scene-compiler.ts` then deterministically compiles that creative output into the canonical `SceneProposal` without inventing narrative facts or relationships:
 
+- both primary and repair provider schemas require a non-empty `durableFact`; the primary parser tolerates an omitted field only as an incomplete draft so it can enter targeted repair, where the provider must supply the missing story material before compilation;
 - `compileCreativeScene` may only copy provider-authored `durableFact` text into `factsToAdd` and map `factTextsToResolve`/`threadTitlesToResolve` by exact normalized text/title to canonical keys;
 - ambiguous or unknown hints are dropped; no guessing, no invented relationship deltas (`relationships: []` always);
 - `resolvedMemory` tombstones are applied: `establishedFacts`, `threadsToOpen`, and `factsToAdd` that exactly match a resolved entry are removed, so exact resurrection is blocked while the tombstone set itself remains bounded;
@@ -77,6 +78,14 @@ Offline `evaluateNarrative().passed` (average ≥80 and every dimension ≥60) i
 
 Adapters have no D1 authority. Only a publication-accepted `SceneProposal` reaches the episode publisher (server IDs, generation-key idempotency, optimistic state version). Provider/model provenance may be stored for cost diagnostics but is not product state. `D1EpisodePublisher` persists `beat`/`pacingRole`/`motifSignature` alongside `script` in `script_json` for later bounded-memory derivation; old rows without those fields are still parsed.
 
+## Derived Scene artwork
+
+Scene text publication does not wait for image generation. After a successful create/continue response is ready, the Worker schedules a fail-open `scene_artwork` media job through the existing Queue by `ExecutionContext.waitUntil()`. A synchronous or asynchronous enqueue failure cannot roll back or alter the canonical Scene.
+
+The Queue consumer reconstructs a bounded illustration prompt from the owner-scoped canonical Scene row: Drama title/premise/mood, protagonist name/traits, Scene title/summary, and at most 1,400 normalized script characters. The prompt explicitly requires the depicted place/action/objects to come from that Scene and forbids forcing the bundled gothic fallback setting when the story does not contain it. The provider sequence is one `@cf/black-forest-labs/flux-2-klein-4b` call at 1024×640, with one `@cf/black-forest-labs/flux-1-schnell` fallback only after primary failure. This asynchronous image call is separate from—and does not increase—the happy-path creative Scene call count of one.
+
+Migration `0012_scene_artworks` stores only derived lifecycle metadata keyed by `(scene_id, content_fingerprint)`. Image bytes remain private in R2 under `scene-artworks/{plot}/{scene}/...`; owner-scoped HTTP exposes client-safe status and authenticated image bytes, never object keys, provider/model details, or credentials. Concurrent claims converge by generation token/lease, existing ready fingerprints replay without requiring an AI binding, stale ready artwork remains displayable while a changed Scene fingerprint regenerates, and account deletion removes both indexed and orphaned plot prefixes. Artwork failure never changes `episodes`, `episode_choices`, `choice_commits`, or plot state.
+
 ## Checkpoint and memory model
 
 Full canonical D1 history is retained (`episodes`, `choice_commits`, `plots.state_json`). Generation memory is bounded:
@@ -85,7 +94,7 @@ Full canonical D1 history is retained (`episodes`, `choice_commits`, `plots.stat
 - `activeFacts` ≤24, `openThreads` ≤12, `relationships` ≤20 (pressure-sorted selection from canonical state);
 - `arcMemory` ≤3 checkpoints (derived cache, `arc_checkpoints` table: `plot_id`, `through_scene_number`, `summary` ≤600, `created_at`; unique on `(plot_id, through_scene_number)`; rebuilt every 5 scenes via `saveArcCheckpoint` which is fail-open and never invalidates a successful canonical commit);
 - `novelty` bounded as above;
-- `resolvedMemory` bounded at 24 fact texts + 24 thread titles, exact tombstones only, no substring resurrection blocking.
+- `resolvedMemory` rebuilt from canonical commits and bounded at the latest 24 unique fact texts + 24 unique thread titles; exact tombstones only, no substring resurrection blocking and no second canonical truth store.
 
 `arc_checkpoints` is a derived cache only with no duplicate canonical story state.
 
@@ -98,6 +107,8 @@ Idempotent scene-generation mutations use a 120-second request budget as a defen
 - `test/creative-scene-schema.test.ts`, `test/scene-compiler.test.ts` — slim schema, durableFact quality, exact-map compilation, no invented relationships, bounded resolved tombstones.
 - `test/scene-prompt.test.ts`, `test/scene-schema.test.ts`
 - `test/workers-ai-scene-generator.test.ts` — one 8B call happy path, no `stateDelta` in primary schema, targeted repair with smaller schema and immutable script, malformed→`invalid_response`, exception→`provider_unavailable`, pipeline telemetry counts/timings and fail-open behavior, old episode rows readable.
-- `test/long-run-soak.test.ts` — 50-scene D1 soak, bounded memory, plateaued context bytes.
+- `test/long-run-soak.test.ts` — 50-scene D1 soak through the real HTTP/service/repository/publisher/committer path with deterministic creative compilation; provider-facing context bytes are recorded at Scenes 1/10/25/50 and exact resolved-state resurrection is attempted again at Scene 50.
+- `test/schema.test.ts` — local migration sequence 0001→0012, legacy-row survival, checkpoint/artwork read-write constraints, cascades, and pre-0011 checkpoint-reader fail-open behavior.
+- `test/scene-artwork.test.ts`, `test/http-artwork.test.ts`, `test/scene-artwork-queue.test.ts` — Scene-specific prompt material, one-call replay, primary/fallback behavior, concurrency convergence, stale refresh, owner isolation, private delivery, fail-open canonical state, Queue ack/retry.
 - `test/gemini-scene-generator.test.ts`, `test/scene-generator-factory.test.ts`
 - `test/narrative-novelty.test.ts`, `test/narrative-quality.test.ts`, `test/narrative-evals.test.ts`

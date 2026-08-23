@@ -1,8 +1,8 @@
-import type { AudioJob } from './audio/contracts';
+import type { MediaJob } from './audio/contracts';
 
 export interface AppEnv {
   DB: D1Database;
-  TTS_QUEUE: Queue<AudioJob>;
+  TTS_QUEUE: Queue<MediaJob>;
   TTS_DLQ_NAME: string;
   AUDIO_BUCKET: R2Bucket;
   ANALYTICS?: AnalyticsEngineDataset;

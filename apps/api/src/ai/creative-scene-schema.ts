@@ -45,8 +45,14 @@ export const creativeSceneResponseSchema = {
   ],
   properties: {
     title: { type: 'string', minLength: 1, maxLength: 80 },
-    // Provider continuations can land near 400 chars; spoken-length quality remains advisory.
-    script: { type: 'string', minLength: 400, maxLength: 2400 },
+    // A soft character floor nudges smaller models above the spoken-length minimum; the server still enforces
+    // the authoritative 100–300 word envelope after compilation.
+    script: {
+      type: 'string',
+      minLength: 500,
+      maxLength: 2400,
+      description: 'One 130–180 word scene. Never fewer than 100 or more than 300 whitespace-separated words.',
+    },
     summary: { type: 'string', minLength: 1, maxLength: 240 },
     beat: { type: 'string', enum: [...NARRATIVE_BEATS] },
     pacingRole: { type: 'string', enum: [...PACING_ROLES] },
@@ -77,6 +83,7 @@ export const creativeSceneResponseSchema = {
           'label',
           'intent',
           'consequence',
+          'durableFact',
           'factTextsToResolve',
           'threadTitlesToResolve',
           'threadsToOpen',
@@ -87,7 +94,12 @@ export const creativeSceneResponseSchema = {
           label: { type: 'string', minLength: 1, maxLength: 120 },
           intent: { type: 'string', minLength: 1, maxLength: 120 },
           consequence: { type: 'string', minLength: 1, maxLength: 240 },
-          durableFact: { type: 'string', minLength: 0, maxLength: 160 },
+          durableFact: {
+            type: 'string',
+            minLength: 1,
+            maxLength: 160,
+            description: 'A concrete completed fact caused by this consequence; reuse at least one concrete consequence word.',
+          },
           factTextsToResolve: {
             type: 'array',
             maxItems: 2,
@@ -164,7 +176,7 @@ export function parseCreativeSceneProposal(raw: string): Result<CreativeScenePro
 
   const choices: CreativeSceneChoice[] = [];
   for (const choice of value.choices) {
-    const parsed = parseChoice(choice);
+    const parsed = parseChoice(choice, true);
     if (!parsed.ok) return parsed;
     choices.push(parsed.value);
   }
@@ -207,7 +219,7 @@ export function parseCreativeSceneRepair(raw: string): Result<CreativeSceneRepai
   if (!Array.isArray(value.choices) || value.choices.length !== 3) return invalid('Creative repair requires exactly three choices.');
   const choices: CreativeSceneChoice[] = [];
   for (const choice of value.choices) {
-    const parsed = parseChoice(choice);
+    const parsed = parseChoice(choice, false);
     if (!parsed.ok) return parsed;
     choices.push(parsed.value);
   }
@@ -231,92 +243,50 @@ export function applyCreativeSceneRepair(base: CreativeSceneProposal, repair: Cr
   return { ...repair, script: base.script };
 }
 
-/**
- * Normalize provider creative text before compile.
- * Fills weak/placeholder durableFact from consequence/label so runtime never dead-ends
- * solely on 8B/70B phrasing variance. Never invents facts outside provider-authored strings.
- */
-export function normalizeCreativeProposal(creative: CreativeSceneProposal): CreativeSceneProposal {
-  const orderedKeys = ['A', 'B', 'C'] as const;
-  const seen = new Set<string>();
-  const choices = creative.choices.map((choice, index) => {
-    const key = orderedKeys[index] ?? choice.key;
-    let durableFact = choice.durableFact.trim();
-    if (isWeakDurableFact(durableFact, choice.consequence)) {
-      durableFact = synthesizeDurableFact(choice);
-    }
-    // Force branch distinctness using provider text only.
-    const normalizedKey = semanticText(durableFact);
-    if (normalizedKey && seen.has(normalizedKey)) {
-      durableFact = `${choice.label.trim()}: ${choice.consequence.trim()}`.slice(0, 160).trim();
-    }
-    if (durableFact) seen.add(semanticText(durableFact));
-    return {
-      ...choice,
-      key,
-      durableFact: durableFact || synthesizeDurableFact(choice),
-      nextTone: choice.nextTone.trim() || 'tense',
-      factTextsToResolve: Array.isArray(choice.factTextsToResolve) ? choice.factTextsToResolve : [],
-      threadTitlesToResolve: Array.isArray(choice.threadTitlesToResolve) ? choice.threadTitlesToResolve : [],
-      threadsToOpen: Array.isArray(choice.threadsToOpen) ? choice.threadsToOpen : [],
-    };
-  });
-  return {
-    ...creative,
-    establishedFacts: Array.isArray(creative.establishedFacts) ? creative.establishedFacts : [],
-    threadsToOpen: Array.isArray(creative.threadsToOpen) ? creative.threadsToOpen : [],
-    threadTitlesToResolve: Array.isArray(creative.threadTitlesToResolve) ? creative.threadTitlesToResolve : [],
-    choices: [choices[0]!, choices[1]!, choices[2]!],
-  };
-}
-
-function isWeakDurableFact(fact: string, consequence: string): boolean {
-  if (!fact.trim() || isPlaceholderDurableFact(fact)) return true;
-  const tokens = semanticTokens(fact);
-  if (tokens.length < 2 && fact.trim().length < 12) return true;
-  const consequenceText = semanticText(consequence);
-  const factText = semanticText(fact);
-  const tokenOverlap = tokens.some((token) => semanticTokens(consequence).includes(token));
-  const phraseOverlap = factText.length >= 8 && consequenceText.includes(factText.slice(0, Math.min(factText.length, 16)));
-  // If the proposed fact is not supported by the consequence, derive the canonical fact
-  // from provider-authored consequence/label text instead of rejecting the whole scene.
-  return !tokenOverlap && !phraseOverlap;
-}
-
-function synthesizeDurableFact(choice: CreativeSceneChoice): string {
-  const consequence = choice.consequence.trim();
-  if (consequence.length >= 12) return consequence.slice(0, 160);
-  const fromLabel = `${choice.label.trim()}: ${choice.intent.trim()}`.trim();
-  if (fromLabel.length >= 8) return fromLabel.slice(0, 160);
-  return `Nhánh ${choice.key} — ${choice.label.trim()}`.slice(0, 160);
-}
-
-/**
- * Soft advisory checks. Runtime must not hard-fail on phrasing after normalizeCreativeProposal.
- * Returns errors only when a choice still has an empty durableFact (should be impossible post-normalize).
- */
 export function validateCreativeSceneSemantics(creative: CreativeSceneProposal): string[] {
   const errors: string[] = [];
+  const durableFacts = creative.choices.map((choice) => choice.durableFact);
+  const nonEmptyFacts = durableFacts.filter((fact) => fact.trim().length > 0);
+  if (new Set(nonEmptyFacts.map(semanticText)).size !== nonEmptyFacts.length) {
+    errors.push('Creative durable facts must be branch-specific and distinct.');
+  }
   for (const choice of creative.choices) {
     if (!choice.durableFact.trim()) {
-      errors.push(`Choice ${choice.key} durableFact is empty after normalization.`);
+      errors.push(`Choice ${choice.key} durableFact is missing provider-authored story material.`);
+      continue;
     }
+    const tokens = semanticTokens(choice.durableFact);
+    if (tokens.length < 3 || isPlaceholderDurableFact(choice.durableFact)) {
+      errors.push(`Choice ${choice.key} durableFact is too generic to become canonical story state.`);
+      continue;
+    }
+    const consequenceTokens = new Set(semanticTokens(choice.consequence));
+    if (!tokens.some((token) => consequenceTokens.has(token))) {
+      errors.push(`Choice ${choice.key} durableFact is not supported by its consequence.`);
+    }
+  }
+  if (hasMateriallySimilarPair(nonEmptyFacts, 0.68)) {
+    errors.push('Creative durable facts must create materially different branch outcomes.');
   }
   return errors;
 }
 
-function parseChoice(value: unknown): Result<CreativeSceneChoice, string[]> {
-  const requiredKeys = [
+function parseChoice(value: unknown, allowMissingDurableFact: boolean): Result<CreativeSceneChoice, string[]> {
+  const keys = [
     'key',
     'label',
     'intent',
     'consequence',
+    'durableFact',
     'factTextsToResolve',
     'threadTitlesToResolve',
     'threadsToOpen',
     'nextTone',
   ];
-  if (!isRecord(value) || !hasOnlyKeysWithOptional(value, requiredKeys, ['durableFact'])) {
+  const shapeIsValid = allowMissingDurableFact
+    ? isRecord(value) && hasOnlyKeysWithOptional(value, keys.filter((key) => key !== 'durableFact'), ['durableFact'])
+    : isRecord(value) && hasOnlyKeys(value, keys);
+  if (!shapeIsValid || !isRecord(value)) {
     return invalid('Creative choice shape is invalid.');
   }
   if (value.key !== 'A' && value.key !== 'B' && value.key !== 'C') return invalid('Creative choice key is invalid.');
@@ -324,7 +294,9 @@ function parseChoice(value: unknown): Result<CreativeSceneChoice, string[]> {
     !boundedText(value.label, 1, 240)
     || !boundedText(value.intent, 1, 240)
     || !boundedText(value.consequence, 1, 500)
-    || (value.durableFact !== undefined && (typeof value.durableFact !== 'string' || value.durableFact.length > 400))
+    || (allowMissingDurableFact
+      ? value.durableFact !== undefined && (typeof value.durableFact !== 'string' || value.durableFact.length > 400)
+      : !boundedText(value.durableFact, 1, 400))
     || !boundedText(value.nextTone, 1, 80)
   ) {
     return invalid('Creative choice text is invalid.');
@@ -359,6 +331,7 @@ function creativeChoiceSchema() {
       'label',
       'intent',
       'consequence',
+      'durableFact',
       'factTextsToResolve',
       'threadTitlesToResolve',
       'threadsToOpen',
@@ -369,7 +342,12 @@ function creativeChoiceSchema() {
       label: { type: 'string', minLength: 1, maxLength: 120 },
       intent: { type: 'string', minLength: 1, maxLength: 120 },
       consequence: { type: 'string', minLength: 1, maxLength: 240 },
-      durableFact: { type: 'string', minLength: 0, maxLength: 160 },
+      durableFact: {
+        type: 'string',
+        minLength: 1,
+        maxLength: 160,
+        description: 'A concrete completed fact caused by this consequence; reuse at least one concrete consequence word.',
+      },
       factTextsToResolve: { type: 'array', maxItems: 2, items: { type: 'string', minLength: 1, maxLength: 160 } },
       threadTitlesToResolve: { type: 'array', maxItems: 2, items: { type: 'string', minLength: 1, maxLength: 160 } },
       threadsToOpen: { type: 'array', maxItems: 1, items: threadSchema() },
@@ -430,6 +408,26 @@ function isPlaceholderDurableFact(value: string): boolean {
   return /^branch [abc]\b/u.test(normalized)
     || /\bcreates? (a )?(distinct )?(immediate )?consequence\b/u.test(normalized)
     || /\bdurable (branch )?effect\b/u.test(normalized);
+}
+
+function hasMateriallySimilarPair(values: string[], threshold: number): boolean {
+  const tokenSets = values.map((value) => new Set(semanticTokens(value)));
+  const commonTokens = new Set(tokenSets[0] ?? []);
+  for (const tokens of tokenSets.slice(1)) {
+    for (const token of commonTokens) if (!tokens.has(token)) commonTokens.delete(token);
+  }
+  for (let left = 0; left < values.length; left += 1) {
+    for (let right = left + 1; right < values.length; right += 1) {
+      const leftTokens = new Set([...tokenSets[left]!].filter((token) => !commonTokens.has(token)));
+      const rightTokens = new Set([...tokenSets[right]!].filter((token) => !commonTokens.has(token)));
+      const union = new Set([...leftTokens, ...rightTokens]);
+      if (union.size === 0) return true;
+      let intersection = 0;
+      for (const token of leftTokens) if (rightTokens.has(token)) intersection += 1;
+      if (intersection / union.size >= threshold) return true;
+    }
+  }
+  return false;
 }
 
 function semanticText(value: string): string {

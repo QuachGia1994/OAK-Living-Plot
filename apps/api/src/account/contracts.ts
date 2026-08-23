@@ -42,6 +42,12 @@ export interface AccountExportScene {
     consequence: string;
     committed: boolean;
   }>;
+  artworks: Array<{
+    status: string;
+    attempts: number;
+    createdAt: string;
+    readyAt: string | null;
+  }>;
   media: Array<{
     kind: 'voice';
     variant: string;

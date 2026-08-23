@@ -1,4 +1,4 @@
-import type { Result, SceneGenerationInput } from './contracts';
+import { SCENE_GENERATION_CONTEXT_LIMITS, type Result, type SceneGenerationInput } from './contracts';
 
 export interface ScenePrompt {
   systemInstruction: string;
@@ -15,28 +15,35 @@ export function validateSceneGenerationInput(input: SceneGenerationInput): Resul
     errors.push('Drama context is invalid.');
   }
   if (!Number.isInteger(input.drama.stateVersion) || input.drama.stateVersion < 0) errors.push('Drama state version is invalid.');
-  if (input.characters.length === 0 || input.characters.length > 12) errors.push('Character count is invalid.');
-  if (input.relationships.length > 30 || input.activeFacts.length > 40 || input.openThreads.length > 20 || input.recentHistory.length > 12) {
-    errors.push('Canonical drama context exceeds Phase 1 bounds.');
+  if (input.characters.length === 0 || input.characters.length > SCENE_GENERATION_CONTEXT_LIMITS.characters) {
+    errors.push('Character count is invalid.');
+  }
+  if (
+    input.relationships.length > SCENE_GENERATION_CONTEXT_LIMITS.relationships
+    || input.activeFacts.length > SCENE_GENERATION_CONTEXT_LIMITS.activeFacts
+    || input.openThreads.length > SCENE_GENERATION_CONTEXT_LIMITS.openThreads
+    || input.recentHistory.length > SCENE_GENERATION_CONTEXT_LIMITS.recentHistory
+  ) {
+    errors.push('Canonical drama context exceeds configured generation bounds.');
   }
   if (input.arcMemory && (
-    input.arcMemory.length > 3
+    input.arcMemory.length > SCENE_GENERATION_CONTEXT_LIMITS.arcMemory
     || input.arcMemory.some((item) => !Number.isInteger(item.throughSceneNumber) || item.throughSceneNumber < 1 || !bounded(item.summary, 1, 600))
   )) {
     errors.push('Arc memory exceeds bounded generation limits.');
   }
   if (input.resolvedMemory && (
-    input.resolvedMemory.facts.length > 24
-    || input.resolvedMemory.threads.length > 24
+    input.resolvedMemory.facts.length > SCENE_GENERATION_CONTEXT_LIMITS.resolvedFacts
+    || input.resolvedMemory.threads.length > SCENE_GENERATION_CONTEXT_LIMITS.resolvedThreads
     || input.resolvedMemory.facts.some((item) => !bounded(item, 1, 240))
     || input.resolvedMemory.threads.some((item) => !bounded(item, 1, 240))
   )) {
     errors.push('Resolved memory exceeds bounded generation limits.');
   }
   if (input.novelty && (
-    input.novelty.excludedBeats.length > 4
-    || input.novelty.trajectoryConstraints.length > 20
-    || input.novelty.motifHistory.length > 12
+    input.novelty.excludedBeats.length > SCENE_GENERATION_CONTEXT_LIMITS.excludedBeats
+    || input.novelty.trajectoryConstraints.length > SCENE_GENERATION_CONTEXT_LIMITS.trajectoryConstraints
+    || input.novelty.motifHistory.length > SCENE_GENERATION_CONTEXT_LIMITS.motifHistory
   )) {
     errors.push('Novelty memory exceeds bounded generation limits.');
   }
@@ -160,17 +167,24 @@ export function buildCreativeScenePrompt(input: SceneGenerationInput, repairReas
       'Use recentHistory and arcMemory as continuity memory. Do not repeat recent titles, summaries, choice actions, consequences, or cooled-down narrative beats.',
       'Keep the protagonist identity, goals, known facts, open threads, and relationship pressure consistent with the supplied context.',
       'resolvedMemory contains facts/threads that were deliberately resolved in canonical history. Never resurrect or reopen them as if unresolved.',
-      'The script should be 130–180 words and roughly 60–90 seconds of speech. Keep title/summary/metadata concise.',
+      'The script MUST contain 130–180 whitespace-separated words and roughly 60–90 seconds of speech. Count before returning; fewer than 100 or more than 300 words is rejected. Aim for 10–14 concrete sentences. Keep title/summary/metadata concise.',
       'Return exactly three materially distinct choices keyed A, B, C in that order.',
+      'Give A/B/C different action families (for example confront, seek help, evade), not three paraphrases of confession or investigation.',
       'For EVERY choice, durableFact must be a concrete branch-specific fact that becomes true if that choice is committed. This text is model-authored canonical material, so never use placeholders, IDs, snake_case, or vague tone-only statements.',
-      'durableFact must differ materially across A/B/C and must be supported by that choice consequence. Do not claim an event that the consequence does not establish.',
+      'Write each durableFact as the completed event established by that same choice consequence. Reuse at least one concrete content word from the consequence so support is explicit; do not add an inferred event such as a friendship ending merely because someone leaves.',
+      'durableFact must differ materially across A/B/C in its event/predicate. Shared character/topic words do not make branches distinct, and copying one generic sentence three times is rejected.',
       'If resolving an existing fact or thread, copy its supplied natural-language text/title exactly into factTextsToResolve/threadTitlesToResolve. Never output database keys.',
       'threadsToOpen may contain only genuinely new concrete threads. Prefer advancing/resolving a high-urgency existing thread before opening multiple mysteries.',
       'Use nextTone only as tone metadata; it never counts as a durable branch effect.',
       'Do not emit relationship numbers or canonical IDs. Server code owns canonical mapping and validation.',
       repairInstruction,
     ].filter(Boolean).join('\n'),
-    userContent: `DRAMA_CONTEXT_JSON\n${JSON.stringify(context)}\nEND_DRAMA_CONTEXT_JSON`,
+    userContent: [
+      'DRAMA_CONTEXT_JSON',
+      JSON.stringify(context),
+      'END_DRAMA_CONTEXT_JSON',
+      'Write the next scene now. Before returning JSON, silently verify: script 130–180 words; exactly A/B/C; three distinct action families; every consequence has its own concrete supported durableFact.',
+    ].join('\n'),
   };
 }
 

@@ -1,9 +1,14 @@
+import type { SceneArtworkJob } from '../artwork/contracts';
+
 export type AudioAssetStatus = 'reserving' | 'queued' | 'processing' | 'staged' | 'ready' | 'failed';
 export type MediaAssetStatus = 'queued' | 'processing' | 'ready' | 'failed';
 
 export interface AudioJob {
+  kind?: 'voice';
   assetId: string;
 }
+
+export type MediaJob = AudioJob | SceneArtworkJob;
 
 export interface MediaAsset {
   id: string;

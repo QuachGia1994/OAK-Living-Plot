@@ -11,7 +11,9 @@ import migrationEight from '../migrations/0008_user_preferences.sql?raw';
 import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?raw';
 import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import migrationEleven from '../migrations/0011_arc_checkpoints.sql?raw';
+import migrationTwelve from '../migrations/0012_scene_artworks.sql?raw';
 import type { SceneGenerationInput, SceneGenerator, SceneProposal } from '../src/ai/contracts';
+import type { SceneArtworkJob, SceneArtworkQueue } from '../src/artwork/contracts';
 import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
 import { handleRequest } from '../src/http/app';
@@ -31,15 +33,22 @@ const testEnv: AppEnv = {
   REVENUECAT_WEBHOOK_SIGNING_SECRET: 'unused-in-drama-tests',
 };
 const nowMs = Date.parse('2026-08-16T12:00:00.000Z');
+const artworkJobs: SceneArtworkJob[] = [];
+const sceneArtworkQueue: SceneArtworkQueue = {
+  async send(message) {
+    artworkJobs.push(structuredClone(message));
+  },
+};
 
 beforeAll(async () => {
-  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven, migrationEight, migrationNine, migrationTen, migrationEleven]) {
+  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven, migrationEight, migrationNine, migrationTen, migrationEleven, migrationTwelve]) {
     await applySqlMigration(db, migration);
   }
 });
 
 beforeEach(async () => {
   await resetStoryData(db);
+  artworkJobs.length = 0;
 });
 
 describe('authenticated drama HTTP loop', () => {
@@ -58,6 +67,7 @@ describe('authenticated drama HTTP loop', () => {
       .bind(drama.currentScene.id)
       .first<{ provider: string; model: string }>();
     expect(stored).toEqual({ provider: 'fixture-provider', model: 'fixture-model-v1' });
+    expect(artworkJobs).toEqual([{ kind: 'scene_artwork', userId: expect.any(String), sceneId: drama.currentScene.id }]);
   });
 
   it('commits exactly one branch and generates the next scene from the canonical consequence', async () => {
@@ -89,6 +99,7 @@ describe('authenticated drama HTTP loop', () => {
     expect(next.currentScene.number).toBe(2);
     expect(next.currentScene.branch).toEqual({ state: 'open' });
     expect(generator.inputs[1].previous?.consequence).toBe(choice.consequence);
+    expect(artworkJobs.map((job) => job.sceneId)).toEqual([first.currentScene.id, next.currentScene.id]);
   }, 20_000);
 
   it('replays creation and the same committed choice idempotently', async () => {
@@ -249,6 +260,28 @@ describe('authenticated drama HTTP loop', () => {
     expect(second.status).toBe(201);
   });
 
+  it('publishes the canonical Scene even when artwork enqueue throws synchronously', async () => {
+    const response = await handleRequest(
+      request('/v1/dramas', 'POST', {
+        ...createBody(),
+        creationKey: 'creation-artwork-fail-open',
+        generationKey: 'generation-artwork-fail-open',
+      }),
+      testEnv,
+      {
+        sessionVerifier: verifier('clerk-artwork-fail-open'),
+        sceneGenerator: new FixtureSceneGenerator(),
+        sceneArtworkQueue: { send() { throw new Error('queue unavailable'); } },
+        dramaClock: () => nowMs,
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const drama = (await response.json() as DramaEnvelope).drama;
+    expect(drama.currentScene.number).toBe(1);
+    expect(await db.prepare('SELECT id FROM episodes WHERE id = ?').bind(drama.currentScene.id).first()).not.toBeNull();
+  });
+
   it('requires authentication before a drama mutation', async () => {
     const response = await handleRequest(request('/v1/dramas', 'POST', createBody()), testEnv, {
       sessionVerifier: verifier(null),
@@ -330,6 +363,7 @@ async function dramaRequest(
   return handleRequest(request(path, method, body), appEnv, {
     sessionVerifier: verifier(subject),
     sceneGenerator: generator,
+    sceneArtworkQueue,
     dramaClock: () => nowMs,
     productTelemetry,
   });

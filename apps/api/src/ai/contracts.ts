@@ -1,5 +1,22 @@
 export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
+/** Provider-facing context ceilings. Canonical history remains complete in D1. */
+export const SCENE_GENERATION_CONTEXT_LIMITS = {
+  characters: 12,
+  relationships: 20,
+  activeFacts: 24,
+  foundationalFacts: 8,
+  openThreads: 12,
+  recentHistory: 4,
+  arcMemory: 3,
+  resolvedFacts: 24,
+  resolvedThreads: 24,
+  noveltyHistory: 12,
+  excludedBeats: 4,
+  trajectoryConstraints: 20,
+  motifHistory: 12,
+} as const;
+
 export interface SceneGenerationInput {
   locale: string;
   targetSpokenSeconds: number;

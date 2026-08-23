@@ -13,21 +13,24 @@ export function compileCreativeScene(input: SceneGenerationInput, creative: Crea
   const resolvedThreads = new Set((input.resolvedMemory?.threads ?? []).map(semanticTextKey));
 
   const sceneResolvedThreadKeys = resolveExactKeys(creative.threadTitlesToResolve, threadKeyByTitle);
-  const choices = creative.choices.map((choice) => ({
-    key: choice.key,
-    label: choice.label.trim(),
-    intent: choice.intent.trim(),
-    consequence: choice.consequence.trim(),
-    stateDelta: {
-      relationships: [],
-      // Durable branch commitment comes directly from provider-authored text. Exact resolved tombstones are never resurrected.
-      factsToAdd: resolvedFacts.has(semanticTextKey(choice.durableFact)) ? [] : [choice.durableFact.trim()],
-      factKeysToResolve: resolveExactKeys(choice.factTextsToResolve, factKeyByText),
-      threadsToOpen: uniqueThreads(choice.threadsToOpen, resolvedThreads),
-      threadKeysToResolve: resolveExactKeys(choice.threadTitlesToResolve, threadKeyByTitle),
-      nextTone: choice.nextTone.trim(),
-    },
-  }));
+  const choices = creative.choices.map((choice) => {
+    const durableFact = choice.durableFact.trim();
+    return {
+      key: choice.key,
+      label: choice.label.trim(),
+      intent: choice.intent.trim(),
+      consequence: choice.consequence.trim(),
+      stateDelta: {
+        relationships: [],
+        // Durable branch commitment comes directly from provider-authored text. Empty or resolved text is filtered, never replaced.
+        factsToAdd: durableFact && !resolvedFacts.has(semanticTextKey(durableFact)) ? [durableFact] : [],
+        factKeysToResolve: resolveExactKeys(choice.factTextsToResolve, factKeyByText),
+        threadsToOpen: uniqueThreads(choice.threadsToOpen, resolvedThreads),
+        threadKeysToResolve: resolveExactKeys(choice.threadTitlesToResolve, threadKeyByTitle),
+        nextTone: choice.nextTone.trim(),
+      },
+    };
+  });
   return {
     title: creative.title.trim(),
     script: creative.script.trim(),

@@ -1,6 +1,8 @@
 import type { SceneGenerator } from '../ai/contracts';
 import { D1AccountService } from '../account/d1-account-service';
 import { createSceneGenerator } from '../ai/scene-generator-factory';
+import { D1SceneArtworkService } from '../artwork/d1-scene-artwork-service';
+import type { SceneArtworkQueue } from '../artwork/contracts';
 import { D1AudioService } from '../audio/d1-audio-service';
 import type { AudioQueue, MediaAsset } from '../audio/contracts';
 import { ClerkSessionVerifier } from '../auth/clerk-session-verifier';
@@ -30,6 +32,7 @@ export interface RequestDependencies {
   revenueCatSubscriberProvider?: RevenueCatSubscriberProvider;
   revenueCatWebhookClock?: () => number;
   sceneGenerator?: SceneGenerator;
+  sceneArtworkQueue?: SceneArtworkQueue;
   dramaClock?: () => number;
   productTelemetry?: ProductTelemetrySink;
 }
@@ -38,6 +41,7 @@ export async function handleRequest(
   request: Request,
   env: AppEnv,
   dependencies: RequestDependencies = {},
+  executionContext?: Pick<ExecutionContext, 'waitUntil'>,
 ): Promise<Response> {
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/health') {
@@ -82,9 +86,11 @@ export async function handleRequest(
     return json({ export: url.searchParams.get('schema') === '3' ? snapshot : legacyAccountExportV2(snapshot) });
   }
   if (route.kind === 'account_delete') return handleAccountDelete(request, env, user.id, dependencies.dramaClock);
+  if (route.kind === 'scene_artwork_status') return handleSceneArtworkStatus(env, user.id, route.sceneId);
+  if (route.kind === 'scene_artwork') return handleSceneArtwork(request, env, user.id, route.sceneId);
   if (route.kind === 'drama_portrait_status') return handlePortraitStatus(env, user.id, route.dramaId);
   if (route.kind === 'drama_portrait') return handlePortrait(request, env, user.id, route.dramaId);
-  if (isDramaRoute(route)) return handleDramaRoute(request, env, user.id, route, dependencies);
+  if (isDramaRoute(route)) return handleDramaRoute(request, env, user.id, route, dependencies, executionContext);
 
   const entitlements = new D1EntitlementRepository(env.DB);
   if (route.kind === 'entitlement') {
@@ -127,6 +133,8 @@ type ProtectedRoute =
   | { kind: 'scene_voice'; sceneId: string }
   | { kind: 'media_status'; assetId: string }
   | { kind: 'media'; assetId: string }
+  | { kind: 'scene_artwork_status'; sceneId: string }
+  | { kind: 'scene_artwork'; sceneId: string }
   | { kind: 'drama_portrait_status'; dramaId: string }
   | { kind: 'drama_portrait'; dramaId: string }
   | DramaRoute;
@@ -147,6 +155,11 @@ function matchProtectedRoute(pathname: string): ProtectedRoute | null {
   if (portraitStatus) return { kind: 'drama_portrait_status', dramaId: portraitStatus };
   const portrait = matchId(pathname, /^\/v1\/dramas\/([^/]+)\/portrait$/);
   if (portrait) return { kind: 'drama_portrait', dramaId: portrait };
+
+  const artworkStatus = matchId(pathname, /^\/v1\/scenes\/([^/]+)\/artwork\/status$/);
+  if (artworkStatus) return { kind: 'scene_artwork_status', sceneId: artworkStatus };
+  const artwork = matchId(pathname, /^\/v1\/scenes\/([^/]+)\/artwork$/);
+  if (artwork) return { kind: 'scene_artwork', sceneId: artwork };
 
   const dramaChoice = matchIds(pathname, /^\/v1\/dramas\/([^/]+)\/scenes\/([^/]+)\/choices\/([^/]+)$/);
   if (dramaChoice) return { kind: 'drama_choice', dramaId: dramaChoice[0], sceneId: dramaChoice[1], choiceId: dramaChoice[2] };
@@ -197,6 +210,8 @@ function methodAllowed(route: ProtectedRoute, method: string): boolean {
   if (route.kind === 'referral_claim') return method === 'POST';
   if (route.kind === 'drama_portrait_status') return method === 'GET';
   if (route.kind === 'drama_portrait') return method === 'GET' || method === 'POST';
+  if (route.kind === 'scene_artwork_status') return method === 'GET';
+  if (route.kind === 'scene_artwork') return method === 'GET' || method === 'POST';
   if (
     route.kind === 'scene_voice' || route.kind === 'drama_collection' || route.kind === 'drama_generate' ||
     route.kind === 'drama_choice' || route.kind === 'drama_archive' || route.kind === 'drama_restore' ||
@@ -219,6 +234,7 @@ async function handleDramaRoute(
   userId: string,
   route: DramaRoute,
   dependencies: RequestDependencies,
+  executionContext?: Pick<ExecutionContext, 'waitUntil'>,
 ): Promise<Response> {
   const service = new DramaService(
     env.DB,
@@ -241,7 +257,16 @@ async function handleDramaRoute(
   if (!body) return json({ error: 'invalid_request' }, 400);
   if (route.kind === 'drama_generate') {
     if (typeof body.generationKey !== 'string') return json({ error: 'invalid_request' }, 400);
-    return dramaResponse(await service.generateNext({ userId, dramaId: route.dramaId, generationKey: body.generationKey }), 'drama');
+    const result = await service.generateNext({ userId, dramaId: route.dramaId, generationKey: body.generationKey });
+    if (result.ok) {
+      await scheduleSceneArtwork(
+        dependencies.sceneArtworkQueue ?? env.TTS_QUEUE,
+        executionContext,
+        userId,
+        result.value.currentScene.id,
+      );
+    }
+    return dramaResponse(result, 'drama');
   }
 
   if (
@@ -264,6 +289,12 @@ async function handleDramaRoute(
     locale: body.locale,
   });
   if (!result.ok) return dramaErrorResponse(result.error);
+  await scheduleSceneArtwork(
+    dependencies.sceneArtworkQueue ?? env.TTS_QUEUE,
+    executionContext,
+    userId,
+    result.value.drama.currentScene.id,
+  );
   return json({ drama: result.value.drama }, result.value.created ? 201 : 200);
 }
 
@@ -354,6 +385,73 @@ function clientPortrait(value: { status: string; current: boolean; attempts: num
     updatedAt: value.updatedAt === null ? null : new Date(value.updatedAt).toISOString(),
     readyAt: value.readyAt === null ? null : new Date(value.readyAt).toISOString(),
   };
+}
+
+async function handleSceneArtworkStatus(env: AppEnv, userId: string, sceneId: string): Promise<Response> {
+  const result = await new D1SceneArtworkService(env.DB, env.AUDIO_BUCKET, env.AI).status(userId, sceneId);
+  if (!result.ok) {
+    return result.error.code === 'not_found'
+      ? json({ error: 'not_found' }, 404)
+      : json({ error: 'internal_error' }, 500);
+  }
+  return json({ artwork: clientSceneArtwork(result.value) });
+}
+
+async function handleSceneArtwork(request: Request, env: AppEnv, userId: string, sceneId: string): Promise<Response> {
+  const service = new D1SceneArtworkService(env.DB, env.AUDIO_BUCKET, env.AI);
+  if (request.method === 'POST') {
+    const generated = await service.generate(userId, sceneId);
+    if (!generated.ok) {
+      if (generated.error.code === 'not_found') return json({ error: 'not_found' }, 404);
+      if (generated.error.code === 'provider_unavailable') return json({ error: 'provider_unavailable' }, 503);
+      if (generated.error.code === 'invalid_response') return json({ error: 'invalid_generation' }, 502);
+      return json({ error: 'internal_error' }, 500);
+    }
+    return json({ artwork: clientSceneArtwork(generated.value), replayed: generated.replayed ?? false });
+  }
+
+  const delivery = await service.delivery(userId, sceneId);
+  if (!delivery.ok) {
+    return delivery.error.code === 'not_found'
+      ? json({ error: 'not_found' }, 404)
+      : json({ error: 'internal_error' }, 500);
+  }
+  if (!delivery.value.objectKey) return json({ artwork: clientSceneArtwork(delivery.value.snapshot) }, 202);
+  const object = await env.AUDIO_BUCKET.get(delivery.value.objectKey);
+  if (!object) return json({ error: 'artwork_unavailable' }, 503);
+  const headers = new Headers({
+    'Cache-Control': 'private, max-age=3600',
+    'Content-Type': object.httpMetadata?.contentType ?? 'image/jpeg',
+  });
+  if (object.httpEtag) headers.set('ETag', object.httpEtag);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  return new Response(object.body, { status: 200, headers });
+}
+
+function clientSceneArtwork(value: { status: string; current: boolean; attempts: number; updatedAt: number | null; readyAt: number | null }) {
+  return {
+    status: value.status,
+    current: value.current,
+    attempts: value.attempts,
+    updatedAt: value.updatedAt === null ? null : new Date(value.updatedAt).toISOString(),
+    readyAt: value.readyAt === null ? null : new Date(value.readyAt).toISOString(),
+  };
+}
+
+async function scheduleSceneArtwork(
+  queue: SceneArtworkQueue,
+  executionContext: Pick<ExecutionContext, 'waitUntil'> | undefined,
+  userId: string,
+  sceneId: string,
+): Promise<void> {
+  const enqueue = Promise.resolve()
+    .then(() => queue.send({ kind: 'scene_artwork', userId, sceneId }))
+    .catch(() => undefined);
+  if (executionContext) {
+    executionContext.waitUntil(enqueue);
+    return;
+  }
+  await enqueue;
 }
 
 async function handleReferral(request: Request, db: D1Database, userId: string): Promise<Response> {

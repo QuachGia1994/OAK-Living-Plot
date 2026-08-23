@@ -1,6 +1,6 @@
 # Canonical drama runtime ownership
 
-> updated 2026-08-22 · 0.0.0
+> updated 2026-08-23 · 0.0.0
 
 Living Plot has one product vocabulary above persistence: **Drama → Scene → Choice → Branch → next Scene**. The existing D1 schema still stores historical table/column names such as `plots`, `episodes`, `plot_id`, `episode_id`, and `story_locale`. Those names are storage details and must not be projected into new mobile or HTTP contracts.
 
@@ -14,6 +14,7 @@ Living Plot has one product vocabulary above persistence: **Drama → Scene → 
 | validated proposal → persisted current scene | `D1EpisodePublisher` persistence adapter + `DramaService` | D1 write with generation-key/idempotency/version guards, then `D1DramaRepository` projects `Drama` |
 | persisted rows → application drama | `D1DramaRepository` | `Drama`, `Scene`, `CharacterIdentity`, `Branch` |
 | scene → voice request/status/private playback | `D1AudioService` + `AudioProcessor` | public `MediaAsset` lifecycle; R2/provider fields remain private |
+| published scene → derived illustration | Scene artwork Queue job + `D1SceneArtworkService` | Scene-specific private R2 image and derived status; canonical Scene publication never waits or rolls back |
 | canonical drama → player phase | mobile `useDramaPlayback` + `derivePlaybackState` | `PlaybackState` |
 | provisional choice → committed branch | API `D1ChoiceCommitter` | exactly one durable choice commit; `Branch.open → Branch.committed` only after canonical response |
 | committed branch → next scene | `DramaService` | idempotent generation request using prior canonical consequence |
@@ -52,12 +53,12 @@ The mobile selection before commit is provisional playback state, not a canonica
 
 Provider flow is `bounded context -> one 8B creative call -> deterministic compiler -> structural/publication gate -> targeted repair when appropriate -> atomic persistence`:
 
-1. `SceneGenerationInput` is assembled only from bounded canonical drama memory: full canonical D1 history is retained, but generation input is bounded to last 4 scenes, ≤24 facts, ≤12 threads, ≤20 relationships, ≤3 arc checkpoints, bounded resolved tombstones (≤24 fact texts + ≤24 thread titles), and bounded novelty (`excludedBeats` ≤4, `trajectoryConstraints` ≤20, `motifHistory` ≤12). Old `script_json` rows without `beat`/`pacingRole`/`motifSignature` remain readable.
+1. `SceneGenerationInput` is assembled only from bounded canonical drama memory: full canonical D1 history is retained, but generation input is bounded to last 4 scenes, ≤24 facts, ≤12 threads, ≤20 relationships, ≤3 arc checkpoints, bounded latest-unique resolved tombstones rebuilt from commits (≤24 fact texts + ≤24 thread titles), and bounded novelty (`excludedBeats` ≤4, `trajectoryConstraints` ≤20, `motifHistory` ≤12). Old `script_json` rows without `beat`/`pacingRole`/`motifSignature` remain readable.
 2. `scene-prompt.ts` serializes user/drama strings as data inside `DRAMA_CONTEXT_JSON`; the creative path strips provider-irrelevant canonical keys/state-version metadata, maps relationship/trajectory endpoints to character names, omits server-only committed relationship deltas, and instructs the provider to emit `durableFact` per choice plus exact natural-language resolution hints rather than canonical keys or relationship deltas.
-3. The selected adapter requests structured JSON via the slim creative schema; on the happy path exactly one 8B provider call is made (`max_tokens: 2300`, `temperature: 0.45`). The adapter never invents narrative facts, relationships, or threads; compilation does exact normalized mapping only.
+3. The selected adapter requests structured JSON via the slim creative schema; on the happy path exactly one 8B provider call is made (`max_tokens: 2300`, `temperature: 0.45`). Primary and repair schemas require `durableFact`; an omitted primary field is held as an incomplete draft only long enough to request provider-authored targeted repair. The adapter never derives a canonical fact from a label or consequence, and compilation does exact normalized mapping only.
 4. `scene-compiler.ts` deterministically compiles the creative proposal: `durableFact` text is copied into `factsToAdd`, `factTextsToResolve`/`threadTitlesToResolve` are exact-mapped to canonical keys (unknown/ambiguous dropped, no invented relationships), and `resolvedMemory` tombstones block exact resurrection.
 5. `scene-schema.ts` parses and validates the compiled proposal, including A/B/C branches, canonical references, score bounds, script envelope, continuation advancement, active-thread duplication, and no unexpected fields. Schema string bounds mirror the domain envelope so incomplete/undersized provider output is rejected before publication.
-6. Failures are handled with at most one controlled follow-up: malformed JSON triggers one full regeneration; publication rejections that do not require rewriting `script` trigger one targeted repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation). A second failure normalizes to `invalid_response`; binding/network exceptions normalize to `provider_unavailable`. Telemetry (`providerCalls`/`repairs`/`timings`/`outcome`) is observational and fail-open.
+6. Failures are handled with at most one controlled follow-up: malformed JSON or a script-level failure such as unrealized prior consequence triggers one full regeneration; publication/metadata/branch rejections that do not require rewriting `script` trigger one targeted repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation). A second failure normalizes to `invalid_response`; binding/network exceptions normalize to `provider_unavailable`. Telemetry (`providerCalls`/`repairs`/`timings`/`outcome`) is observational and fail-open.
 7. Only validated `SceneProposal` reaches publication. Canonical state application deduplicates semantically identical fact/thread text before and during branch commits, and generation context performs the same normalization so previously polluted development state cannot keep feeding repeated facts/threads back into later Scenes. `arc_checkpoints` (`plot_id`, `through_scene_number`, `summary`, `created_at`, unique on `(plot_id, through_scene_number)`) is a derived cache only; `saveArcCheckpoint` is fail-open and never invalidates a successful canonical commit.
 
 Provider/model names may exist in adapter telemetry and persistence provenance. They are never application state.
@@ -74,7 +75,7 @@ Mobile `GenerationJob` represents user-visible generation state. Server mutation
 
 ## Media pipeline
 
-Phase 1 implements **voice media only**. There is no generated image/video media pipeline yet; UI artwork remains deterministic native presentation and must not be represented as generated media.
+Voice and Scene illustration are independent **derived media**. Neither is canonical story state, and neither can make a published Scene fail.
 
 Internal D1/TTS lifecycle may use `reserving`, `queued`, `processing`, `staged`, `ready`, `failed`. The public product lifecycle is intentionally smaller:
 - `queued`
@@ -84,7 +85,9 @@ Internal D1/TTS lifecycle may use `reserving`, `queued`, `processing`, `staged`,
 
 `D1AudioService` normalizes internal storage state to the public `MediaAsset`. `objectKey`, provider voice ID, provider credentials, and staging state never cross the HTTP boundary. Binary playback uses an authenticated owner-scoped endpoint. Automatic status polling is bounded; after the poll budget is exhausted, the UI requires an explicit status refresh instead of polling forever. If private R2 cleanup fails during a terminal media transition, the processor keeps the staged object key, records `r2_cleanup_failed`, and retries instead of deleting the only reconciliation pointer.
 
-Script readiness therefore does **not** imply voice readiness.
+`D1SceneArtworkService` uses `scene_artworks` as a rebuildable derived cache. Create/continue schedules a Queue job only after canonical publication; enqueue is fail-open. The consumer fingerprints canonical Scene material, converges concurrent work by a 120-second lease and generation token, renders one Scene-specific 1024×640 image with a single hosted fallback on primary failure, and stores it under a private R2 plot prefix. The client immediately shows a bundled classical fallback, auto-backfills old Scenes without an artwork row, then polls within a bounded budget. Status/delivery are owner-scoped and expose no R2 key or provider details. Account export carries lifecycle metadata only; deletion clears portrait and Scene-artwork prefixes before D1 cascade.
+
+Script readiness therefore implies neither voice nor artwork readiness. A failed voice or image provider leaves script/choices/branch continuity fully usable.
 
 ## Playback ownership
 

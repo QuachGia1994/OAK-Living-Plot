@@ -1,7 +1,7 @@
 import { isDramaMood, type Choice, type CharacterIdentity, type Drama, type Scene } from '../domain/drama';
 import { createInitialDramaState, normalizeDramaStateSemantics, parseDramaState, semanticTextKey } from '../domain/drama-state';
 import type { FactState, RelationshipState, ThreadState } from '../domain/drama-state';
-import type { ChoiceStateDelta } from '../ai/contracts';
+import { SCENE_GENERATION_CONTEXT_LIMITS, type ChoiceStateDelta } from '../ai/contracts';
 import {
   deriveTrajectoryConstraints,
   excludedBeatsFromHistory,
@@ -435,7 +435,10 @@ export class D1DramaRepository {
       .first<CommitRow>();
   }
 
-  private async loadRecentHistory(plotId: string, limit = 4): Promise<SceneGenerationInputRecentHistory> {
+  private async loadRecentHistory(
+    plotId: string,
+    limit = SCENE_GENERATION_CONTEXT_LIMITS.recentHistory,
+  ): Promise<SceneGenerationInputRecentHistory> {
     const rows = await this.db
       .prepare(
         `SELECT e.id AS episode_id, e.episode_number, e.title, e.summary, e.script_json,
@@ -484,9 +487,9 @@ export class D1DramaRepository {
          JOIN episodes e ON e.id = cc.episode_id AND e.plot_id = cc.plot_id
          JOIN episode_choices c ON c.id = cc.choice_id AND c.episode_id = cc.episode_id
          WHERE cc.plot_id = ?
-         ORDER BY cc.sequence DESC LIMIT 12`,
+         ORDER BY cc.sequence DESC LIMIT ?`,
       )
-      .bind(plotId)
+      .bind(plotId, SCENE_GENERATION_CONTEXT_LIMITS.noveltyHistory)
       .all<NoveltyHistoryRow>();
     const chronological = [...rows.results].reverse();
     const metadata = chronological.map((row) => parseStoredGenerationMetadata(row.script_json));
@@ -495,8 +498,11 @@ export class D1DramaRepository {
     }));
     return {
       excludedBeats: excludedBeatsFromHistory(metadata.map((item) => isNarrativeBeat(item.beat) ? item.beat : 'unknown')),
-      trajectoryConstraints: deriveTrajectoryConstraints(relationshipHistory).slice(0, 20),
-      motifHistory: metadata.flatMap((item) => item.motifSignature ? [item.motifSignature] : []).slice(-12),
+      trajectoryConstraints: deriveTrajectoryConstraints(relationshipHistory)
+        .slice(0, SCENE_GENERATION_CONTEXT_LIMITS.trajectoryConstraints),
+      motifHistory: metadata
+        .flatMap((item) => item.motifSignature ? [item.motifSignature] : [])
+        .slice(-SCENE_GENERATION_CONTEXT_LIMITS.motifHistory),
     };
   }
 
@@ -511,9 +517,9 @@ export class D1DramaRepository {
           `SELECT through_scene_number, summary
            FROM arc_checkpoints
            WHERE plot_id = ? AND through_scene_number <= ?
-           ORDER BY through_scene_number DESC LIMIT 3`,
+           ORDER BY through_scene_number DESC LIMIT ?`,
         )
-        .bind(plotId, maxThroughScene)
+        .bind(plotId, maxThroughScene, SCENE_GENERATION_CONTEXT_LIMITS.arcMemory)
         .all<ArcCheckpointRow>();
       return [...rows.results].reverse().map((row) => ({
         throughSceneNumber: row.through_scene_number,
@@ -536,7 +542,7 @@ export class D1DramaRepository {
          JOIN episodes e ON e.id = cc.episode_id AND e.plot_id = cc.plot_id
          JOIN episode_choices c ON c.id = cc.choice_id AND c.episode_id = cc.episode_id
          WHERE cc.plot_id = ?
-         ORDER BY cc.sequence DESC LIMIT 24`,
+         ORDER BY cc.sequence DESC`,
       )
       .bind(plotId)
       .all<ResolvedMemoryRow>();
@@ -562,8 +568,8 @@ export class D1DramaRepository {
       }
     }
     return {
-      facts: uniqueRecentTexts(factTexts, 24),
-      threads: uniqueRecentTexts(threadTitles, 24),
+      facts: uniqueRecentTexts(factTexts, SCENE_GENERATION_CONTEXT_LIMITS.resolvedFacts),
+      threads: uniqueRecentTexts(threadTitles, SCENE_GENERATION_CONTEXT_LIMITS.resolvedThreads),
     };
   }
 
@@ -683,23 +689,32 @@ function buildArcCheckpointSummary(rows: CheckpointSourceRow[]): string {
   return text.length <= 600 ? text : `${text.slice(0, 597).trimEnd()}…`;
 }
 
-function selectBoundedFacts(facts: FactState[], limit = 24): FactState[] {
+function selectBoundedFacts(
+  facts: FactState[],
+  limit = SCENE_GENERATION_CONTEXT_LIMITS.activeFacts,
+): FactState[] {
   if (facts.length <= limit) return facts.map((item) => ({ ...item }));
-  const foundational = facts.slice(0, 8);
+  const foundational = facts.slice(0, SCENE_GENERATION_CONTEXT_LIMITS.foundationalFacts);
   const recent = facts.slice(-(limit - foundational.length));
   const byKey = new Map<string, FactState>();
   for (const item of [...foundational, ...recent]) byKey.set(item.key, { ...item });
   return [...byKey.values()].slice(0, limit);
 }
 
-function selectBoundedThreads(threads: ThreadState[], limit = 12): ThreadState[] {
+function selectBoundedThreads(
+  threads: ThreadState[],
+  limit = SCENE_GENERATION_CONTEXT_LIMITS.openThreads,
+): ThreadState[] {
   return [...threads]
     .sort((left, right) => right.urgency - left.urgency || left.key.localeCompare(right.key))
     .slice(0, limit)
     .map((item) => ({ ...item }));
 }
 
-function selectBoundedRelationships(relationships: RelationshipState[], limit = 20): RelationshipState[] {
+function selectBoundedRelationships(
+  relationships: RelationshipState[],
+  limit = SCENE_GENERATION_CONTEXT_LIMITS.relationships,
+): RelationshipState[] {
   return [...relationships]
     .sort((left, right) => relationshipPressure(right) - relationshipPressure(left) || `${left.fromKey}\u0000${left.toKey}`.localeCompare(`${right.fromKey}\u0000${right.toKey}`))
     .slice(0, limit)
@@ -758,6 +773,7 @@ function toDramaSummary(session: Drama): DramaSummary {
   const scene = session.currentScene;
   return {
     id: session.id,
+    sceneId: scene.id,
     title: session.title,
     premise: session.premise,
     mood: session.mood,
