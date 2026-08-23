@@ -5,6 +5,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
 import { AndroidLivingPlotTabBar } from '@/ui/android-living-plot-tab-bar';
 import { AndroidTabBarStateProvider, useAndroidTabBarState } from '@/ui/android-tab-bar-state';
+import { iosNativeTabMinimizeBehavior, usesNativeSystemTabs } from '@/ui/tab-bar-platform';
 import { colors } from '@/ui/theme';
 
 const iosTint = Platform.OS === 'ios'
@@ -15,7 +16,7 @@ const iosLabel = Platform.OS === 'ios'
   : colors.inkMuted;
 
 export default function TabsLayout() {
-  if (Platform.OS === 'android') {
+  if (!usesNativeSystemTabs(Platform.OS)) {
     return (
       <AndroidTabBarStateProvider>
         <AndroidTabs />
@@ -58,7 +59,7 @@ function IosNativeTabs() {
   const { preferences } = useUserPreferences();
   const vi = preferences.uiLocale === 'vi';
   return (
-    <NativeTabs tintColor={iosTint} labelStyle={{ color: iosLabel }} minimizeBehavior="onScrollDown">
+    <NativeTabs tintColor={iosTint} labelStyle={{ color: iosLabel }} minimizeBehavior={iosNativeTabMinimizeBehavior}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
         <NativeTabs.Trigger.Label>{vi ? 'Trang chủ' : 'Home'}</NativeTabs.Trigger.Label>
