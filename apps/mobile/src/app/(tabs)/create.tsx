@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { GenerationJob } from '@/features/drama/domain';
 import type { DramaDraft, DramaMood } from '@/features/drama/contracts';
 import { DramaClientError } from '@/features/drama/contracts';
@@ -9,10 +9,10 @@ import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useUiCopy } from '@/features/localization/ui-copy';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
-import { DramaCastingPreview, DramaComposerPreview, DramaGenerationState, DramaMoodSwatch, DramaUtilityHero } from '@/ui/drama-visuals';
-import { conceptFlowLabels, conceptFlowStep } from '@/ui/concept-flow';
-import { ActionButton, BrandMark, Eyebrow, Screen, StoryFlowRail } from '@/ui/primitives';
-import { colors, radius, spacing, typography } from '@/ui/theme';
+import { DramaComposerPreview, DramaGenerationState, DramaUtilityHero } from '@/ui/drama-visuals';
+import { conceptFlowStep } from '@/ui/concept-flow';
+import { ActionButton, BrandMark, ConceptStageHeader, Screen, TaskActionDock } from '@/ui/primitives';
+import { cinematic, classical, colors, radius, spacing, typography } from '@/ui/theme';
 
 const initialDraft: DramaDraft = {
   premise: '',
@@ -26,7 +26,6 @@ export default function CreateDramaScreen() {
   const auth = useMobileAuth();
   const { locale, t } = useUiCopy();
   const dramaExperienceClient = useDramaExperienceClient();
-  const flowSteps = conceptFlowLabels(locale);
   const worldStep = conceptFlowStep(locale, 'world');
   const creationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
   const submitting = useRef(false);
@@ -105,17 +104,35 @@ export default function CreateDramaScreen() {
     );
   }
 
+  const generating = generationJob.state === 'running';
+  const footer = (
+    <TaskActionDock
+      eyebrow={t('Scene 1 setup', 'Thiết lập cảnh 1')}
+      title={draft.characterName.trim() || t('Name your lead', 'Đặt tên nhân vật chính')}
+      detail={submitError
+        ? t('Your setup is preserved for a safe retry.', 'Thiết lập vẫn được giữ để thử lại an toàn.')
+        : t('One canonical Scene with three choices.', 'Một Cảnh chuẩn với ba lựa chọn.')}
+    >
+      <ActionButton
+        label={generationJob.state === 'failed' ? t('Retry scene 1', 'Thử lại cảnh 1') : t('Begin the story', 'Bắt đầu câu chuyện')}
+        busy={generating}
+        disabled={generating}
+        onPress={() => void submit()}
+      />
+    </TaskActionDock>
+  );
+
   return (
-    <Screen>
+    <Screen contentStyle={styles.screenContent} footer={footer}>
       <BrandMark />
 
-      <View style={styles.intro}>
-        <Eyebrow>{`${String(worldStep.number).padStart(2, '0')} · ${worldStep.kicker}`}</Eyebrow>
-        <Text style={styles.title}>{t('Build the world. Light the first scene.', 'Dựng thế giới. Thắp sáng cảnh đầu tiên.')}</Text>
-        <Text style={styles.subtitle}>{t('One spark. One lead. One mood. Living Plot turns it into a branchable scene.', 'Một tia lửa. Một nhân vật. Một không khí. Living Plot biến nó thành cảnh có thể rẽ nhánh.')}</Text>
-      </View>
-
-      <StoryFlowRail activeStep={worldStep.number} steps={flowSteps} />
+      <ConceptStageHeader
+        number={worldStep.number}
+        kicker={worldStep.kicker}
+        title={t('Build the world', 'Tạo thế giới')}
+        description={t('Give Living Plot one dramatic spark, one mood and one lead.', 'Trao cho Living Plot một mầm drama, một không khí và một nhân vật chính.')}
+        meta={t('Scene 1 begins from this setup', 'Cảnh 1 bắt đầu từ thiết lập này')}
+      />
 
       <DramaComposerPreview
         premise={draft.premise}
@@ -123,10 +140,11 @@ export default function CreateDramaScreen() {
         mood={draft.mood}
         label={t('LIVE SCENE PREVIEW', 'XEM TRƯỚC CẢNH')}
         locale={locale}
+        compact
       />
 
-      <View style={styles.composerSection}>
-        <FieldHeader step="01" label={t('Drama spark', 'Mầm drama')} hint={t('The moment everything changes', 'Khoảnh khắc mọi thứ thay đổi')} />
+      <View style={styles.worldForm}>
+        <FieldLabel label={t('Drama spark', 'Mầm drama')} hint={t('The moment everything changes', 'Khoảnh khắc mọi thứ thay đổi')} />
         <View style={[styles.sparkComposer, showValidation && errors.premise && styles.composerError]}>
           <TextInput
             accessibilityLabel={t('Drama premise', 'Tình huống drama')}
@@ -144,34 +162,22 @@ export default function CreateDramaScreen() {
             <Text style={styles.counter}>{draft.premise.length}/600</Text>
           </View>
         </View>
-      </View>
 
-      <View style={styles.composerSection}>
-        <FieldHeader step="02" label={t('Light the scene', 'Chọn ánh sáng cảnh')} hint={t('Choose the dramatic pressure', 'Chọn áp lực kịch tính')} />
+        <FieldLabel label={t('Dramatic mood', 'Không khí drama')} hint={t('Choose the pressure surrounding Scene 1', 'Chọn áp lực bao quanh Cảnh 1')} />
         <View style={styles.moodGrid}>
           {moodOptions.map((option) => (
-            <DramaMoodSwatch
+            <MoodChip
               key={option.value}
               mood={option.value}
               label={option.label}
               description={option.description}
               selected={draft.mood === option.value}
-              locale={locale}
               onPress={() => setDraft((current) => ({ ...current, mood: option.value }))}
             />
           ))}
         </View>
-      </View>
 
-      <View style={styles.composerSection}>
-        <FieldHeader step="03" label={t('Cast the lead', 'Chọn nhân vật chính')} hint={t('Name the person at the center', 'Đặt tên người ở trung tâm')} />
-        <DramaCastingPreview
-          characterName={draft.characterName}
-          mood={draft.mood}
-          premise={draft.premise}
-          label={t('LEAD CAST', 'NHÂN VẬT CHÍNH')}
-          locale={locale}
-        />
+        <FieldLabel label={t('Lead character', 'Nhân vật chính')} hint={t('Name the person at the center', 'Đặt tên người ở trung tâm')} />
         <View style={[styles.castInputShell, showValidation && errors.characterName && styles.castInputError]}>
           <Text style={styles.castInputLabel}>{t('NAME', 'TÊN')}</Text>
           <TextInput
@@ -204,11 +210,7 @@ export default function CreateDramaScreen() {
           detail={t('Creating the canonical script and first branch. Voice remains a separate media step.', 'Đang tạo kịch bản chuẩn và nhánh đầu tiên. Giọng đọc là một bước media riêng.')}
           locale={locale}
         />
-      ) : (
-        <View style={styles.submitBlock}>
-          <ActionButton label={generationJob.state === 'failed' ? t('Retry scene 1', 'Thử lại cảnh 1') : t('Create scene 1', 'Tạo cảnh 1')} onPress={() => void submit()} />
-        </View>
-      )}
+      ) : null}
     </Screen>
   );
 }
@@ -247,62 +249,67 @@ function readMood(value: string | string[] | undefined): DramaMood | null {
   return candidate === 'tense' || candidate === 'romantic' || candidate === 'mysterious' || candidate === 'hopeful' ? candidate : null;
 }
 
-function FieldHeader({ step, label, hint }: { step: string; label: string; hint: string }) {
+function FieldLabel({ label, hint }: { label: string; hint: string }) {
   return (
     <View style={styles.fieldHeader}>
-      <View style={styles.fieldHeadingRow}>
-        <Text style={styles.step}>{step}</Text>
-        <Text style={styles.fieldLabel}>{label}</Text>
-      </View>
+      <Text style={styles.fieldLabel}>{label}</Text>
       <Text style={styles.hint}>{hint}</Text>
     </View>
   );
 }
 
+function MoodChip({
+  mood,
+  label,
+  description,
+  selected,
+  onPress,
+}: {
+  mood: DramaMood;
+  label: string;
+  description: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const tone = cinematic.scene[mood];
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityLabel={`${label}. ${description}`}
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.moodChip,
+        selected && { borderColor: tone.rim, backgroundColor: tone.base },
+        pressed && styles.moodChipPressed,
+      ]}
+    >
+      <View style={[styles.moodSignal, { backgroundColor: tone.rim }]} />
+      <View style={styles.moodCopy}>
+        <Text style={[styles.moodLabel, selected && { color: tone.rim }]}>{label}</Text>
+        <Text style={styles.moodDescription} numberOfLines={1}>{description}</Text>
+      </View>
+      <Text style={[styles.moodState, selected && styles.moodStateSelected]}>{selected ? '●' : '○'}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  intro: {
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-  },
-  title: {
-    color: colors.ink,
-    fontFamily: typography.display,
-    fontSize: 28,
-    lineHeight: 33,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    color: colors.inkMuted,
-    fontSize: 15,
-    lineHeight: 23,
-    maxWidth: 560,
-  },
-  composerSection: {
+  screenContent: { gap: spacing.md },
+  worldForm: {
     gap: spacing.md,
-    paddingTop: spacing.lg,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: classical.goldDeep,
+    backgroundColor: colors.surfaceGlass,
   },
-  fieldHeader: {
-    gap: spacing.sm,
-  },
-  fieldHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  step: {
-    color: colors.accentStrong,
-    fontFamily: typography.mono,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
+  fieldHeader: { gap: 2, paddingTop: spacing.xs },
   fieldLabel: {
-    flex: 1,
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 25,
-    lineHeight: 30,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: '700',
   },
   hint: {
@@ -313,22 +320,22 @@ const styles = StyleSheet.create({
   sparkComposer: {
     overflow: 'hidden',
     borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderGlow,
+    borderWidth: 1,
+    borderColor: classical.goldDeep,
     backgroundColor: colors.surfaceGlass,
   },
   composerError: {
     borderColor: colors.danger,
   },
   sparkInput: {
-    minHeight: 132,
+    minHeight: 104,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 19,
-    lineHeight: 28,
+    fontSize: 17,
+    lineHeight: 24,
   },
   fieldFooter: {
     minHeight: 34,
@@ -353,16 +360,38 @@ const styles = StyleSheet.create({
   moodGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
+  moodChip: {
+    minWidth: 142,
+    minHeight: 58,
+    flex: 1,
+    flexBasis: '47%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceQuiet,
+  },
+  moodChipPressed: { opacity: 0.76 },
+  moodSignal: { width: 3, height: 28, borderRadius: radius.pill },
+  moodCopy: { minWidth: 0, flex: 1, gap: 2 },
+  moodLabel: { color: colors.ink, fontSize: 13, lineHeight: 17, fontWeight: '800' },
+  moodDescription: { color: colors.quietInk, fontSize: 9, lineHeight: 13 },
+  moodState: { color: colors.quietInk, fontSize: 12 },
+  moodStateSelected: { color: colors.accentStrong },
   castInputShell: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.md,
     borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderGlow,
+    borderWidth: 1,
+    borderColor: classical.goldDeep,
     backgroundColor: colors.surfaceGlass,
   },
   castInputError: {
@@ -400,9 +429,5 @@ const styles = StyleSheet.create({
     color: colors.inkMuted,
     fontSize: 13,
     lineHeight: 19,
-  },
-  submitBlock: {
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
   },
 });

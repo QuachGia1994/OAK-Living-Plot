@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -15,9 +15,10 @@ import type { UiLocale } from '@/features/preferences/contracts';
 import type { Choice, DramaMood } from '@/features/drama/domain';
 import { dramaVisualCopyFor } from './drama-copy';
 import { buildSubtitleBeats, clampSceneBeat, moveSceneBeat, sceneMotifForText, type SceneMotif } from './drama-storyboard';
-import { cinematic, colors, radius, spacing, typography } from './theme';
+import { cinematic, classical, colors, radius, spacing, typography } from './theme';
 
 type SceneTone = (typeof cinematic.scene)[DramaMood];
+const classicalFallbackArtwork = require('../../assets/living-plot-scene-fallback-classical.jpg') as ImageSourcePropType;
 
 export function DramaPoster({
   title,
@@ -26,6 +27,7 @@ export function DramaPoster({
   mood,
   sceneLabel,
   actionLabel,
+  artwork,
   onPress,
   style,
 }: {
@@ -35,6 +37,7 @@ export function DramaPoster({
   mood: DramaMood;
   sceneLabel: string;
   actionLabel: string;
+  artwork?: ReactNode;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
@@ -46,8 +49,9 @@ export function DramaPoster({
       onPress={onPress}
       style={({ pressed }) => [styles.poster, { backgroundColor: tone.base }, style, pressed && styles.posterPressed]}
     >
-      <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${premise}`} />
+      {artwork ?? <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${premise}`} />}
       <View style={styles.posterTopFade} />
+      <View pointerEvents="none" style={styles.posterInnerFrame} />
       <View style={styles.posterMetaRow}>
         <Text style={styles.posterMeta}>{sceneLabel}</Text>
         <View style={[styles.moodSignal, { backgroundColor: tone.rim }]} />
@@ -72,6 +76,7 @@ export function DramaCoverTile({
   mood,
   sceneLabel,
   statusLabel,
+  artwork,
   onPress,
   subdued = false,
   style,
@@ -82,6 +87,7 @@ export function DramaCoverTile({
   mood: DramaMood;
   sceneLabel: string;
   statusLabel: string;
+  artwork?: ReactNode;
   onPress: () => void;
   subdued?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -100,8 +106,9 @@ export function DramaCoverTile({
         pressed && styles.coverTilePressed,
       ]}
     >
-      <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${premise}`} compact />
+      {artwork ?? <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${premise}`} compact />}
       <View style={styles.coverShade} />
+      <View pointerEvents="none" style={styles.coverInnerFrame} />
       <View style={styles.coverMetaRow}>
         <Text style={styles.coverScene}>{sceneLabel}</Text>
         <View style={[styles.coverSignal, { backgroundColor: tone.rim }]} />
@@ -148,19 +155,21 @@ export function DramaComposerPreview({
   mood,
   label,
   locale,
+  compact = false,
 }: {
   premise: string;
   characterName: string;
   mood: DramaMood;
   label: string;
   locale: UiLocale;
+  compact?: boolean;
 }) {
   const tone = cinematic.scene[mood];
   const copy = dramaVisualCopyFor(locale);
   const lead = characterName.trim() || copy.composerLead;
   const sceneText = premise.trim() || copy.composerFallbackScene;
   return (
-    <View style={[styles.composerPreview, { backgroundColor: tone.base }]} accessibilityLabel={`${label}. ${lead}.`}>
+    <View style={[styles.composerPreview, compact && styles.composerPreviewCompact, { backgroundColor: tone.base }]} accessibilityLabel={`${label}. ${lead}.`}>
       <SceneArtwork mood={mood} characterName={lead} sceneText={sceneText} compact />
       <View style={styles.composerShade} />
       <View style={styles.composerMetaRow}>
@@ -337,6 +346,7 @@ export function DramaSceneStage({
   mood,
   locale,
   consequence,
+  artwork,
   onPlaybackComplete,
 }: {
   sceneNumber: number;
@@ -346,6 +356,7 @@ export function DramaSceneStage({
   mood: DramaMood;
   locale: UiLocale;
   consequence?: string;
+  artwork?: ReactNode;
   onPlaybackComplete?: () => void;
 }) {
   const beats = useMemo(() => buildSubtitleBeats(body), [body]);
@@ -376,20 +387,12 @@ export function DramaSceneStage({
   }, [beats.length, consequence, onPlaybackComplete]);
 
   return (
-    <Pressable
-      accessibilityRole={consequence || !hasNextBeat ? undefined : 'button'}
-      accessibilityLabel={consequence ? undefined : `${characterName}. ${beat}`}
-      accessibilityHint={consequence ? undefined : hasNextBeat ? copy.sceneAdvanceHint : copy.sceneFinalHint}
-      disabled={Boolean(consequence) || beats.length <= 1}
-      onPress={() => {
-        if (hasNextBeat) advanceBeat();
-      }}
-      style={[styles.sceneStage, { backgroundColor: tone.base }]}
-    >
-      <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${body}`} />
-      <View style={styles.sceneTopShade} />
-      <View style={styles.sceneHeader}>
-        <View>
+    <View style={[styles.sceneStage, { backgroundColor: tone.base }]}>
+      {artwork ?? <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${body}`} />}
+      <View pointerEvents="none" style={styles.sceneTopShade} />
+      <View pointerEvents="none" style={styles.sceneInnerFrame} />
+      <View pointerEvents="box-none" style={styles.sceneHeader}>
+        <View pointerEvents="none">
           <Text style={styles.sceneIndex}>{locale === 'vi' ? 'CẢNH' : 'SCENE'} {String(sceneNumber).padStart(2, '0')}</Text>
           <Text style={styles.sceneTitle} numberOfLines={2}>{title}</Text>
         </View>
@@ -423,7 +426,7 @@ export function DramaSceneStage({
       {consequence ? (
         <ConsequenceOverlay consequence={consequence} tone={tone} locale={locale} />
       ) : (
-        <View style={styles.subtitleDock}>
+        <View pointerEvents="none" style={styles.subtitleDock}>
           <View style={styles.subtitleLabelRow}>
             <Text style={[styles.subtitleSpeaker, { color: tone.rim }]}>{characterName}</Text>
             <Text style={styles.subtitleCue}>{hasNextBeat ? copy.sceneAdvanceCue : copy.sceneEndCue}</Text>
@@ -431,7 +434,19 @@ export function DramaSceneStage({
           <SubtitleBeat key={`${sceneNumber}-${beatIndex}`} text={beat} />
         </View>
       )}
-    </Pressable>
+
+      {!consequence && beats.length > 1 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${characterName}. ${beat}`}
+          accessibilityHint={hasNextBeat ? copy.sceneAdvanceHint : copy.sceneFinalHint}
+          accessibilityState={{ disabled: !hasNextBeat }}
+          disabled={!hasNextBeat}
+          onPress={advanceBeat}
+          style={styles.sceneTapTarget}
+        />
+      ) : null}
+    </View>
   );
 }
 
@@ -452,6 +467,7 @@ export function DramaChoiceCard({
 }) {
   void _mood;
   const copy = dramaVisualCopyFor(locale);
+  const palette = choicePalette(choice.key);
   return (
     <Pressable
       accessibilityRole="button"
@@ -461,19 +477,22 @@ export function DramaChoiceCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.choiceCard,
-        selected && { borderColor: colors.violetStrong, backgroundColor: 'rgba(139, 77, 255, 0.14)' },
+        { borderColor: palette.border, backgroundColor: palette.background },
+        selected && { borderColor: palette.activeBorder, backgroundColor: palette.activeBackground },
         pressed && !disabled && styles.choicePressed,
         disabled && styles.choiceDisabled,
       ]}
     >
-      <View style={[styles.choiceKey, selected && { borderColor: colors.accent, backgroundColor: colors.accent }]}>
-        <Text style={[styles.choiceKeyText, selected && { color: colors.accentInk }]}>{choice.key}</Text>
+      <View pointerEvents="none" style={[styles.choiceInnerFrame, { borderColor: palette.innerBorder }]} />
+      <View style={[styles.choiceKey, { borderColor: palette.border, backgroundColor: palette.badge }, selected && { borderColor: palette.activeBorder }]}>
+        <Text style={[styles.choiceSigil, { color: palette.activeBorder }]}>{palette.sigil}</Text>
+        <Text style={[styles.choiceKeyText, selected && { color: colors.ink }]}>{choice.key}</Text>
       </View>
       <View style={styles.choiceCopy}>
         <Text style={[styles.choiceLabel, selected && { color: colors.ink }]} numberOfLines={2}>{choice.label}</Text>
         <Text style={styles.choiceIntent} numberOfLines={1}>{choice.intent}</Text>
       </View>
-      <Text style={[styles.choiceChevron, selected && { color: colors.accentStrong }]} accessibilityElementsHidden>
+      <Text style={[styles.choiceChevron, { color: palette.activeBorder }]} accessibilityElementsHidden>
         {selected ? '✓' : '›'}
       </Text>
     </Pressable>
@@ -546,17 +565,56 @@ function SceneArtwork({
   const artworkVariant: ArtworkVariant = variant ?? (compact ? 'card' : 'scene');
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={[styles.sceneBase, { backgroundColor: tone.deep }]} />
-      <View style={[styles.lightOrb, styles.lightOrbPrimary, { backgroundColor: tone.glow, opacity: compact ? 0.5 : 0.7 }]} />
-      <View style={[styles.lightOrb, styles.lightOrbSecondary, { backgroundColor: tone.rim, opacity: compact ? 0.13 : 0.2 }]} />
-      <View style={[styles.horizonGlow, { backgroundColor: tone.haze }]} />
-      <SceneMotifLayer motif={motif} tone={tone} />
-      <View style={[styles.setPanel, styles.setPanelOne, { borderColor: tone.rim }]} />
-      <View style={[styles.setPanel, styles.setPanelTwo, { borderColor: tone.glow }]} />
-      <CharacterPortrait characterName={characterName} tone={tone} alignRight={alignRight} compact={compact} variant={artworkVariant} />
-      <View style={styles.floorShadow} />
+      <Image source={classicalFallbackArtwork} style={styles.sceneFallbackArtwork} resizeMode="cover" accessibilityIgnoresInvertColors />
+      {artworkVariant === 'hero' ? (
+        <>
+          <View style={[styles.sceneBase, { backgroundColor: tone.deep }]} />
+          <View style={[styles.lightOrb, styles.lightOrbPrimary, { backgroundColor: tone.glow, opacity: compact ? 0.5 : 0.7 }]} />
+          <View style={[styles.lightOrb, styles.lightOrbSecondary, { backgroundColor: tone.rim, opacity: compact ? 0.13 : 0.2 }]} />
+          <View style={[styles.horizonGlow, { backgroundColor: tone.haze }]} />
+          <SceneMotifLayer motif={motif} tone={tone} />
+          <View style={[styles.setPanel, styles.setPanelOne, { borderColor: tone.rim }]} />
+          <View style={[styles.setPanel, styles.setPanelTwo, { borderColor: tone.glow }]} />
+          <CharacterPortrait characterName={characterName} tone={tone} alignRight={alignRight} compact={compact} variant={artworkVariant} />
+          <View style={styles.floorShadow} />
+        </>
+      ) : <View style={[styles.sceneImageTint, { backgroundColor: tone.deep }]} />}
     </View>
   );
+}
+
+function choicePalette(key: Choice['key']) {
+  if (key === 'B') {
+    return {
+      sigil: '✦',
+      border: 'rgba(151, 164, 174, 0.62)',
+      activeBorder: '#D5DEE4',
+      innerBorder: 'rgba(213, 222, 228, 0.22)',
+      background: 'rgba(17, 23, 26, 0.88)',
+      activeBackground: 'rgba(39, 52, 58, 0.94)',
+      badge: 'rgba(151, 164, 174, 0.09)',
+    };
+  }
+  if (key === 'C') {
+    return {
+      sigil: '❧',
+      border: 'rgba(92, 143, 102, 0.66)',
+      activeBorder: '#A7D2A7',
+      innerBorder: 'rgba(167, 210, 167, 0.22)',
+      background: 'rgba(12, 27, 17, 0.88)',
+      activeBackground: 'rgba(24, 55, 32, 0.94)',
+      badge: 'rgba(92, 143, 102, 0.1)',
+    };
+  }
+  return {
+    sigil: '☼',
+    border: classical.hairline,
+    activeBorder: classical.goldPale,
+    innerBorder: classical.hairlineSoft,
+    background: 'rgba(35, 25, 13, 0.9)',
+    activeBackground: 'rgba(69, 46, 19, 0.94)',
+    badge: 'rgba(201, 154, 84, 0.1)',
+  };
 }
 
 function CharacterPortrait({
@@ -740,16 +798,27 @@ const styles = StyleSheet.create({
     minHeight: 390,
     overflow: 'hidden',
     borderRadius: cinematic.radius.scene,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderGlow,
-    shadowColor: colors.violetStrong,
-    shadowOpacity: 0.18,
-    shadowRadius: 22,
+    borderWidth: 1,
+    borderColor: classical.goldDeep,
+    shadowColor: classical.gold,
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
     shadowOffset: { width: 0, height: 10 },
     elevation: 5,
   },
   posterPressed: { opacity: 0.93, transform: [{ scale: 0.995 }] },
   posterTopFade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: cinematic.overlay.middle },
+  posterInnerFrame: {
+    position: 'absolute',
+    zIndex: 3,
+    top: 5,
+    right: 5,
+    bottom: 5,
+    left: 5,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: classical.hairline,
+    borderRadius: Math.max(1, cinematic.radius.scene - 4),
+  },
   posterMetaRow: {
     position: 'absolute',
     top: spacing.lg,
@@ -781,13 +850,24 @@ const styles = StyleSheet.create({
     minHeight: 210,
     overflow: 'hidden',
     borderRadius: cinematic.radius.choice,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderGlow,
+    borderWidth: 1,
+    borderColor: classical.goldDeep,
     backgroundColor: colors.surfaceGlass,
   },
   coverTileSubdued: { opacity: 0.68 },
   coverTilePressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
   coverShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(2,2,2,0.18)' },
+  coverInnerFrame: {
+    position: 'absolute',
+    zIndex: 3,
+    top: 4,
+    right: 4,
+    bottom: 4,
+    left: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: classical.hairline,
+    borderRadius: Math.max(1, cinematic.radius.choice - 3),
+  },
   coverMetaRow: {
     position: 'absolute',
     top: spacing.md,
@@ -839,6 +919,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
   },
+  composerPreviewCompact: { minHeight: 210 },
   composerShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.22)' },
   composerMetaRow: {
     position: 'absolute',
@@ -961,12 +1042,21 @@ const styles = StyleSheet.create({
     minHeight: 440,
     maxHeight: 560,
     overflow: 'hidden',
-    borderBottomLeftRadius: cinematic.radius.scene,
-    borderBottomRightRadius: cinematic.radius.scene,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderGlow,
+    borderRadius: cinematic.radius.scene,
+    borderWidth: 1,
+    borderColor: classical.goldDeep,
   },
-  sceneBase: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  sceneTapTarget: {
+    position: 'absolute',
+    zIndex: 1,
+    top: 132,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  sceneFallbackArtwork: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
+  sceneImageTint: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0.2 },
+  sceneBase: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0.5 },
   lightOrb: { position: 'absolute', borderRadius: radius.pill },
   lightOrbPrimary: { width: 430, height: 430, top: -105, right: -145 },
   lightOrbSecondary: { width: 320, height: 320, top: 150, left: -150 },
@@ -1006,7 +1096,18 @@ const styles = StyleSheet.create({
   setPanelTwo: { width: 130, height: 220, top: 150, left: -35, transform: [{ rotate: '-7deg' }] },
   floorShadow: { position: 'absolute', left: -40, right: -40, bottom: -70, height: 210, borderRadius: radius.pill, backgroundColor: '#030303', opacity: 0.88 },
   sceneTopShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: cinematic.overlay.top },
-  sceneHeader: { position: 'absolute', top: spacing.lg, left: spacing.lg, right: spacing.lg, gap: spacing.md },
+  sceneInnerFrame: {
+    position: 'absolute',
+    zIndex: 3,
+    top: 5,
+    right: 5,
+    bottom: 5,
+    left: 5,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: classical.hairline,
+    borderRadius: Math.max(1, cinematic.radius.scene - 4),
+  },
+  sceneHeader: { position: 'absolute', zIndex: 2, top: spacing.lg, left: spacing.lg, right: spacing.lg, gap: spacing.md },
   sceneIndex: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
   sceneTitle: { maxWidth: 300, color: '#FFF9EF', fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: -0.5 },
   sceneProgress: { flexDirection: 'row', gap: 5 },
@@ -1030,31 +1131,43 @@ const styles = StyleSheet.create({
   subtitleCue: { color: '#918B83', fontFamily: typography.mono, fontSize: 8, fontWeight: '800', letterSpacing: 0.8 },
   subtitleText: { color: '#FFF9EF', fontSize: 18, lineHeight: 27, fontWeight: '700' },
   choiceCard: {
+    position: 'relative',
     minHeight: 78,
     maxHeight: 104,
+    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surfaceGlass,
   },
   choicePressed: { opacity: 0.88, transform: [{ scale: 0.995 }] },
   choiceDisabled: { opacity: 0.5 },
+  choiceInnerFrame: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    bottom: 4,
+    left: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Math.max(1, radius.lg - 3),
+  },
   choiceKey: {
-    width: 28,
-    height: 28,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 22,
+    borderWidth: 1,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surfaceQuiet,
   },
-  choiceKeyText: { color: colors.ink, fontFamily: typography.mono, fontSize: 12, fontWeight: '900' },
+  choiceSigil: { fontFamily: typography.display, fontSize: 16, lineHeight: 18 },
+  choiceKeyText: { color: colors.ink, fontFamily: typography.mono, fontSize: 8, lineHeight: 10, fontWeight: '900' },
   choiceCopy: { flex: 1, minWidth: 0, gap: 2 },
   choiceIntent: {
     color: colors.quietInk,

@@ -16,6 +16,7 @@ export default function LibraryStackLayout() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="drama" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="character" />
       <Stack.Screen name="history" />
     </Stack>
   );

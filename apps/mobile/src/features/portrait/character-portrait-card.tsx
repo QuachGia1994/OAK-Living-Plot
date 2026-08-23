@@ -2,13 +2,23 @@ import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { useUiCopy } from '@/features/localization/ui-copy';
 import { ActionButton, Eyebrow, Pill } from '@/ui/primitives';
-import { colors, radius, spacing, typography } from '@/ui/theme';
+import { classical, colors, radius, spacing, typography } from '@/ui/theme';
 import { CharacterPortraitClientError, type PortraitSnapshot } from './portrait-client';
 import { useCharacterPortraitClient } from './portrait-runtime';
 
 const fallbackPortrait = require('../../../assets/living-plot-scene-mina-3d.jpg') as ImageSourcePropType;
 
-export function CharacterPortraitCard({ dramaId, characterName, storyRevision }: { dramaId: string; characterName: string; storyRevision: string }) {
+export function CharacterPortraitCard({
+  dramaId,
+  characterName,
+  storyRevision,
+  showStageLabel = true,
+}: {
+  dramaId: string;
+  characterName: string;
+  storyRevision: string;
+  showStageLabel?: boolean;
+}) {
   const client = useCharacterPortraitClient();
   const { t } = useUiCopy();
   const [snapshot, setSnapshot] = useState<PortraitSnapshot | null>(null);
@@ -75,21 +85,28 @@ export function CharacterPortraitCard({ dramaId, characterName, storyRevision }:
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
-          <Eyebrow>{t('05 · Living character', '05 · Nhân vật sống')}</Eyebrow>
+          {showStageLabel ? <Eyebrow>{t('05 · Living character', '05 · Nhân vật sống')}</Eyebrow> : null}
           <Text style={styles.name}>{characterName}</Text>
         </View>
         <Pill tone={snapshot?.status === 'ready' && !mediaFailed ? 'success' : 'neutral'}>{statusLabel}</Pill>
       </View>
-      <Image
-        source={source}
-        style={styles.portrait}
-        resizeMode="cover"
-        onError={() => {
-          setSource(fallbackPortrait);
-          setMediaFailed(true);
-        }}
-        accessibilityLabel={t(`Current portrait of ${characterName}`, `Chân dung hiện tại của ${characterName}`)}
-      />
+      <View style={styles.portraitFrame}>
+        <Image
+          source={source}
+          style={styles.portrait}
+          resizeMode="cover"
+          onError={() => {
+            setSource(fallbackPortrait);
+            setMediaFailed(true);
+          }}
+          accessibilityLabel={t(`Current portrait of ${characterName}`, `Chân dung hiện tại của ${characterName}`)}
+        />
+        <View pointerEvents="none" style={styles.portraitInnerFrame} />
+        <Text pointerEvents="none" style={[styles.portraitCorner, styles.portraitCornerTopLeft]}>❧</Text>
+        <Text pointerEvents="none" style={[styles.portraitCorner, styles.portraitCornerTopRight]}>❧</Text>
+        <Text pointerEvents="none" style={[styles.portraitCorner, styles.portraitCornerBottomLeft]}>❧</Text>
+        <Text pointerEvents="none" style={[styles.portraitCorner, styles.portraitCornerBottomRight]}>❧</Text>
+      </View>
       <Text style={styles.detail}>{t('The profile can evolve with the current canonical story while preserving the previous portrait as an identity reference.', 'Chân dung có thể thay đổi theo cốt truyện chuẩn hiện tại và dùng ảnh trước làm tham chiếu để giữ nhận diện nhân vật.')}</Text>
       {needsRefresh ? (
         <ActionButton
@@ -124,11 +141,18 @@ function portraitMessage(error: unknown, t: Translate): string {
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGlow, backgroundColor: colors.surfaceGlass, shadowColor: colors.violetStrong, shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 2 },
+  card: { gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: classical.goldDeep, backgroundColor: colors.surfaceGlass, shadowColor: colors.violetStrong, shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 2 },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   headerCopy: { flex: 1, gap: spacing.xs },
   name: { color: colors.ink, fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700' },
-  portrait: { width: '100%', aspectRatio: 1.35, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.violetSoft, backgroundColor: colors.surfaceWarmDeep },
+  portraitFrame: { position: 'relative', overflow: 'hidden', width: '100%', aspectRatio: 1.35, borderRadius: radius.lg, borderWidth: 1, borderColor: classical.goldDeep, backgroundColor: colors.surfaceWarmDeep },
+  portrait: { width: '100%', height: '100%' },
+  portraitInnerFrame: { position: 'absolute', top: 5, right: 5, bottom: 5, left: 5, borderWidth: StyleSheet.hairlineWidth, borderColor: classical.hairline, borderRadius: Math.max(1, radius.lg - 4) },
+  portraitCorner: { position: 'absolute', color: classical.goldPale, fontFamily: typography.display, fontSize: 18, lineHeight: 20, textShadowColor: colors.background, textShadowRadius: 4 },
+  portraitCornerTopLeft: { top: 8, left: 9 },
+  portraitCornerTopRight: { top: 8, right: 9, transform: [{ rotate: '90deg' }] },
+  portraitCornerBottomLeft: { bottom: 8, left: 9, transform: [{ rotate: '-90deg' }] },
+  portraitCornerBottomRight: { right: 9, bottom: 8, transform: [{ rotate: '180deg' }] },
   detail: { color: colors.inkMuted, fontSize: 12, lineHeight: 18 },
   message: { color: colors.quietInk, fontSize: 11, lineHeight: 17 },
 });

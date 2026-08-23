@@ -13,12 +13,14 @@ import {
   Text,
   View,
   type PressableProps,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ANDROID_MINI_NAV_METRICS, useAndroidTabBarState } from './android-tab-bar-state';
-import { colors, radius, spacing, typography } from './theme';
+import { classical, colors, radius, spacing, typography } from './theme';
 
 export function Screen({
   children,
@@ -31,11 +33,13 @@ export function Screen({
 }) {
   const androidTabBar = useAndroidTabBarState();
   const insets = useSafeAreaInsets();
-  const androidBottomInset = Platform.OS === 'android' && androidTabBar
-    ? (androidTabBar.compact ? ANDROID_MINI_NAV_METRICS.compactRailHeight : ANDROID_MINI_NAV_METRICS.expandedHeight) + Math.max(insets.bottom, spacing.xs) + spacing.lg
+  const usesCustomTabBar = Platform.OS !== 'ios' && androidTabBar !== null;
+  const androidTabOffset = usesCustomTabBar
+    ? (androidTabBar.compact ? ANDROID_MINI_NAV_METRICS.compactRailHeight : ANDROID_MINI_NAV_METRICS.expandedHeight) + Math.max(insets.bottom, spacing.xs)
     : undefined;
+  const androidBottomInset = androidTabOffset === undefined ? undefined : androidTabOffset + spacing.lg;
   return (
-    <SafeAreaView style={styles.safeArea} edges={footer ? ['top', 'right', 'bottom', 'left'] : ['top', 'right', 'left']}>
+    <SafeAreaView style={styles.safeArea} edges={footer && !usesCustomTabBar ? ['top', 'right', 'bottom', 'left'] : ['top', 'right', 'left']}>
       <View pointerEvents="none" style={styles.screenAtmosphere}>
         <View style={[styles.screenGlow, styles.screenGlowViolet]} />
         <View style={[styles.screenGlow, styles.screenGlowGold]} />
@@ -44,19 +48,36 @@ export function Screen({
         <ScrollView
           automaticallyAdjustKeyboardInsets
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={[styles.screenContent, androidBottomInset === undefined ? null : { paddingBottom: androidBottomInset }, footer ? styles.screenContentWithFooter : null, contentStyle]}
+          contentContainerStyle={[
+            styles.screenContent,
+            !footer && androidBottomInset !== undefined ? { paddingBottom: androidBottomInset } : null,
+            footer ? styles.screenContentWithFooter : null,
+            contentStyle,
+          ]}
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={() => Keyboard.dismiss()}
-          onScroll={Platform.OS === 'android' && androidTabBar ? (event) => androidTabBar.reportScroll(event.nativeEvent.contentOffset.y) : undefined}
+          onScroll={androidTabBar ? (event) => androidTabBar.reportScroll(readScrollOffsetY(event)) : undefined}
           scrollEventThrottle={32}
         >
           {children}
         </ScrollView>
-        {footer ? <View style={styles.footerSlot}>{footer}</View> : null}
+        {footer ? <View style={[styles.footerSlot, androidTabOffset === undefined ? null : { marginBottom: androidTabOffset }]}>{footer}</View> : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function readScrollOffsetY(event: NativeSyntheticEvent<NativeScrollEvent>): number {
+  if (Platform.OS === 'web') {
+    const eventTarget = (event as unknown as { target?: { scrollTop?: unknown } }).target;
+    const currentTarget = event.currentTarget as unknown as { scrollTop?: unknown } | undefined;
+    const nativeTarget = (event.nativeEvent as unknown as { target?: { scrollTop?: unknown } }).target;
+    const scrollTop = eventTarget?.scrollTop ?? currentTarget?.scrollTop ?? nativeTarget?.scrollTop;
+    if (typeof scrollTop === 'number' && Number.isFinite(scrollTop)) return scrollTop;
+  }
+  const nativeY = event.nativeEvent.contentOffset?.y;
+  return typeof nativeY === 'number' && Number.isFinite(nativeY) ? nativeY : 0;
 }
 
 export function SectionHeader({
@@ -110,21 +131,49 @@ export function SettingsRow({
   );
 }
 
-export function BrandMark() {
+export function BrandMark({ prominent = false }: { prominent?: boolean }) {
   return (
-    <View style={styles.brandRow} accessible accessibilityRole="image" accessibilityLabel="Living Plot">
+    <View style={[styles.brandRow, prominent && styles.brandRowProminent]} accessible accessibilityRole="image" accessibilityLabel="Living Plot">
       <Image
         source={require('../../assets/brand/living-plot-monogram.png')}
-        style={styles.brandIcon}
+        style={[styles.brandIcon, prominent && styles.brandIconProminent]}
         accessibilityIgnoresInvertColors
       />
-      <Text style={styles.brandText}>LIVING PLOT</Text>
+      <View style={styles.brandCopy}>
+        <Text style={[styles.brandText, prominent && styles.brandTextProminent]}>LIVING PLOT</Text>
+        {prominent ? <Text style={styles.brandMotto}>WRITE · CHOOSE · CONSEQUENCE</Text> : null}
+      </View>
     </View>
   );
 }
 
 export function Eyebrow({ children }: { children: ReactNode }) {
   return <Text style={styles.eyebrow}>{children}</Text>;
+}
+
+export function OrnamentDivider({ compact = false }: { compact?: boolean }) {
+  return (
+    <View pointerEvents="none" style={[styles.ornamentDivider, compact && styles.ornamentDividerCompact]}>
+      <View style={styles.ornamentLine} />
+      <Text style={styles.ornamentDiamond}>◇</Text>
+      <View style={styles.ornamentDot} />
+      <Text style={styles.ornamentDiamond}>◇</Text>
+      <View style={styles.ornamentLine} />
+    </View>
+  );
+}
+
+export function ClassicalFrame({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[styles.classicalFrame, style]}>
+      <View pointerEvents="none" style={styles.classicalFrameInner} />
+      <Text pointerEvents="none" style={[styles.frameCorner, styles.frameCornerTopLeft]}>⌜</Text>
+      <Text pointerEvents="none" style={[styles.frameCorner, styles.frameCornerTopRight]}>⌝</Text>
+      <Text pointerEvents="none" style={[styles.frameCorner, styles.frameCornerBottomLeft]}>⌞</Text>
+      <Text pointerEvents="none" style={[styles.frameCorner, styles.frameCornerBottomRight]}>⌟</Text>
+      {children}
+    </View>
+  );
 }
 
 export function StoryFlowRail({
@@ -135,20 +184,76 @@ export function StoryFlowRail({
   activeStep?: number;
 }) {
   return (
-    <View style={styles.flowRail} accessibilityRole="summary">
-      {steps.map((label, index) => {
-        const step = index + 1;
-        const active = step === activeStep;
-        const complete = activeStep > 0 && step < activeStep;
-        return (
-          <View key={`${step}-${label}`} style={[styles.flowStep, active && styles.flowStepActive]}>
-            <View style={[styles.flowNumber, complete && styles.flowNumberComplete, active && styles.flowNumberActive]}>
-              <Text style={[styles.flowNumberText, (complete || active) && styles.flowNumberTextActive]}>{step}</Text>
+    <View style={styles.flowRailShell} accessibilityRole="summary">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.flowRail}>
+        {steps.map((label, index) => {
+          const step = index + 1;
+          const active = step === activeStep;
+          const complete = activeStep > 0 && step < activeStep;
+          return (
+            <View key={`${step}-${label}`} style={[styles.flowStep, active && styles.flowStepActive]}>
+              <View style={[styles.flowNumber, complete && styles.flowNumberComplete, active && styles.flowNumberActive]}>
+                <Text style={[styles.flowNumberText, (complete || active) && styles.flowNumberTextActive]}>{step}</Text>
+              </View>
+              <Text style={[styles.flowLabel, active && styles.flowLabelActive]} numberOfLines={2}>{label}</Text>
             </View>
-            <Text style={[styles.flowLabel, active && styles.flowLabelActive]} numberOfLines={2}>{label}</Text>
-          </View>
-        );
-      })}
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+export function ConceptStageHeader({
+  number,
+  kicker,
+  title,
+  description,
+  meta,
+}: {
+  number: number;
+  kicker: string;
+  title: string;
+  description: string;
+  meta?: string;
+}) {
+  return (
+    <View style={styles.stageHeader} accessibilityRole="header">
+      <View style={styles.stageCopy}>
+        <View style={styles.stageKickerRow}>
+          <Text style={styles.stageNumber}>{String(number).padStart(2, '0')}</Text>
+          <Text style={styles.stageTotal}>/ 06</Text>
+          <Text style={styles.stageKicker}>{kicker}</Text>
+        </View>
+        <Text style={styles.stageTitle}>{title}</Text>
+        <OrnamentDivider compact />
+        <Text style={styles.stageDescription}>{description}</Text>
+        {meta ? <Text style={styles.stageMeta}>{meta}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+export function TaskActionDock({
+  eyebrow,
+  title,
+  detail,
+  children,
+}: {
+  eyebrow?: string;
+  title: string;
+  detail?: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.actionDock}>
+      <View pointerEvents="none" style={styles.actionDockInnerFrame} />
+      <View style={styles.actionDockCopy}>
+        {eyebrow ? <Text style={styles.actionDockEyebrow}>{eyebrow}</Text> : null}
+        <Text style={styles.actionDockTitle} numberOfLines={1}>{title}</Text>
+        {detail ? <Text style={styles.actionDockDetail} numberOfLines={2}>{detail}</Text> : null}
+      </View>
+      <View style={styles.actionDockAction}>{children}</View>
     </View>
   );
 }
@@ -204,6 +309,7 @@ export function ActionButton({
       ]}
       {...props}
     >
+      {variant !== 'ghost' ? <View pointerEvents="none" style={styles.buttonInnerFrame} /> : null}
       {busy ? (
         <ActivityIndicator color={variant === 'primary' ? colors.accentInk : colors.ink} />
       ) : (
@@ -300,14 +406,14 @@ const styles = StyleSheet.create({
     height: 420,
     top: -250,
     right: -190,
-    backgroundColor: 'rgba(139, 77, 255, 0.11)',
+    backgroundColor: 'rgba(125, 88, 43, 0.09)',
   },
   screenGlowGold: {
     width: 340,
     height: 340,
     bottom: -230,
     left: -180,
-    backgroundColor: 'rgba(227, 178, 95, 0.07)',
+    backgroundColor: 'rgba(200, 154, 85, 0.06)',
   },
   keyboardArea: {
     flex: 1,
@@ -334,7 +440,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderSubtle,
-    backgroundColor: colors.background,
+    backgroundColor: 'rgba(7, 8, 6, 0.96)',
   },
   sectionHeader: {
     width: '100%',
@@ -422,9 +528,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
+  brandRowProminent: {
+    alignSelf: 'center',
+    flexDirection: 'column',
+    gap: 2,
+    paddingVertical: spacing.sm,
+  },
   brandIcon: {
     width: 36,
     height: 36,
+  },
+  brandIconProminent: {
+    width: 42,
+    height: 42,
+  },
+  brandCopy: {
+    alignItems: 'center',
+    gap: 2,
   },
   brandText: {
     color: colors.accentStrong,
@@ -432,6 +552,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 2.1,
+  },
+  brandTextProminent: {
+    fontSize: 30,
+    lineHeight: 36,
+    letterSpacing: 4.2,
+  },
+  brandMotto: {
+    color: colors.inkMuted,
+    fontFamily: typography.display,
+    fontSize: 10,
+    letterSpacing: 2,
   },
   eyebrow: {
     color: colors.accentStrong,
@@ -441,20 +572,80 @@ const styles = StyleSheet.create({
     letterSpacing: 1.7,
     textTransform: 'uppercase',
   },
-  flowRail: {
+  ornamentDivider: {
+    width: '100%',
+    maxWidth: 280,
+    alignSelf: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: spacing.xs,
+  },
+  ornamentDividerCompact: {
+    maxWidth: 176,
+    paddingVertical: 1,
+  },
+  ornamentLine: {
+    width: 46,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: classical.hairline,
+  },
+  ornamentDiamond: {
+    color: classical.gold,
+    fontFamily: typography.display,
+    fontSize: 10,
+    lineHeight: 12,
+  },
+  ornamentDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: classical.goldPale,
+  },
+  classicalFrame: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: classical.goldDeep,
+    borderRadius: radius.lg,
+    backgroundColor: classical.inkGlass,
+  },
+  classicalFrameInner: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    bottom: 4,
+    left: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: classical.hairlineSoft,
+    borderRadius: Math.max(1, radius.lg - 3),
+  },
+  frameCorner: {
+    position: 'absolute',
+    zIndex: 2,
+    color: classical.gold,
+    fontFamily: typography.display,
+    fontSize: 18,
+    lineHeight: 20,
+  },
+  frameCornerTopLeft: { top: 3, left: 5 },
+  frameCornerTopRight: { top: 3, right: 5 },
+  frameCornerBottomLeft: { bottom: 3, left: 5 },
+  frameCornerBottomRight: { right: 5, bottom: 3 },
+  flowRailShell: {
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderGlow,
     backgroundColor: colors.surfaceGlass,
+    overflow: 'hidden',
+  },
+  flowRail: {
+    gap: spacing.xs,
+    padding: spacing.sm,
   },
   flowStep: {
-    minWidth: 88,
-    flex: 1,
-    flexBasis: '30%',
+    width: 106,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
@@ -465,8 +656,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   flowStepActive: {
-    borderColor: colors.violetSoft,
-    backgroundColor: 'rgba(139, 77, 255, 0.11)',
+    borderColor: classical.goldDeep,
+    backgroundColor: classical.patina,
   },
   flowNumber: {
     width: 24,
@@ -483,9 +674,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAccentPill,
   },
   flowNumberActive: {
-    borderColor: colors.violetStrong,
-    backgroundColor: colors.violet,
-    shadowColor: colors.violetStrong,
+    borderColor: colors.accentStrong,
+    backgroundColor: colors.accentSoft,
+    shadowColor: colors.accentStrong,
     shadowOpacity: 0.28,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
@@ -509,11 +700,132 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   flowLabelActive: { color: colors.ink },
+  stageHeader: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: classical.hairlineSoft,
+  },
+  stageNumber: {
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  stageTotal: {
+    color: colors.quietInk,
+    fontFamily: typography.mono,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  stageCopy: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 4,
+  },
+  stageKickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  stageKicker: {
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  stageTitle: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 30,
+    lineHeight: 35,
+    fontWeight: '700',
+    letterSpacing: 0.25,
+    textAlign: 'center',
+  },
+  stageDescription: {
+    color: colors.inkMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  stageMeta: {
+    paddingTop: 3,
+    color: colors.quietInk,
+    fontFamily: typography.mono,
+    fontSize: 8,
+    lineHeight: 13,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  actionDock: {
+    position: 'relative',
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderGlow,
+    backgroundColor: colors.surfaceGlass,
+  },
+  actionDockInnerFrame: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    bottom: 4,
+    left: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: classical.hairlineSoft,
+    borderRadius: Math.max(1, radius.lg - 3),
+  },
+  actionDockCopy: {
+    minWidth: 0,
+    flex: 1,
+    gap: 2,
+    paddingLeft: spacing.xs,
+  },
+  actionDockEyebrow: {
+    color: colors.violetStrong,
+    fontFamily: typography.mono,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  actionDockTitle: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  actionDockDetail: {
+    color: colors.quietInk,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  actionDockAction: {
+    minWidth: 138,
+    maxWidth: 220,
+    flexShrink: 0,
+  },
   card: {
     gap: spacing.md,
     padding: spacing.lg,
     borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surfaceGlass,
   },
@@ -542,12 +854,24 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
   button: {
+    position: 'relative',
+    overflow: 'hidden',
     minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  buttonInnerFrame: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    bottom: 3,
+    left: 3,
     borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 235, 190, 0.42)',
+    borderRadius: Math.max(1, radius.md - 2),
   },
   buttonPrimary: {
     borderColor: colors.accentStrong,
@@ -559,7 +883,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   buttonSecondary: {
-    borderColor: colors.violetSoft,
+    borderColor: classical.goldDeep,
     backgroundColor: colors.surfaceGlass,
   },
   buttonGhost: {
@@ -576,9 +900,10 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: colors.ink,
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.15,
+    fontFamily: typography.display,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   buttonTextPrimary: {
     color: colors.accentInk,

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -23,6 +24,15 @@ export function AndroidLivingPlotTabBar({ compact, state, descriptors, navigatio
   return (
     <View pointerEvents="box-none" style={[styles.overlay, { paddingBottom: bottomInset }]}>
       <View style={[compact ? styles.compactRail : styles.expandedRail, compact ? { width: androidMiniRailWidth(width) } : null]}>
+        <BlurView
+          pointerEvents="none"
+          intensity={72}
+          tint="dark"
+          experimentalBlurMethod="dimezisBlurView"
+          style={StyleSheet.absoluteFill}
+        />
+        <View pointerEvents="none" style={styles.railPatina} />
+        <View pointerEvents="none" style={styles.railInnerFrame} />
         {state.routes.map((route, index) => {
           const focused = state.index === index;
           const options = descriptors[route.key]?.options;
@@ -32,7 +42,12 @@ export function AndroidLivingPlotTabBar({ compact, state, descriptors, navigatio
 
           const onPress = () => {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+            if (event.defaultPrevented) return;
+            if (routeName === 'library') {
+              navigation.navigate(route.name, { screen: 'index' });
+              return;
+            }
+            if (!focused) navigation.navigate(route.name, route.params);
           };
           const onLongPress = () => navigation.emit({ type: 'tabLongPress', target: route.key });
 
@@ -103,7 +118,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderGlow,
-    backgroundColor: colors.surfaceGlass,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(12, 10, 7, 0.72)',
   },
   compactRail: {
     height: ANDROID_MINI_NAV_METRICS.compactRailHeight,
@@ -113,7 +129,31 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderGlow,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceGlass,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(12, 10, 7, 0.72)',
+    shadowColor: colors.accentStrong,
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  railPatina: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(93, 61, 25, 0.12)',
+  },
+  railInnerFrame: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    bottom: 4,
+    left: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(222, 178, 100, 0.22)',
+    borderRadius: radius.pill,
   },
   item: {
     flex: 1,
@@ -126,7 +166,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   expandedItemSelected: {
-    backgroundColor: 'rgba(139, 77, 255, 0.14)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(222, 178, 100, 0.34)',
+    backgroundColor: 'rgba(190, 131, 52, 0.15)',
   },
   compactItem: {
     minHeight: ANDROID_MINI_NAV_METRICS.minimumTapTarget,
@@ -144,7 +186,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.violetSoft,
     borderRadius: 17,
-    backgroundColor: 'rgba(139, 77, 255, 0.16)',
+    backgroundColor: 'rgba(190, 131, 52, 0.18)',
   },
   glyph: {
     color: colors.quietInk,

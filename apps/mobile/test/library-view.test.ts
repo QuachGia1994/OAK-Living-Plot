@@ -23,6 +23,7 @@ describe('library concept filters', () => {
 function summary(id: string): DramaSummary {
   return {
     id,
+    sceneId: `${id}-scene`,
     title: id,
     premise: 'A sufficiently specific premise.',
     mood: 'mysterious',

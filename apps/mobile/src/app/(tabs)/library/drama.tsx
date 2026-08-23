@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PanResponder, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { SceneArtworkBackdrop } from '@/features/artwork/scene-artwork-backdrop';
 import { SceneVoiceCard } from '@/features/audio/scene-voice-card';
 import type { DramaMood } from '@/features/drama/domain';
 import { useDramaPlayback, type DramaFailure } from '@/features/drama/use-drama-playback';
@@ -8,11 +9,10 @@ import { canViewSceneSheet, liveSceneSheet, sceneSheetAfterSwipe, type SceneShee
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeDramaShareText } from '@/features/share/drama-share';
-import { CharacterPortraitCard } from '@/features/portrait/character-portrait-card';
 import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
-import { conceptFlowLabels, conceptFlowStep } from '@/ui/concept-flow';
-import { ActionButton, BrandMark, ErrorState, Eyebrow, MotionReveal, Screen, StoryFlowRail } from '@/ui/primitives';
-import { colors, radius, spacing, typography } from '@/ui/theme';
+import { conceptFlowStep } from '@/ui/concept-flow';
+import { ActionButton, BrandMark, ConceptStageHeader, ErrorState, Eyebrow, MotionReveal, Screen, TaskActionDock } from '@/ui/primitives';
+import { classical, colors, radius, spacing, typography } from '@/ui/theme';
 
 export default function DramaScreen() {
   const router = useRouter();
@@ -24,8 +24,8 @@ export default function DramaScreen() {
   const authReady = !auth.configured || (auth.isLoaded && auth.isSignedIn);
   const playback = useDramaPlayback({ dramaId, enabled: authReady });
   const [sheet, setSheet] = useState<SceneSheet>('scene');
+  const [utilitiesOpen, setUtilitiesOpen] = useState(false);
   const liveSheet = liveSceneSheet(playback.playbackState.phase);
-  const flowSteps = conceptFlowLabels(locale);
   const activeConceptStep = conceptFlowStep(locale, sheet === 'scene' ? 'scene' : sheet === 'choice' ? 'choice' : 'consequence');
   const sceneKey = playback.drama?.currentScene.id ?? '';
   const lastSceneKey = useRef('');
@@ -109,16 +109,79 @@ export default function DramaScreen() {
   const consequence = scene.branch.state === 'committed' ? scene.branch.consequence : undefined;
   const canonicalChoiceId = scene.branch.state === 'committed' ? scene.branch.choiceId : playback.selectedChoiceId;
   const canonicalChoice = scene.choices.find((choice) => choice.id === canonicalChoiceId) ?? null;
+  const stageTitle = sheet === 'scene'
+    ? scene.title
+    : sheet === 'choice'
+      ? t(`What should ${drama.leadCharacter.name} do?`, `${drama.leadCharacter.name} nên làm gì?`)
+      : t('The story remembers', 'Câu chuyện ghi nhớ');
+  const footer = readOnly ? (
+    <TaskActionDock
+      eyebrow={t('Archived drama', 'Drama đã tạm dừng')}
+      title={t('This scene is read only', 'Cảnh này ở chế độ chỉ đọc')}
+      detail={t('Return to your library to choose another drama.', 'Trở về thư viện để chọn một drama khác.')}
+    >
+      <ActionButton label={t('Open library', 'Mở thư viện')} variant="secondary" onPress={() => router.push('/library')} />
+    </TaskActionDock>
+  ) : sheet !== liveSheet ? (
+    <TaskActionDock
+      eyebrow={t('Reviewing an earlier step', 'Đang xem lại bước trước')}
+      title={activeConceptStep.label}
+      detail={t('Your canonical story state is unchanged.', 'Trạng thái chuẩn của câu chuyện không thay đổi.')}
+    >
+      <ActionButton label={t('Return to current step', 'Về bước hiện tại')} variant="secondary" onPress={() => setSheet(liveSheet)} />
+    </TaskActionDock>
+  ) : sheet === 'scene' ? (
+    <TaskActionDock
+      eyebrow={t(`Scene ${scene.number}`, `Cảnh ${scene.number}`)}
+      title={scene.title}
+      detail={t('Finish reading, then direct the next turn.', 'Đọc xong rồi chỉ đạo bước ngoặt tiếp theo.')}
+    >
+      <ActionButton label={t('See choices', 'Xem lựa chọn')} onPress={playback.markSceneComplete} />
+    </TaskActionDock>
+  ) : sheet === 'choice' ? (
+    <TaskActionDock
+      eyebrow={t('Canonical decision', 'Quyết định nhánh chuẩn')}
+      title={playback.selectedChoice?.label ?? t('Choose one branch', 'Chọn một nhánh')}
+      detail={playback.selectedChoice
+        ? t('This choice becomes permanent when locked.', 'Lựa chọn này trở thành nhánh chuẩn khi được chốt.')
+        : t('Compare A, B and C before continuing.', 'So sánh A, B và C trước khi tiếp tục.')}
+    >
+      <ActionButton
+        label={t('Lock this choice', 'Chốt lựa chọn')}
+        busy={playback.playbackState.phase === 'committing_choice'}
+        disabled={!playback.selectedChoice}
+        onPress={() => void playback.commitChoice()}
+      />
+    </TaskActionDock>
+  ) : (
+    <TaskActionDock
+      eyebrow={t('Branch committed', 'Đã chốt nhánh')}
+      title={canonicalChoice?.label ?? t('Consequence recorded', 'Hệ quả đã được ghi nhận')}
+      detail={t('The next scene will continue from this exact consequence.', 'Cảnh tiếp theo sẽ nối tiếp chính xác hệ quả này.')}
+    >
+      <ActionButton
+        label={t(`Continue to scene ${scene.number + 1}`, `Tiếp tục cảnh ${scene.number + 1}`)}
+        busy={playback.playbackState.phase === 'continuing'}
+        onPress={() => void playback.continueDrama()}
+      />
+    </TaskActionDock>
+  );
 
   return (
-    <Screen contentStyle={styles.playerScreen}>
+    <Screen contentStyle={styles.playerScreen} footer={footer}>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={t('My dramas', 'Drama của tôi')} variant="ghost" onPress={() => router.push('/library')} />
       </View>
 
-      <View style={styles.flowWrap}>
-        <StoryFlowRail activeStep={activeConceptStep.number} steps={flowSteps} />
+      <View style={styles.stageWrap}>
+        <ConceptStageHeader
+          number={activeConceptStep.number}
+          kicker={activeConceptStep.kicker}
+          title={stageTitle}
+          description={activeConceptStep.description}
+          meta={t(`Scene ${scene.number} · ${drama.title}`, `Cảnh ${scene.number} · ${drama.title}`)}
+        />
       </View>
 
       <View style={styles.sheetDeck} {...sheetPanResponder.panHandlers}>
@@ -136,6 +199,16 @@ export default function DramaScreen() {
               characterName={drama.leadCharacter.name}
               mood={drama.mood}
               locale={locale}
+              artwork={(
+                <SceneArtworkBackdrop
+                  sceneId={scene.id}
+                  revision={`${scene.number}:${scene.title}:${scene.summary}`}
+                  accessibilityLabel={t(
+                    `Generated illustration for scene ${scene.number}: ${scene.title}`,
+                    `Tranh minh họa được tạo cho cảnh ${scene.number}: ${scene.title}`,
+                  )}
+                />
+              )}
               onPlaybackComplete={playback.markSceneComplete}
             />
           </MotionReveal>
@@ -167,18 +240,14 @@ export default function DramaScreen() {
                 {scene.branch.state === 'committed' ? (
                   <View style={styles.commitDock}>
                     <Text style={styles.commitText} numberOfLines={2}>{canonicalChoice?.label ?? t('Canonical branch locked', 'Nhánh chuẩn đã được chốt')}</Text>
-                    <ActionButton label={t('Review consequence', 'Xem hậu quả')} variant="secondary" onPress={() => setSheet('consequence')} />
+                    <Text style={styles.commitMeta}>{t('This is the canonical choice for this scene.', 'Đây là lựa chọn chuẩn của cảnh này.')}</Text>
                   </View>
                 ) : !playback.selectedChoice ? (
                   <Text style={styles.choiceHint}>{t('Pick a branch to continue the drama.', 'Chọn một nhánh để tiếp tục drama.')}</Text>
                 ) : (
                   <View style={styles.commitDock}>
                     <Text style={styles.commitText} numberOfLines={1}>{playback.selectedChoice.label}</Text>
-                    <ActionButton
-                      label={t('Lock this choice', 'Chốt lựa chọn')}
-                      busy={playback.playbackState.phase === 'committing_choice'}
-                      onPress={() => void playback.commitChoice()}
-                    />
+                    <Text style={styles.commitMeta}>{t('Ready to lock from the action bar below.', 'Sẵn sàng chốt tại thanh hành động bên dưới.')}</Text>
                   </View>
                 )}
               </View>
@@ -194,13 +263,6 @@ export default function DramaScreen() {
                 <Text style={styles.nextTitle}>{t('Your choice changed what happens next.', 'Lựa chọn của bạn đã thay đổi cảnh tiếp theo.')}</Text>
                 {canonicalChoice ? <Text style={styles.consequenceChoice}>{canonicalChoice.label}</Text> : null}
                 <Text style={styles.consequenceText}>{consequence}</Text>
-                {!readOnly ? (
-                  <ActionButton
-                    label={t(`Continue to scene ${scene.number + 1}`, `Tiếp tục cảnh ${scene.number + 1}`)}
-                    busy={playback.playbackState.phase === 'continuing'}
-                    onPress={() => void playback.continueDrama()}
-                  />
-                ) : null}
               </View>
             </View>
           </MotionReveal>
@@ -228,33 +290,73 @@ export default function DramaScreen() {
               <Text style={styles.readOnlyStatus}>{t('READ ONLY', 'CHỈ ĐỌC')}</Text>
             </View>
             <Text style={styles.readOnlyTitle}>{t('Paused at this scene.', 'Tạm dừng tại cảnh này.')}</Text>
-            <ActionButton label={t('Open drama library', 'Mở thư viện drama')} variant="secondary" onPress={() => router.push('/library')} />
           </View>
         ) : null}
 
-        <CharacterPortraitCard
-          key={`portrait-${drama.id}-${scene.number}`}
-          dramaId={drama.id}
-          characterName={drama.leadCharacter.name}
-          storyRevision={`${scene.number}:${scene.branch.state}:${scene.branch.state === 'committed' ? scene.branch.choiceId : 'open'}`}
-        />
-
-        <SceneVoiceCard key={scene.id} sceneId={scene.id} sceneText={scene.script} />
-
-        <View style={styles.dramaUtilityRail}>
+        <View style={styles.storyTools}>
           <View style={styles.dramaUtilityCopy}>
             <Text style={styles.dramaUtilityKicker}>{playbackLabel(playback.playbackState.phase, locale)}</Text>
             <Text style={styles.dramaUtilityTitle} numberOfLines={2}>{drama.title}</Text>
             <Text style={styles.dramaUtilityMeta}>{drama.leadCharacter.name} · {moodLabel(drama.mood, locale)}</Text>
           </View>
-          <View style={styles.dramaActions}>
-            <ActionButton
-              label={t('Share', 'Chia sẻ')}
-              variant="ghost"
-              onPress={() => void Share.share({ message: buildSpoilerSafeDramaShareText({ title: drama.title, sceneNumber: scene.number, premise: drama.premise, uiLocale: locale }) })}
-            />
-            <ActionButton label={t('History', 'Lịch sử')} variant="ghost" onPress={() => router.push({ pathname: '/library/history', params: { dramaId: drama.id } })} />
+
+          <View style={styles.utilityGrid}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t(`Open ${drama.leadCharacter.name}'s living profile`, `Mở hồ sơ sống của ${drama.leadCharacter.name}`)}
+              onPress={() => router.push({ pathname: '/library/character', params: { dramaId: drama.id } })}
+              style={({ pressed }) => [styles.utilityCard, pressed && styles.utilityCardPressed]}
+            >
+              <Text style={styles.utilityNumber}>05</Text>
+              <View style={styles.utilityCopy}>
+                <Text style={styles.utilityLabel}>{t('Living character', 'Nhân vật sống')}</Text>
+                <Text style={styles.utilityDetail} numberOfLines={1}>{drama.leadCharacter.name}</Text>
+              </View>
+              <Text style={styles.utilityArrow}>›</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('Open canonical timeline', 'Mở dòng lịch sử chuẩn')}
+              onPress={() => router.push({ pathname: '/library/history', params: { dramaId: drama.id } })}
+              style={({ pressed }) => [styles.utilityCard, pressed && styles.utilityCardPressed]}
+            >
+              <Text style={styles.utilityNumber}>06</Text>
+              <View style={styles.utilityCopy}>
+                <Text style={styles.utilityLabel}>{t('Timeline', 'Dòng lịch sử')}</Text>
+                <Text style={styles.utilityDetail} numberOfLines={1}>{t(`Through scene ${scene.number}`, `Đến cảnh ${scene.number}`)}</Text>
+              </View>
+              <Text style={styles.utilityArrow}>›</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: utilitiesOpen }}
+              accessibilityLabel={t('Toggle scene tools', 'Bật tắt công cụ cảnh')}
+              onPress={() => setUtilitiesOpen((current) => !current)}
+              style={({ pressed }) => [styles.utilityCard, pressed && styles.utilityCardPressed]}
+            >
+              <Text style={styles.utilityNumber}>••</Text>
+              <View style={styles.utilityCopy}>
+                <Text style={styles.utilityLabel}>{t('Scene tools', 'Công cụ cảnh')}</Text>
+                <Text style={styles.utilityDetail} numberOfLines={1}>{t('Voice and sharing', 'Giọng đọc và chia sẻ')}</Text>
+              </View>
+              <Text style={styles.utilityArrow}>{utilitiesOpen ? '⌃' : '⌄'}</Text>
+            </Pressable>
           </View>
+
+          {utilitiesOpen ? (
+            <MotionReveal>
+              <View style={styles.utilityPanel}>
+                <SceneVoiceCard key={scene.id} sceneId={scene.id} sceneText={scene.script} />
+                <ActionButton
+                  label={t('Share this drama', 'Chia sẻ drama này')}
+                  variant="secondary"
+                  onPress={() => void Share.share({ message: buildSpoilerSafeDramaShareText({ title: drama.title, sceneNumber: scene.number, premise: drama.premise, uiLocale: locale }) })}
+                />
+              </View>
+            </MotionReveal>
+          ) : null}
         </View>
       </View>
     </Screen>
@@ -356,13 +458,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     backgroundColor: 'transparent',
   },
-  flowWrap: { paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
+  stageWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
   sheetDeck: {
     overflow: 'hidden',
     marginHorizontal: spacing.sm,
     borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderGlow,
+    borderWidth: 1,
+    borderColor: classical.goldDeep,
     backgroundColor: colors.surfaceGlass,
   },
   sheetRail: {
@@ -382,7 +487,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  sheetTabSelected: { borderBottomColor: colors.violetStrong, backgroundColor: 'rgba(139, 77, 255, 0.08)' },
+  sheetTabSelected: { borderBottomColor: classical.gold, backgroundColor: classical.patina },
   sheetTabDisabled: { opacity: 0.32 },
   sheetTabPressed: { opacity: 0.72 },
   sheetTabIndex: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
@@ -392,13 +497,13 @@ const styles = StyleSheet.create({
   reviewNote: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, color: colors.quietInk, fontSize: 10, lineHeight: 15, textAlign: 'center' },
   sheetPanelBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   playerBody: {
-    gap: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
-  dramaUtilityRail: {
     gap: spacing.md,
-    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  storyTools: {
+    gap: spacing.md,
+    paddingVertical: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderStrong,
   },
@@ -406,12 +511,39 @@ const styles = StyleSheet.create({
   dramaUtilityKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
   dramaUtilityTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 22, lineHeight: 27, fontWeight: '700' },
   dramaUtilityMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  dramaActions: {
+  utilityGrid: { gap: spacing.xs },
+  utilityCard: {
+    minHeight: 58,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginHorizontal: -spacing.sm,
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceGlass,
   },
+  utilityCardPressed: { opacity: 0.72 },
+  utilityNumber: {
+    width: 24,
+    color: colors.violetStrong,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  utilityCopy: { minWidth: 0, flex: 1, gap: 2 },
+  utilityLabel: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: '700',
+  },
+  utilityDetail: { color: colors.quietInk, fontSize: 10, lineHeight: 14 },
+  utilityArrow: { color: colors.accentStrong, fontSize: 22, lineHeight: 24 },
+  utilityPanel: { gap: spacing.md, paddingTop: spacing.xs },
   choiceSection: {
     gap: spacing.lg,
     paddingTop: spacing.md,
@@ -443,7 +575,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.violetSoft,
+    borderColor: classical.hairline,
     backgroundColor: colors.surfaceGlass,
   },
   commitText: {
@@ -453,13 +585,21 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '700',
   },
+  commitMeta: {
+    color: colors.quietInk,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    lineHeight: 14,
+    fontWeight: '700',
+    letterSpacing: 0.35,
+  },
   nextSection: {
     gap: spacing.md,
     padding: spacing.lg,
     marginTop: spacing.md,
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.violetSoft,
+    borderColor: classical.hairline,
     backgroundColor: colors.surfaceGlass,
   },
   nextTitle: {

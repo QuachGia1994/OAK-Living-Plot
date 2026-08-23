@@ -10,6 +10,7 @@ export interface DramaDraft {
 
 export interface DramaSummary {
   id: string;
+  sceneId: string;
   title: string;
   premise: string;
   mood: DramaMood;

@@ -377,6 +377,7 @@ function toSummary(drama: Drama, uiLocale: UiLocale): DramaSummary {
   const scene = drama.currentScene;
   return {
     id: drama.id,
+    sceneId: scene.id,
     title: drama.title,
     premise: drama.premise,
     mood: drama.mood,

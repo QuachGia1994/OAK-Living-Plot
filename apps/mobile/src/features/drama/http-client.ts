@@ -286,13 +286,14 @@ function parseHistory(value: Record<string, unknown>): DramaHistory {
 
 function parseDramaSummary(value: unknown, nowMs: number, uiLocale: UiLocale): DramaSummary {
   if (
-    !isRecord(value) || typeof value.id !== 'string' || typeof value.title !== 'string' || typeof value.premise !== 'string' ||
+    !isRecord(value) || typeof value.id !== 'string' || typeof value.sceneId !== 'string' || typeof value.title !== 'string' || typeof value.premise !== 'string' ||
     !isMood(value.mood) || typeof value.characterName !== 'string' || !Number.isInteger(value.updatedAt) ||
     !Number.isInteger(value.sceneNumber) || (value.status !== 'awaiting_choice' && value.status !== 'ready_for_next_scene') ||
     typeof value.resumeLine !== 'string'
   ) throw invalidBackendResponse();
   return {
     id: value.id,
+    sceneId: value.sceneId,
     title: value.title,
     premise: value.premise,
     mood: value.mood,

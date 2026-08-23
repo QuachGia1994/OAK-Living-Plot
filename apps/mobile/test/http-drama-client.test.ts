@@ -194,6 +194,7 @@ type TestFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 function summaryPayload(updatedAt: number) {
   return {
     id: 'drama-1',
+    sceneId: 'scene-2',
     title: 'The Message',
     premise: 'Mina receives an impossible message.',
     mood: 'mysterious',

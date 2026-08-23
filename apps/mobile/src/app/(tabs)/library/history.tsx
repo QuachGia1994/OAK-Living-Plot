@@ -5,10 +5,10 @@ import { useDramaExperienceClient } from '@/features/drama/drama-client-context'
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHistory, DramaHistoryItem } from '@/features/drama/contracts';
 import { journeyStats } from '@/features/drama/journey-stats';
-import { DramaEmptyStage, DramaLoadingStage, DramaRecapFrame, DramaUtilityHero } from '@/ui/drama-visuals';
-import { conceptFlowLabels, conceptFlowStep } from '@/ui/concept-flow';
-import { ActionButton, BrandMark, ErrorState, Pill, Screen, StoryFlowRail } from '@/ui/primitives';
-import { colors, spacing, typography } from '@/ui/theme';
+import { DramaEmptyStage, DramaLoadingStage, DramaRecapFrame } from '@/ui/drama-visuals';
+import { conceptFlowStep } from '@/ui/concept-flow';
+import { ActionButton, BrandMark, ConceptStageHeader, ErrorState, Pill, Screen, TaskActionDock } from '@/ui/primitives';
+import { classical, colors, spacing, typography } from '@/ui/theme';
 
 export default function DramaHistoryScreen() {
   const router = useRouter();
@@ -16,7 +16,6 @@ export default function DramaHistoryScreen() {
   const params = useLocalSearchParams<{ dramaId?: string | string[] }>();
   const dramaId = useMemo(() => readParam(params.dramaId), [params.dramaId]);
   const client = useDramaExperienceClient();
-  const flowSteps = conceptFlowLabels(locale);
   const timelineStep = conceptFlowStep(locale, 'timeline');
   const [history, setHistory] = useState<DramaHistory | null>(null);
   const [error, setError] = useState<string | null>(dramaId ? null : t('This history link is missing its drama identifier.', 'Liên kết lịch sử thiếu mã drama.'));
@@ -50,23 +49,31 @@ export default function DramaHistoryScreen() {
   }, [client, dramaId, t]);
 
   const backToDrama = () => dramaId ? router.replace({ pathname: '/library/drama', params: { dramaId } }) : router.replace('/');
+  const currentItem = history?.items[history.items.length - 1];
+  const footer = dramaId ? (
+    <TaskActionDock
+      eyebrow={t('Return to the live story', 'Trở lại câu chuyện hiện tại')}
+      title={currentItem?.title ?? history?.title ?? t('Drama timeline', 'Dòng lịch sử drama')}
+      detail={currentItem ? t(`Current canonical position: Scene ${currentItem.sceneNumber}.`, `Vị trí chuẩn hiện tại: Cảnh ${currentItem.sceneNumber}.`) : undefined}
+    >
+      <ActionButton label={t('Back to drama', 'Quay lại drama')} onPress={backToDrama} />
+    </TaskActionDock>
+  ) : undefined;
 
   return (
-    <Screen>
+    <Screen contentStyle={styles.screen} footer={footer}>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={t('Back to drama', 'Quay lại drama')} variant="ghost" onPress={backToDrama} />
       </View>
 
-      <DramaUtilityHero
-        kicker={`${String(timelineStep.number).padStart(2, '0')} · ${timelineStep.kicker}`}
+      <ConceptStageHeader
+        number={timelineStep.number}
+        kicker={timelineStep.kicker}
         title={history?.title ?? t('Drama so far', 'Drama đến đây')}
-        detail={history ? t(`${history.items.length} scenes preserved in canonical order.`, `${history.items.length} cảnh được giữ theo thứ tự chuẩn.`) : t('Restoring the choices that brought this drama here.', 'Đang khôi phục các lựa chọn đã đưa drama tới đây.')}
-        mood="mysterious"
-        characterName="Recap"
+        description={timelineStep.description}
+        meta={history ? t(`${history.items.length} scenes · canonical order`, `${history.items.length} cảnh · thứ tự chuẩn`) : t('Restoring committed branches…', 'Đang khôi phục các nhánh đã chốt…')}
       />
-
-      <StoryFlowRail activeStep={timelineStep.number} steps={flowSteps} />
 
       {error ? <ErrorState title={t('Recap unavailable', 'Tóm tắt không khả dụng')} message={error} retryLabel={sharedUiCopy.tryAgain[locale]} onRetry={() => void load()} /> : null}
       {!history && !error ? <DramaLoadingStage label={t('Building your drama recap…', 'Đang dựng lại tóm tắt drama…')} detail={t('Restoring each scene, committed branch and consequence.', 'Đang khôi phục từng cảnh, nhánh đã chốt và hậu quả.')} locale={locale} /> : null}
@@ -176,13 +183,14 @@ function readParam(value: string | string[] | undefined): string | null {
 }
 
 const styles = StyleSheet.create({
+  screen: { gap: spacing.md },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   emptyState: { gap: spacing.md },
   statsStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  statMetric: { minWidth: 104, flex: 1, gap: 3, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGlow, backgroundColor: colors.surfaceGlass },
+  statMetric: { minWidth: 104, flex: 1, gap: 3, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: classical.hairline, backgroundColor: colors.surfaceGlass },
   statValue: { color: colors.violetStrong, fontFamily: typography.display, fontSize: 24, lineHeight: 27, fontWeight: '700' },
   statLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 13, fontWeight: '900', letterSpacing: 0.55, textTransform: 'uppercase' },
-  branchMap: { gap: spacing.md, padding: spacing.md, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGlow, backgroundColor: colors.surfaceGlass },
+  branchMap: { gap: spacing.md, padding: spacing.md, borderRadius: 12, borderWidth: 1, borderColor: classical.goldDeep, backgroundColor: colors.surfaceGlass },
   branchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   branchKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   branchMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
@@ -196,7 +204,7 @@ const styles = StyleSheet.create({
   branchFuture: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
   branchFutureLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
   branchFutureChoices: { flexDirection: 'row', gap: spacing.xs },
-  branchGhost: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.violetSoft, backgroundColor: 'rgba(139, 77, 255, 0.14)' },
+  branchGhost: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.violetSoft, backgroundColor: classical.patina },
   branchGhostText: { color: colors.violetStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900' },
   timeline: { position: 'relative', gap: spacing.lg, paddingTop: spacing.sm },
   timelineRail: { position: 'absolute', top: spacing.md, bottom: spacing.xl, left: 17, width: 1, backgroundColor: colors.violetSoft },

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SceneArtworkBackdrop } from '@/features/artwork/scene-artwork-backdrop';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaLibrarySnapshot, DramaSummary } from '@/features/drama/contracts';
 import { libraryView, type DramaLibraryFilter } from '@/features/drama/library-view';
 import { DramaEmptyStage, DramaLoadingStage, DramaCoverTile } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, ErrorState, Eyebrow, Screen } from '@/ui/primitives';
-import { colors, radius, spacing, typography } from '@/ui/theme';
+import { ActionButton, BrandMark, ErrorState, Eyebrow, OrnamentDivider, Screen } from '@/ui/primitives';
+import { classical, colors, radius, spacing, typography } from '@/ui/theme';
 
 export default function DramaLibraryScreen() {
   const router = useRouter();
@@ -70,6 +71,7 @@ export default function DramaLibraryScreen() {
           <Text style={styles.title}>{t('Your dramas', 'Drama của bạn')}</Text>
           <ActionButton label={t('New drama', 'Drama mới')} variant="ghost" onPress={() => router.push('/create')} style={styles.newDramaAction} />
         </View>
+        <OrnamentDivider compact />
       </View>
 
       {snapshot && !emptyLibrary ? <LibraryFilterRail filter={filter} snapshot={snapshot} locale={locale} onChange={setFilter} /> : null}
@@ -107,6 +109,16 @@ export default function DramaLibraryScreen() {
                 mood={featured.mood}
                 sceneLabel={`${t('SCENE', 'CẢNH')} ${String(featured.sceneNumber).padStart(2, '0')}`}
                 statusLabel={featured.status === 'awaiting_choice' ? t('Your choice is waiting', 'Đang chờ lựa chọn của bạn') : t('Continue from consequence', 'Tiếp tục từ hậu quả')}
+                artwork={(
+                  <SceneArtworkBackdrop
+                    sceneId={featured.sceneId}
+                    revision={`${featured.sceneNumber}:${featured.resumeLine}`}
+                    accessibilityLabel={t(
+                      `Generated illustration for ${featured.title}, scene ${featured.sceneNumber}`,
+                      `Tranh minh họa được tạo cho ${featured.title}, cảnh ${featured.sceneNumber}`,
+                    )}
+                  />
+                )}
                 onPress={() => router.push({ pathname: '/library/drama', params: { dramaId: featured.id } })}
               />
               <View style={styles.coverFooter}>
@@ -255,20 +267,22 @@ function LibraryRow({
     : t('Continue', 'Tiếp tục');
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${drama.title}. ${scene}. ${status}`}
-      onPress={onOpen}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-    >
-      <View style={[styles.thumb, action === 'restore' && styles.thumbMuted]}>
-        <Text style={styles.thumbMark}>{drama.characterName.slice(0, 1).toUpperCase()}</Text>
-      </View>
-      <View style={styles.rowCopy}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{drama.title}</Text>
-        <Text style={styles.rowMeta} numberOfLines={1}>{scene} · {status}</Text>
-        <Text style={styles.rowUpdated} numberOfLines={1}>{drama.updatedLabel}</Text>
-      </View>
+    <View style={styles.row}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${drama.title}. ${scene}. ${status}`}
+        onPress={onOpen}
+        style={({ pressed }) => [styles.rowMain, pressed && styles.rowPressed]}
+      >
+        <View style={[styles.thumb, action === 'restore' && styles.thumbMuted]}>
+          <Text style={styles.thumbMark}>{drama.characterName.slice(0, 1).toUpperCase()}</Text>
+        </View>
+        <View style={styles.rowCopy}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{drama.title}</Text>
+          <Text style={styles.rowMeta} numberOfLines={1}>{scene} · {status}</Text>
+          <Text style={styles.rowUpdated} numberOfLines={1}>{drama.updatedLabel}</Text>
+        </View>
+      </Pressable>
       <ActionButton
         label={action === 'archive' ? t('Pause', 'Tạm dừng') : t('Restore', 'Khôi phục')}
         variant="ghost"
@@ -277,19 +291,19 @@ function LibraryRow({
         onPress={onChange}
         style={styles.rowAction}
       />
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hero: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGlow, backgroundColor: colors.surfaceGlass },
+  hero: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: classical.goldDeep, backgroundColor: colors.surfaceGlass },
   heroTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   title: { flex: 1, minWidth: 180, color: colors.ink, fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: -0.3 },
   newDramaAction: { minHeight: 40, paddingHorizontal: spacing.sm },
   filterRail: { flexDirection: 'row', overflow: 'hidden', borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderGlow, backgroundColor: colors.surfaceGlass },
   filterTab: { minHeight: 46, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, backgroundColor: 'transparent' },
-  filterTabSelected: { backgroundColor: 'rgba(139, 77, 255, 0.16)' },
+  filterTabSelected: { backgroundColor: classical.patina },
   filterTabPressed: { opacity: 0.76 },
   filterLabel: { color: colors.inkMuted, fontSize: 11, fontWeight: '800' },
   filterLabelSelected: { color: colors.ink },
@@ -315,14 +329,21 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
     minHeight: 72,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
+    paddingRight: spacing.sm,
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderGlow,
     backgroundColor: colors.surfaceGlass,
+  },
+  rowMain: {
+    minWidth: 0,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingLeft: spacing.sm,
   },
   rowPressed: { opacity: 0.88 },
   thumb: {
@@ -331,7 +352,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,
-    backgroundColor: 'rgba(139, 77, 255, 0.14)',
+    backgroundColor: classical.patina,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.violetSoft,
   },
