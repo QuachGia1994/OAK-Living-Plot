@@ -2,12 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { GenerationJob } from '@/features/drama/domain';
-import type { DramaDraft, DramaMood } from '@/features/drama/contracts';
+import type { DramaDraft, DramaMood, DramaSeedSuggestion } from '@/features/drama/contracts';
 import { DramaClientError } from '@/features/drama/contracts';
+import { creationAttemptCoordinator, type CreationAttempt } from '@/features/drama/creation-attempt';
+import {
+  applyDramaSeedSuggestion,
+  beginSuggestionRequest,
+  buildSuggestionInput,
+  completeSuggestionRequest,
+  failSuggestionRequest,
+  initialSuggestionPanelState,
+  shouldClearSuggestionAttempt,
+  SuggestionSingleFlight,
+  suggestionErrorMessage,
+  suggestionInputFingerprint,
+} from '@/features/drama/suggestion-action';
+import { suggestionAttemptCoordinator, type SuggestionAttempt } from '@/features/drama/suggestion-attempt';
 import { dramaDraftValidationSummary, dramaMoodOptionsFor, hasDraftErrors, normalizeDramaDraft, validateDramaDraft } from '@/features/drama/setup';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useUiCopy } from '@/features/localization/ui-copy';
-import { createIdempotencyKey } from '@/lib/idempotency-key';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { DramaComposerPreview, DramaGenerationState, DramaUtilityHero } from '@/ui/drama-visuals';
 import { conceptFlowStep } from '@/ui/concept-flow';
@@ -27,8 +40,10 @@ export default function CreateDramaScreen() {
   const { locale, t } = useUiCopy();
   const dramaExperienceClient = useDramaExperienceClient();
   const worldStep = conceptFlowStep(locale, 'world');
-  const creationAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
   const submitting = useRef(false);
+  const suggestionFlight = useRef(new SuggestionSingleFlight());
+  const mounted = useRef(true);
+  const suggestionRequestId = useRef(0);
   const initialLaunchKey = readParam(params.launchKey);
   const appliedLaunchKey = useRef(initialLaunchKey);
   const [draft, setDraft] = useState<DramaDraft>(() => ({
@@ -39,27 +54,36 @@ export default function CreateDramaScreen() {
   const [showValidation, setShowValidation] = useState(false);
   const [generationJob, setGenerationJob] = useState<GenerationJob>({ state: 'idle' });
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [suggestionPanel, setSuggestionPanel] = useState(initialSuggestionPanelState);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     const launchKey = readParam(params.launchKey);
     if (!launchKey || launchKey === appliedLaunchKey.current) return;
     appliedLaunchKey.current = launchKey;
-    creationAttempt.current = null;
     setDraft({
       premise: readParam(params.premise) ?? initialDraft.premise,
       mood: readMood(params.mood) ?? initialDraft.mood,
       characterName: readParam(params.characterName) ?? initialDraft.characterName,
     });
+    suggestionRequestId.current += 1;
     setShowValidation(false);
     setGenerationJob({ state: 'idle' });
     setSubmitError(null);
+    setSuggestionPanel(initialSuggestionPanelState);
+    setSelectedSuggestionIndex(null);
   }, [params.characterName, params.launchKey, params.mood, params.premise]);
 
   const errors = validateDramaDraft(draft, locale);
   const moodOptions = dramaMoodOptionsFor(locale);
 
   async function submit() {
-    if (submitting.current) return;
+    if (submitting.current || suggestionFlight.current.active) return;
     const currentErrors = validateDramaDraft(draft, locale);
     setShowValidation(true);
     setSubmitError(null);
@@ -70,22 +94,59 @@ export default function CreateDramaScreen() {
 
     const normalizedDraft = normalizeDramaDraft(draft);
     const fingerprint = JSON.stringify(normalizedDraft);
-    const previousAttempt = creationAttempt.current;
-    const attempt = previousAttempt?.fingerprint === fingerprint
-      ? previousAttempt
-      : { fingerprint, key: createIdempotencyKey('creation') };
-    creationAttempt.current = attempt;
+    const ownerId = auth.clerkUserId ?? (auth.configured ? 'authenticated-session' : 'preview');
     submitting.current = true;
-    setGenerationJob({ state: 'running', operation: 'first_scene', requestKey: attempt.key });
+    let attempt: CreationAttempt | null = null;
     try {
-      const drama = await dramaExperienceClient.createDrama(normalizedDraft, attempt.key);
+      attempt = await creationAttemptCoordinator.resolve(ownerId, fingerprint);
+      setGenerationJob({ state: 'running', operation: 'first_scene', requestKey: attempt.key });
+      const drama = await dramaExperienceClient.createDrama(normalizedDraft, attempt.key, attempt.generationKey);
       router.replace({ pathname: '/library/drama', params: { dramaId: drama.id } });
+      await creationAttemptCoordinator.complete(ownerId, fingerprint, attempt.key);
     } catch (caught) {
+      if (attempt && caught instanceof DramaClientError && (caught.code === 'invalid_input' || caught.code === 'choice_required')) {
+        await creationAttemptCoordinator.complete(ownerId, fingerprint, attempt.key);
+      }
       setSubmitError(createErrorMessage(caught, locale));
       setGenerationJob({ state: 'failed', operation: 'first_scene', code: generationFailureCode(caught) });
     } finally {
       submitting.current = false;
     }
+  }
+
+  async function requestSuggestions() {
+    if (submitting.current || !suggestionFlight.current.tryBegin()) return;
+    const requestId = ++suggestionRequestId.current;
+    const input = buildSuggestionInput(draft);
+    const fingerprint = suggestionInputFingerprint(input);
+    const ownerId = auth.clerkUserId ?? (auth.configured ? 'authenticated-session' : 'preview');
+    setSuggestionPanel((current) => beginSuggestionRequest(current, requestId));
+    let attempt: SuggestionAttempt | null = null;
+    try {
+      attempt = await suggestionAttemptCoordinator.resolve(ownerId, fingerprint);
+      const suggestions = await dramaExperienceClient.suggestDramaSeeds(input, attempt.key);
+      if (!mounted.current) return;
+      setSuggestionPanel((current) => completeSuggestionRequest(current, requestId, suggestions));
+      setSelectedSuggestionIndex(null);
+      await suggestionAttemptCoordinator.complete(ownerId, fingerprint, attempt.key);
+    } catch (caught) {
+      if (attempt && shouldClearSuggestionAttempt(caught)) {
+        await suggestionAttemptCoordinator.complete(ownerId, fingerprint, attempt.key);
+      }
+      if (!mounted.current) return;
+      setSuggestionPanel((current) => failSuggestionRequest(current, requestId, suggestionErrorMessage(caught, locale)));
+    } finally {
+      suggestionFlight.current.end();
+    }
+  }
+
+  function selectSuggestion(suggestion: DramaSeedSuggestion, index: number) {
+    setDraft(applyDramaSeedSuggestion(draft, suggestion));
+    setSelectedSuggestionIndex(index);
+    setShowValidation(false);
+    setSubmitError(null);
+    setGenerationJob({ state: 'idle' });
+    setSuggestionPanel((current) => ({ ...current, error: null }));
   }
 
   if (auth.configured && (!auth.isLoaded || !auth.isSignedIn)) {
@@ -116,7 +177,7 @@ export default function CreateDramaScreen() {
       <ActionButton
         label={generationJob.state === 'failed' ? t('Retry scene 1', 'Thử lại cảnh 1') : t('Begin the story', 'Bắt đầu câu chuyện')}
         busy={generating}
-        disabled={generating}
+        disabled={generating || suggestionPanel.loading}
         onPress={() => void submit()}
       />
     </TaskActionDock>
@@ -155,13 +216,69 @@ export default function CreateDramaScreen() {
             style={styles.sparkInput}
             textAlignVertical="top"
             value={draft.premise}
-            onChangeText={(premise) => setDraft((current) => ({ ...current, premise }))}
+            onChangeText={(premise) => {
+              setSelectedSuggestionIndex(null);
+              setDraft((current) => ({ ...current, premise }));
+            }}
           />
           <View style={styles.fieldFooter}>
             <Text style={styles.errorText}>{showValidation ? errors.premise ?? '' : ''}</Text>
             <Text style={styles.counter}>{draft.premise.length}/600</Text>
           </View>
         </View>
+
+        <View style={styles.suggestionActionRow}>
+          <ActionButton
+            label={suggestionPanel.suggestions ? t('Suggest more', 'Gợi ý thêm') : t('Suggest with AI', 'Gợi ý bằng AI')}
+            accessibilityLabel={suggestionPanel.suggestions ? t('Generate three more AI drama suggestions', 'Tạo thêm ba gợi ý drama bằng AI') : t('Generate three AI drama suggestions', 'Tạo ba gợi ý drama bằng AI')}
+            variant="ghost"
+            busy={suggestionPanel.loading}
+            disabled={generationJob.state === 'running' || suggestionPanel.loading}
+            onPress={() => void requestSuggestions()}
+          />
+        </View>
+
+        {suggestionPanel.loading ? (
+          <View style={styles.suggestionStatus} accessibilityLiveRegion="polite" accessible>
+            <Text style={styles.suggestionStatusText}>{t('Finding three dramatic sparks…', 'Đang tìm ba mầm drama…')}</Text>
+          </View>
+        ) : null}
+
+        {suggestionPanel.error ? (
+          <View style={styles.suggestionError} accessibilityLiveRegion="assertive" accessible>
+            <Text style={styles.suggestionErrorText}>{suggestionPanel.error}</Text>
+          </View>
+        ) : null}
+
+        {suggestionPanel.suggestions ? (
+          <View style={styles.suggestionList} accessibilityRole="radiogroup">
+            {suggestionPanel.suggestions.map((suggestion, index) => {
+              const selected = selectedSuggestionIndex === index;
+              const moodLabel = moodOptions.find((option) => option.value === suggestion.mood)?.label ?? suggestion.mood;
+              return (
+                <Pressable
+                  key={`${suggestion.label}-${index}`}
+                  accessibilityRole="radio"
+                  accessibilityLabel={t(`Use suggestion: ${suggestion.label}`, `Dùng gợi ý: ${suggestion.label}`)}
+                  accessibilityHint={`${moodLabel}. ${suggestion.characterName}. ${suggestion.premise}`}
+                  accessibilityState={{ checked: selected, selected }}
+                  onPress={() => selectSuggestion(suggestion, index)}
+                  style={({ pressed }) => [
+                    styles.suggestionCard,
+                    selected && styles.suggestionCardSelected,
+                    pressed && styles.suggestionCardPressed,
+                  ]}
+                >
+                  <View style={styles.suggestionCardHeader}>
+                    <Text style={styles.suggestionLabel}>{suggestion.label}</Text>
+                    <Text style={styles.suggestionMeta}>{moodLabel} · {suggestion.characterName}</Text>
+                  </View>
+                  <Text style={styles.suggestionPremise}>{suggestion.premise}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
 
         <FieldLabel label={t('Dramatic mood', 'Không khí drama')} hint={t('Choose the pressure surrounding Scene 1', 'Chọn áp lực bao quanh Cảnh 1')} />
         <View style={styles.moodGrid}>
@@ -172,7 +289,10 @@ export default function CreateDramaScreen() {
               label={option.label}
               description={option.description}
               selected={draft.mood === option.value}
-              onPress={() => setDraft((current) => ({ ...current, mood: option.value }))}
+              onPress={() => {
+                setSelectedSuggestionIndex(null);
+                setDraft((current) => ({ ...current, mood: option.value }));
+              }}
             />
           ))}
         </View>
@@ -188,7 +308,10 @@ export default function CreateDramaScreen() {
             placeholderTextColor={colors.placeholder}
             style={styles.castInput}
             value={draft.characterName}
-            onChangeText={(characterName) => setDraft((current) => ({ ...current, characterName }))}
+            onChangeText={(characterName) => {
+              setSelectedSuggestionIndex(null);
+              setDraft((current) => ({ ...current, characterName }));
+            }}
             onSubmitEditing={() => void submit()}
           />
         </View>
@@ -356,6 +479,65 @@ const styles = StyleSheet.create({
     color: colors.inkMuted,
     fontFamily: typography.mono,
     fontSize: 10,
+  },
+  suggestionActionRow: {
+    alignItems: 'flex-start',
+  },
+  suggestionStatus: {
+    paddingHorizontal: spacing.xs,
+  },
+  suggestionStatusText: {
+    color: colors.inkMuted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  suggestionError: {
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.danger,
+    backgroundColor: colors.surfaceDanger,
+  },
+  suggestionErrorText: {
+    color: colors.inkMuted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  suggestionList: {
+    gap: spacing.sm,
+  },
+  suggestionCard: {
+    minHeight: 96,
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceQuiet,
+  },
+  suggestionCardSelected: {
+    borderColor: colors.accentStrong,
+    backgroundColor: colors.surfaceGlass,
+  },
+  suggestionCardPressed: { opacity: 0.78 },
+  suggestionCardHeader: { gap: 2 },
+  suggestionLabel: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  suggestionMeta: {
+    color: colors.accentStrong,
+    fontFamily: typography.mono,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+  suggestionPremise: {
+    color: colors.inkMuted,
+    fontSize: 13,
+    lineHeight: 19,
   },
   moodGrid: {
     flexDirection: 'row',
