@@ -8,6 +8,21 @@ export interface DramaDraft {
   characterName: string;
 }
 
+export interface DramaSeedSuggestionInput {
+  mood: DramaMood;
+  characterName?: string;
+  inspiration?: string;
+}
+
+export interface DramaSeedSuggestion {
+  label: string;
+  premise: string;
+  mood: DramaMood;
+  characterName: string;
+}
+
+export type DramaSeedSuggestionBatch = [DramaSeedSuggestion, DramaSeedSuggestion, DramaSeedSuggestion];
+
 export interface DramaSummary {
   id: string;
   sceneId: string;
@@ -26,6 +41,7 @@ export interface DailyDramaPrompt {
   premise: string;
   mood: DramaMood;
   characterName: string;
+  resumeDramaId?: string;
 }
 
 export interface RetentionDisplay {
@@ -78,7 +94,8 @@ export interface DramaHistory {
 export interface DramaExperienceClient {
   loadHome(): Promise<DramaHomeSnapshot>;
   loadLibrary(): Promise<DramaLibrarySnapshot>;
-  createDrama(draft: DramaDraft, creationKey?: string): Promise<Drama>;
+  createDrama(draft: DramaDraft, creationKey?: string, firstGenerationKey?: string): Promise<Drama>;
+  suggestDramaSeeds(input: DramaSeedSuggestionInput, requestKey: string): Promise<DramaSeedSuggestionBatch>;
   loadDrama(dramaId: string): Promise<Drama>;
   loadHistory(dramaId: string): Promise<DramaHistory>;
   archiveDrama(dramaId: string): Promise<DramaSummary>;
@@ -96,6 +113,11 @@ export type DramaClientErrorCode =
   | 'quota_exceeded'
   | 'provider_unavailable'
   | 'invalid_generation'
+  | 'suggestion_conflict'
+  | 'suggestion_in_progress'
+  | 'suggestion_rate_limited'
+  | 'invalid_suggestion_response'
+  | 'suggestion_unavailable'
   | 'backend_unavailable';
 
 export class DramaClientError extends Error {

@@ -36,4 +36,19 @@ describe('retention snapshot', () => {
     expect(rotated.premise).not.toBe(originalVi.premise);
     expect(buildRetentionSnapshot([], 1, now, 'vi', [originalEn.premise]).dailyPrompt).toEqual(rotated);
   });
+
+  it('resolves the newest canonical drama after every catalog prompt has been used', () => {
+    const used: Array<{ id: string; premise: string }> = [];
+    for (let index = 0; index < 10; index += 1) {
+      const prompt = promptForUtcDay('2026-08-17', 'en', used);
+      if (used.some((drama) => drama.premise === prompt.premise)) break;
+      used.push({ id: `drama-${index}`, premise: prompt.premise });
+    }
+
+    const repeated = promptForUtcDay('2026-08-17', 'en', used);
+    const original = used.find((drama) => drama.premise === repeated.premise)!;
+    const newest = { id: 'drama-newest', premise: original.premise };
+
+    expect(promptForUtcDay('2026-08-17', 'vi', [newest, ...used]).resumeDramaId).toBe(newest.id);
+  });
 });

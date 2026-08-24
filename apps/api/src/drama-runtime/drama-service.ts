@@ -10,7 +10,7 @@ import { isDramaLocale } from '../preferences/contracts';
 import { D1QuotaLedger } from '../quota/d1-quota-ledger';
 import type { QuotaError } from '../quota/contracts';
 import { quotaPolicyFor, quotaResourceIsEnforced, type QuotaMode } from '../quota/policy';
-import { buildRetentionSnapshot } from '../retention/retention';
+import { buildRetentionSnapshot, dailyPromptCatalogPremises } from '../retention/retention';
 import { D1VoiceBonusLedger } from '../referrals/d1-voice-bonus-ledger';
 import type { ProductEventTelemetry, ProductTelemetrySink } from '../telemetry/product-events';
 import { NOOP_PRODUCT_TELEMETRY } from '../telemetry/product-events';
@@ -58,8 +58,9 @@ export class DramaService {
     const policy = quotaPolicyFor(entitlement.tier);
     const utcDay = utcDayFromMillis(this.clock());
     const usage = await this.quota.getDailyUsage(userId, utcDay);
-    const [recentDramas, activity, preferences, voiceBonusCredits] = await Promise.all([
+    const [recentDramas, dailyPromptDramas, activity, preferences, voiceBonusCredits] = await Promise.all([
       this.dramas.listOwnedDramas(userId),
+      this.dramas.listOwnedDailyPromptDramas(userId, dailyPromptCatalogPremises()),
       this.dramas.loadRetentionActivity(userId),
       this.preferences.get(userId),
       new D1VoiceBonusLedger(this.db, this.clock).balance(userId),
@@ -84,7 +85,7 @@ export class DramaService {
           recentDramas.length,
           this.clock(),
           preferences.uiLocale,
-          recentDramas.map((drama) => drama.premise),
+          dailyPromptDramas,
         ),
       },
     };

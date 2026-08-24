@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SceneArtworkBackdrop } from '@/features/artwork/scene-artwork-backdrop';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
+import { dailyPromptAction, dailyPromptPresentation } from '@/features/drama/daily-prompt-action';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHomeSnapshot, DramaSummary } from '@/features/drama/contracts';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
@@ -35,12 +36,17 @@ export default function HomeScreen() {
 
   function openDailySpark(source: DramaHomeSnapshot) {
     const prompt = source.retention.dailyPrompt;
+    const action = dailyPromptAction(prompt);
+    if (action.kind === 'resume') {
+      router.push({ pathname: '/library/drama', params: { dramaId: action.dramaId } });
+      return;
+    }
     router.navigate({
       pathname: '/create',
       params: {
-        premise: prompt.premise,
-        mood: prompt.mood,
-        characterName: prompt.characterName,
+        premise: action.draft.premise,
+        mood: action.draft.mood,
+        characterName: action.draft.characterName,
         launchKey: String(Date.now()),
       },
     });
@@ -208,17 +214,42 @@ function UpNextShelf({ snapshot, featuredDramaId, t, onOpenDrama, onOpenSpark }:
   onOpenSpark: () => void;
 }) {
   const prompt = snapshot.retention.dailyPrompt;
-  const secondaryDramas = snapshot.recentDramas.filter((drama) => drama.id !== featuredDramaId).slice(0, 3);
+  const presentation = dailyPromptPresentation(prompt, snapshot.recentDramas);
+  const promptDrama = presentation.drama;
+  const showPromptTile = presentation.mode === 'create'
+    || (presentation.action.kind === 'resume' && presentation.action.dramaId !== featuredDramaId);
+  const secondaryDramas = snapshot.recentDramas
+    .filter((drama) => drama.id !== featuredDramaId && drama.id !== promptDrama?.id)
+    .slice(0, showPromptTile ? 3 : 4);
+  const shelfCount = secondaryDramas.length + (showPromptTile ? 1 : 0);
   return (
     <View style={styles.shelfSection}>
       <View style={styles.shelfHeader}>
         <View><Eyebrow>{t('Up next', 'Tiếp theo')}</Eyebrow><Text style={styles.shelfTitle}>{t('Choose another drama', 'Chọn drama khác')}</Text></View>
-        <Text style={styles.shelfCount}>{String(secondaryDramas.length + 1).padStart(2, '0')}</Text>
+        <Text style={styles.shelfCount}>{String(shelfCount).padStart(2, '0')}</Text>
       </View>
       <View style={styles.coverGrid}>
-        <View style={styles.coverItem}>
-          <DramaCoverTile title={prompt.label} premise={prompt.premise} characterName={prompt.characterName} mood={prompt.mood} sceneLabel={t('NEW · TODAY', 'MỚI · HÔM NAY')} statusLabel={t('Start a new drama', 'Bắt đầu drama mới')} onPress={onOpenSpark} />
-        </View>
+        {showPromptTile ? (
+          <View style={styles.coverItem}>
+            <DramaCoverTile
+              title={promptDrama?.title ?? prompt.label}
+              premise={promptDrama?.resumeLine ?? prompt.premise}
+              characterName={promptDrama?.characterName ?? prompt.characterName}
+              mood={promptDrama?.mood ?? prompt.mood}
+              sceneLabel={presentation.mode === 'resume-known' && promptDrama
+                ? `${t('SCENE', 'CẢNH')} ${String(promptDrama.sceneNumber).padStart(2, '0')}`
+                : presentation.mode === 'resume-generic'
+                  ? t('RESUME', 'TIẾP TỤC')
+                  : t('NEW · TODAY', 'MỚI · HÔM NAY')}
+              statusLabel={presentation.mode === 'resume-known' && promptDrama
+                ? (promptDrama.status === 'awaiting_choice' ? t('Your choice is waiting', 'Đang chờ lựa chọn') : t('Continue from consequence', 'Tiếp tục từ hậu quả'))
+                : presentation.mode === 'resume-generic'
+                  ? t('Continue this drama', 'Tiếp tục drama này')
+                  : t('Start a new drama', 'Bắt đầu drama mới')}
+              onPress={onOpenSpark}
+            />
+          </View>
+        ) : null}
         {secondaryDramas.map((drama) => (
           <View key={drama.id} style={styles.coverItem}>
             <DramaCoverTile

@@ -4,6 +4,9 @@ import type {
   DramaDraft,
   DramaExperienceClient,
   DramaHistory,
+  DramaSeedSuggestion,
+  DramaSeedSuggestionBatch,
+  DramaSeedSuggestionInput,
   DramaHomeSnapshot,
   DramaLibrarySnapshot,
   DramaSummary,
@@ -13,6 +16,7 @@ import { createIdempotencyKey } from '../../lib/idempotency-key';
 import { AuthenticatedJsonTransport, HttpTransportError, type FetchLike, type TokenProvider } from '../../lib/http-transport';
 
 const AI_MUTATION_TIMEOUT_MS = 120_000;
+export const AI_SUGGESTION_TIMEOUT_MS = 30_000;
 
 export class HttpDramaExperienceClient implements DramaExperienceClient {
   private readonly createGenerationKeys = new Map<string, string>();
@@ -43,9 +47,15 @@ export class HttpDramaExperienceClient implements DramaExperienceClient {
     return parseLibrary(payload.library, this.clock(), this.uiLocale);
   }
 
-  async createDrama(draft: DramaDraft, creationKey = createIdempotencyKey('creation')): Promise<Drama> {
-    const generationKey = this.createGenerationKeys.get(creationKey) ?? createIdempotencyKey('generation');
-    this.createGenerationKeys.set(creationKey, generationKey);
+  async createDrama(
+    draft: DramaDraft,
+    creationKey = createIdempotencyKey('creation'),
+    firstGenerationKey?: string,
+  ): Promise<Drama> {
+    const generationKey = firstGenerationKey
+      ?? this.createGenerationKeys.get(creationKey)
+      ?? createIdempotencyKey('generation');
+    if (!firstGenerationKey) this.createGenerationKeys.set(creationKey, generationKey);
     try {
       const payload = await this.request('/v1/dramas', 'POST', {
         creationKey,
@@ -61,6 +71,18 @@ export class HttpDramaExperienceClient implements DramaExperienceClient {
       if (error instanceof DramaClientError && error.code === 'invalid_input') this.createGenerationKeys.delete(creationKey);
       throw error;
     }
+  }
+
+  async suggestDramaSeeds(input: DramaSeedSuggestionInput, requestKey: string): Promise<DramaSeedSuggestionBatch> {
+    const characterName = input.characterName?.normalize('NFKC').trim().replace(/\s+/gu, ' ') ?? '';
+    const inspiration = input.inspiration?.normalize('NFKC').trim().replace(/\s+/gu, ' ') ?? '';
+    const payload = await this.request('/v1/dramas/suggestions', 'POST', {
+      requestKey,
+      mood: input.mood,
+      ...(characterName.length >= 2 && characterName.length <= 50 ? { characterName } : {}),
+      ...(inspiration ? { inspiration } : {}),
+    }, AI_SUGGESTION_TIMEOUT_MS);
+    return parseDramaSeedSuggestionEnvelope(payload);
   }
 
   async loadDrama(dramaId: string): Promise<Drama> {
@@ -125,18 +147,21 @@ export class HttpDramaExperienceClient implements DramaExperienceClient {
     try {
       const response = await this.transport.request(path, method, body, timeoutMs);
       if (!response.jsonValid && response.ok) throw invalidBackendResponse();
-      if (!response.ok) throw mapHttpError(response.status, response.payload);
+      if (!response.ok) throw mapHttpError(response.status, response.payload, path);
       return response.payload;
     } catch (error) {
       if (error instanceof DramaClientError) throw error;
       if (error instanceof HttpTransportError && error.code === 'auth_required') {
-        throw new DramaClientError('auth_required', 'Sign in before using canonical Living Plot dramas.');
+        throw new DramaClientError('auth_required', path === '/v1/dramas/suggestions'
+          ? 'Sign in before using AI suggestions.'
+          : 'Sign in before using canonical Living Plot dramas.');
       }
+      const suggestionRequest = path === '/v1/dramas/suggestions';
       throw new DramaClientError(
         'backend_unavailable',
         error instanceof HttpTransportError && error.code === 'timeout'
-          ? 'The Living Plot server took too long to respond.'
-          : 'The Living Plot server could not be reached.',
+          ? (suggestionRequest ? 'The AI suggestion service took too long to respond.' : 'The Living Plot server took too long to respond.')
+          : (suggestionRequest ? 'The AI suggestion service could not be reached.' : 'The Living Plot server could not be reached.'),
       );
     }
   }
@@ -149,12 +174,51 @@ export class AuthRequiredDramaExperienceClient implements DramaExperienceClient 
   async loadHome(): Promise<DramaHomeSnapshot> { return this.fail(); }
   async loadLibrary(): Promise<DramaLibrarySnapshot> { return this.fail(); }
   async createDrama(): Promise<Drama> { return this.fail(); }
+  async suggestDramaSeeds(): Promise<DramaSeedSuggestionBatch> { return this.fail(); }
   async loadDrama(): Promise<Drama> { return this.fail(); }
   async loadHistory(): Promise<DramaHistory> { return this.fail(); }
   async archiveDrama(): Promise<DramaSummary> { return this.fail(); }
   async restoreDrama(): Promise<DramaSummary> { return this.fail(); }
   async commitChoice(): Promise<Drama> { return this.fail(); }
   async requestNextScene(): Promise<Drama> { return this.fail(); }
+}
+
+export function parseDramaSeedSuggestionEnvelope(payload: unknown): DramaSeedSuggestionBatch {
+  if (!isRecord(payload) || !hasExactKeys(payload, ['suggestions']) || !Array.isArray(payload.suggestions) || payload.suggestions.length !== 3) {
+    throw invalidSuggestionResponse();
+  }
+  const suggestions = payload.suggestions.map(parseDramaSeedSuggestion);
+  const labels = new Set(suggestions.map((suggestion) => semanticKey(suggestion.label)));
+  const premises = new Set(suggestions.map((suggestion) => semanticKey(suggestion.premise)));
+  if (labels.size !== 3 || premises.size !== 3) throw invalidSuggestionResponse();
+  return suggestions as DramaSeedSuggestionBatch;
+}
+
+function parseDramaSeedSuggestion(value: unknown): DramaSeedSuggestion {
+  if (!isRecord(value) || !hasExactKeys(value, ['label', 'premise', 'mood', 'characterName'])) throw invalidSuggestionResponse();
+  const label = boundedSuggestionText(value.label, 3, 48);
+  const premise = boundedSuggestionText(value.premise, 12, 600);
+  const characterName = boundedSuggestionText(value.characterName, 2, 50);
+  if (!label || !premise || !characterName || !isMood(value.mood) || !premise.includes('?') || /^(?:option\s*)?[abc]$/iu.test(label)) {
+    throw invalidSuggestionResponse();
+  }
+  return { label, premise, mood: value.mood, characterName };
+}
+
+function boundedSuggestionText(value: unknown, min: number, max: number): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.normalize('NFKC').trim().replace(/\s+/gu, ' ');
+  return normalized.length >= min && normalized.length <= max ? normalized : null;
+}
+
+function semanticKey(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/gu, ' ');
+}
+
+function hasExactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
+  const keys = Object.keys(value);
+  const allowed = new Set(expected);
+  return keys.length === expected.length && keys.every((key) => allowed.has(key));
 }
 
 function parseDramaEnvelope(payload: unknown): Drama {
@@ -311,25 +375,40 @@ function parseRetention(value: unknown): DramaHomeSnapshot['retention'] {
     !Number.isInteger(value.activeDramas) || !isRecord(value.dailyPrompt)
   ) throw invalidBackendResponse();
   const prompt = value.dailyPrompt;
-  if (typeof prompt.label !== 'string' || typeof prompt.premise !== 'string' || !isMood(prompt.mood) || typeof prompt.characterName !== 'string') {
+  if (
+    typeof prompt.label !== 'string' || typeof prompt.premise !== 'string' || !isMood(prompt.mood) ||
+    typeof prompt.characterName !== 'string' ||
+    (prompt.resumeDramaId !== undefined && (typeof prompt.resumeDramaId !== 'string' || !prompt.resumeDramaId.trim()))
+  ) {
     throw invalidBackendResponse();
   }
+  const dailyPrompt = { label: prompt.label, premise: prompt.premise, mood: prompt.mood, characterName: prompt.characterName } as DramaHomeSnapshot['retention']['dailyPrompt'];
+  if (typeof prompt.resumeDramaId === 'string') dailyPrompt.resumeDramaId = prompt.resumeDramaId;
   return {
     currentStreakDays: Number(value.currentStreakDays),
     choicesMade: Number(value.choicesMade),
     activeDramas: Number(value.activeDramas),
-    dailyPrompt: { label: prompt.label, premise: prompt.premise, mood: prompt.mood, characterName: prompt.characterName },
+    dailyPrompt,
   };
 }
 
-function mapHttpError(status: number, payload: unknown): DramaClientError {
+function mapHttpError(status: number, payload: unknown, path: string): DramaClientError {
   const code = isRecord(payload) && typeof payload.error === 'string' ? payload.error : '';
+  const suggestionRequest = path === '/v1/dramas/suggestions';
   if (status === 401) return new DramaClientError('auth_required', 'Your session expired. Sign in again.');
+  if (suggestionRequest && (status === 404 || status === 405)) return new DramaClientError('suggestion_unavailable', 'AI suggestions are not available on this server yet.');
+  if (code === 'suggestion_conflict') return new DramaClientError('suggestion_conflict', 'This suggestion request key belongs to different input.');
+  if (code === 'suggestion_in_progress') return new DramaClientError('suggestion_in_progress', 'This suggestion batch is still being prepared.');
+  if (code === 'suggestion_rate_limited') return new DramaClientError('suggestion_rate_limited', 'The daily AI suggestion limit has been reached.');
+  if (code === 'invalid_suggestion_response') return new DramaClientError('invalid_suggestion_response', 'The AI suggestion batch did not satisfy the public contract.');
   if (status === 404 || code === 'not_found') return new DramaClientError('not_found', 'This drama could not be found.');
   if (code === 'choice_conflict') return new DramaClientError('choice_conflict', 'Another choice is already canonical for this scene.');
   if (code === 'choice_required' || code === 'stale_state' || code === 'creation_conflict') return new DramaClientError('choice_required', 'The drama changed on the server. Reload before continuing.');
   if (status === 429 || code === 'quota_exceeded') return new DramaClientError('quota_exceeded', 'Scene generation is temporarily rate limited by the server.');
-  if (status === 503 || code === 'provider_unavailable') return new DramaClientError('provider_unavailable', 'Drama generation is temporarily unavailable.');
+  if (status === 503 || code === 'provider_unavailable') return new DramaClientError(
+    'provider_unavailable',
+    suggestionRequest ? 'AI suggestions are temporarily unavailable.' : 'Drama generation is temporarily unavailable.',
+  );
   if (status === 502 || code === 'invalid_generation') return new DramaClientError('invalid_generation', 'The generated scene did not satisfy the canonical drama contract.');
   if (status === 400 || code === 'invalid_input') return new DramaClientError('invalid_input', 'The drama request is invalid.');
   return new DramaClientError('backend_unavailable', 'The Living Plot server could not complete the request.');
@@ -353,6 +432,10 @@ function relativeUpdatedLabel(updatedAt: number, nowMs: number, uiLocale: UiLoca
 
 function invalidBackendResponse(): DramaClientError {
   return new DramaClientError('backend_unavailable', 'The Living Plot server returned an invalid response.');
+}
+
+function invalidSuggestionResponse(): DramaClientError {
+  return new DramaClientError('invalid_suggestion_response', 'The Living Plot server returned an invalid AI suggestion batch.');
 }
 
 function isMood(value: unknown): value is DramaMood {

@@ -8,7 +8,7 @@ import {
   isNarrativeBeat,
   type SceneMotifSignature,
 } from '../evals/narrative-novelty';
-import type { RetentionActivityDay } from '../retention/retention';
+import type { DailyPromptDrama, RetentionActivityDay } from '../retention/retention';
 import type {
   CreatedDramaRecord,
   DramaCreateInput,
@@ -157,6 +157,29 @@ export class D1DramaRepository {
 
   async listOwnedDramas(userId: string, limit = 20): Promise<DramaSummary[]> {
     return this.listOwnedDramasByStatus(userId, 'active', limit);
+  }
+
+  async listOwnedDailyPromptDramas(userId: string, catalogPremises: readonly string[]): Promise<DailyPromptDrama[]> {
+    const premises = [...new Set(catalogPremises.map((premise) => premise.trim()).filter(Boolean))];
+    if (premises.length === 0) return [];
+    const placeholders = premises.map(() => '?').join(', ');
+    const result = await this.db
+      .prepare(
+        `WITH ranked AS (
+           SELECT p.id, p.premise, p.updated_at,
+                  ROW_NUMBER() OVER (PARTITION BY p.premise ORDER BY p.updated_at DESC, p.id DESC) AS premise_rank
+           FROM plots p
+           WHERE p.user_id = ? AND p.status = 'active' AND p.premise IN (${placeholders})
+             AND EXISTS (SELECT 1 FROM episodes e WHERE e.plot_id = p.id)
+         )
+         SELECT id, premise
+         FROM ranked
+         WHERE premise_rank = 1
+         ORDER BY updated_at DESC, id DESC`,
+      )
+      .bind(userId, ...premises)
+      .all<{ id: string; premise: string }>();
+    return result.results.map((row) => ({ id: row.id, premise: row.premise }));
   }
 
   async loadLibrary(userId: string, limit = 50): Promise<DramaLibrary> {

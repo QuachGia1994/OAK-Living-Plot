@@ -12,11 +12,13 @@ import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?r
 import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import migrationEleven from '../migrations/0011_arc_checkpoints.sql?raw';
 import migrationTwelve from '../migrations/0012_scene_artworks.sql?raw';
+import migrationThirteen from '../migrations/0013_drama_suggestion_cache.sql?raw';
 import type { SceneGenerationInput, SceneGenerator, SceneProposal } from '../src/ai/contracts';
 import type { SceneArtworkJob, SceneArtworkQueue } from '../src/artwork/contracts';
 import type { SessionVerifier } from '../src/auth/session-verifier';
 import type { AppEnv } from '../src/env';
 import { handleRequest } from '../src/http/app';
+import { promptForUtcDay } from '../src/retention/retention';
 import type { ProductEventTelemetry, ProductTelemetrySink } from '../src/telemetry/product-events';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
 
@@ -41,7 +43,7 @@ const sceneArtworkQueue: SceneArtworkQueue = {
 };
 
 beforeAll(async () => {
-  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven, migrationEight, migrationNine, migrationTen, migrationEleven, migrationTwelve]) {
+  for (const migration of [migrationOne, migrationTwo, migrationThree, migrationFour, migrationFive, migrationSix, migrationSeven, migrationEight, migrationNine, migrationTen, migrationEleven, migrationTwelve, migrationThirteen]) {
     await applySqlMigration(db, migration);
   }
 });
@@ -152,6 +154,49 @@ describe('authenticated drama HTTP loop', () => {
     const attacker = await dramaRequest(`/v1/dramas/${first.id}`, 'GET', undefined, 'clerk-attacker', generator);
     expect(attacker.status).toBe(404);
   });
+
+  it('turns an exhausted daily prompt into a canonical resume target instead of another drama', async () => {
+    const generator = new FixtureSceneGenerator();
+    const promptDramaIds = new Map<string, string>();
+    const usedPremises: string[] = [];
+
+    while (true) {
+      const prompt = promptForUtcDay('2026-08-16', 'en', usedPremises);
+      if (usedPremises.includes(prompt.premise)) break;
+
+      const index = usedPremises.length + 1;
+      const response = await dramaRequest('/v1/dramas', 'POST', {
+        ...createBody(),
+        creationKey: `creation-daily-${index}`,
+        generationKey: `generation-daily-${index}`,
+        premise: prompt.premise,
+        mood: prompt.mood,
+        characterName: prompt.characterName,
+      }, 'clerk-owner', generator);
+      expect(response.status).toBe(201);
+      const drama = (await response.json() as DramaEnvelope).drama;
+      promptDramaIds.set(prompt.premise, drama.id);
+      usedPremises.push(prompt.premise);
+    }
+
+    expect(promptDramaIds.size).toBeGreaterThan(1);
+    for (let index = 1; index <= 21; index += 1) {
+      const response = await dramaRequest('/v1/dramas', 'POST', {
+        ...createBody(),
+        creationKey: `creation-unrelated-${index}`,
+        generationKey: `generation-unrelated-${index}`,
+        premise: `Unrelated custom drama ${index} forces old daily prompts outside the recent Home shelf without changing canonical ownership.`,
+      }, 'clerk-owner', generator);
+      expect(response.status).toBe(201);
+      const drama = (await response.json() as DramaEnvelope).drama;
+      await db.prepare('UPDATE plots SET updated_at = ? WHERE id = ?').bind(nowMs + 31_536_000_000 + index, drama.id).run();
+    }
+
+    const homeResponse = await dramaRequest('/v1/dramas/home', 'GET', undefined, 'clerk-owner', generator);
+    const home = (await homeResponse.json() as HomeEnvelope).home;
+    expect(home.recentDramas.some((drama) => [...promptDramaIds.values()].includes(drama.id))).toBe(false);
+    expect(home.retention.dailyPrompt.resumeDramaId).toBe(promptDramaIds.get(home.retention.dailyPrompt.premise));
+  }, 20_000);
 
   it('archives and restores an owned drama idempotently while archived state is mutation-locked', async () => {
     const generator = new FixtureSceneGenerator();
@@ -395,7 +440,11 @@ interface DramaEnvelope {
 }
 
 interface HomeEnvelope {
-  home: { recentDramas: Array<{ id: string }>; quota: { enforced: boolean; textEnforced: boolean; voiceEnforced: boolean } };
+  home: {
+    recentDramas: Array<{ id: string }>;
+    quota: { enforced: boolean; textEnforced: boolean; voiceEnforced: boolean };
+    retention: { dailyPrompt: { premise: string; resumeDramaId?: string } };
+  };
 }
 
 interface LibraryEnvelope {

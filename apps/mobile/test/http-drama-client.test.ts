@@ -27,6 +27,28 @@ describe('HttpDramaExperienceClient', () => {
     expect(typeof body.generationKey).toBe('string');
   });
 
+  it('uses the persisted first Scene generation key across HTTP client remounts', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fetcher = vi.fn<TestFetch>(async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return Response.json({ drama: dramaPayload() }, { status: 201 });
+    });
+    const draft = {
+      premise: 'Mina receives an impossible message and must decide whom to trust tonight.',
+      mood: 'mysterious' as const,
+      characterName: 'Mina',
+    };
+    const creationKey = 'creation-remount-001';
+    const generationKey = 'generation-remount-001';
+
+    const first = new HttpDramaExperienceClient('https://api.test', async () => 'token', fetcher);
+    await first.createDrama(draft, creationKey, generationKey);
+    const remounted = new HttpDramaExperienceClient('https://api.test', async () => 'token', fetcher);
+    await remounted.createDrama(draft, creationKey, generationKey);
+
+    expect(bodies.map((body) => body.generationKey)).toEqual([generationKey, generationKey]);
+  });
+
   it('allows slow AI mutations beyond 60 seconds without aborting the canonical request', async () => {
     vi.useFakeTimers();
     try {
@@ -174,7 +196,7 @@ describe('HttpDramaExperienceClient', () => {
           currentStreakDays: 2,
           choicesMade: 5,
           activeDramas: 1,
-          dailyPrompt: { label: 'Daily spark', premise: 'A sufficiently specific daily drama premise appears here.', mood: 'tense', characterName: 'Mina' },
+          dailyPrompt: { label: 'Daily spark', premise: 'A sufficiently specific daily drama premise appears here.', mood: 'tense', characterName: 'Mina', resumeDramaId: 'drama-1' },
         },
       } }),
       'en-US',
@@ -186,10 +208,113 @@ describe('HttpDramaExperienceClient', () => {
     expect(home.recentDramas[0]).toMatchObject({ updatedLabel: '1h ago', sceneNumber: 2 });
     expect(home.quota).toMatchObject({ textRemaining: 49, textLimit: 50, voiceRemaining: 1, voiceLimit: 1, voiceBonusCredits: 7 });
     expect(home.retention).toMatchObject({ currentStreakDays: 2, choicesMade: 5, activeDramas: 1 });
+    expect(home.retention.dailyPrompt.resumeDramaId).toBe('drama-1');
+  });
+
+  it('posts a suggestion request with a caller-owned request key and parses exactly three public options', async () => {
+    const fetcher = vi.fn<TestFetch>(async () => Response.json({ suggestions: suggestionPayload() }));
+    const client = new HttpDramaExperienceClient('https://api.test/', async () => 'token', fetcher, 'vi-VN');
+
+    const suggestions = await client.suggestDramaSeeds({
+      mood: 'mysterious',
+      characterName: '  Mina  ',
+      inspiration: '  Một   tin nhắn\nkhông thể tồn tại.  ',
+    }, 'suggestion-stable-001');
+
+    expect(suggestions).toHaveLength(3);
+    expect(suggestions[0]).toMatchObject({ label: 'Lost call', mood: 'mysterious', characterName: 'Mina' });
+    expect(String(fetcher.mock.calls[0][0])).toBe('https://api.test/v1/dramas/suggestions');
+    const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body)) as Record<string, unknown>;
+    expect(body).toEqual({
+      requestKey: 'suggestion-stable-001',
+      mood: 'mysterious',
+      characterName: 'Mina',
+      inspiration: 'Một tin nhắn không thể tồn tại.',
+    });
+    expect(body).not.toHaveProperty('userId');
+    expect(body).not.toHaveProperty('locale');
+  });
+
+  it.each([
+    { name: 'two items', payload: { suggestions: suggestionPayload().slice(0, 2) } },
+    { name: 'four items', payload: { suggestions: [...suggestionPayload(), suggestionPayload()[0]] } },
+    { name: 'extra response field', payload: { suggestions: suggestionPayload(), provider: 'hidden' } },
+    { name: 'extra item field', payload: { suggestions: [{ ...suggestionPayload()[0], script: 'nope' }, ...suggestionPayload().slice(1)] } },
+    { name: 'invalid mood', payload: { suggestions: [{ ...suggestionPayload()[0], mood: 'angry' }, ...suggestionPayload().slice(1)] } },
+    { name: 'one-character name', payload: { suggestions: [{ ...suggestionPayload()[0], characterName: 'M' }, ...suggestionPayload().slice(1)] } },
+    { name: 'short premise', payload: { suggestions: [{ ...suggestionPayload()[0], premise: 'Too short?' }, ...suggestionPayload().slice(1)] } },
+    { name: 'reserved label', payload: { suggestions: [{ ...suggestionPayload()[0], label: 'A' }, ...suggestionPayload().slice(1)] } },
+  ])('rejects malformed suggestion success payload: $name', async ({ payload }) => {
+    const client = new HttpDramaExperienceClient('https://api.test', async () => 'token', async () => Response.json(payload));
+    await expect(client.suggestDramaSeeds({ mood: 'mysterious' }, 'suggestion-parse-001')).rejects.toMatchObject({ code: 'invalid_suggestion_response' });
+  });
+
+  it('omits a one-character partial character name from the suggestion request', async () => {
+    const fetcher = vi.fn<TestFetch>(async () => Response.json({ suggestions: suggestionPayload() }));
+    const client = new HttpDramaExperienceClient('https://api.test', async () => 'token', fetcher);
+    await client.suggestDramaSeeds({ mood: 'mysterious', characterName: ' M ' }, 'suggestion-short-name');
+    const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body)) as Record<string, unknown>;
+    expect(body).not.toHaveProperty('characterName');
+  });
+
+  it('uses a 30-second defensive suggestion timeout without changing the 120-second Scene ceiling', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn<TestFetch>(async (_input, init) => new Promise<Response>((resolve, reject) => {
+        const timer = setTimeout(() => resolve(Response.json({ suggestions: suggestionPayload() })), 40_000);
+        init?.signal?.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new Error('aborted'));
+        });
+      }));
+      const client = new HttpDramaExperienceClient('https://api.test', async () => 'token', fetcher);
+      const assertion = expect(client.suggestDramaSeeds({ mood: 'mysterious' }, 'suggestion-timeout-001')).rejects.toMatchObject({ code: 'backend_unavailable' });
+      await vi.advanceTimersByTimeAsync(30_001);
+      await assertion;
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('maps old-server and suggestion-specific failures without retrying POST automatically', async () => {
+    const oldServer = new HttpDramaExperienceClient('https://api.test', async () => 'token', async () => Response.json({ error: 'method_not_allowed' }, { status: 405 }));
+    await expect(oldServer.suggestDramaSeeds({ mood: 'tense' }, 'suggestion-old-api')).rejects.toMatchObject({ code: 'suggestion_unavailable' });
+
+    const limited = new HttpDramaExperienceClient('https://api.test', async () => 'token', async () => Response.json({ error: 'suggestion_rate_limited' }, { status: 429 }));
+    await expect(limited.suggestDramaSeeds({ mood: 'tense' }, 'suggestion-limited')).rejects.toMatchObject({ code: 'suggestion_rate_limited' });
+
+    const fetcher = vi.fn<TestFetch>(async () => { throw new Error('network uncertainty'); });
+    const noRetry = new HttpDramaExperienceClient('https://api.test', async () => 'token', fetcher);
+    await expect(noRetry.suggestDramaSeeds({ mood: 'tense' }, 'suggestion-no-retry')).rejects.toMatchObject({ code: 'backend_unavailable' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
 
 type TestFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
+function suggestionPayload() {
+  return [
+    {
+      label: 'Lost call',
+      premise: 'Mina receives a call from her missing sister and must answer before police seize the phone. Who is really calling?',
+      mood: 'mysterious',
+      characterName: 'Mina',
+    },
+    {
+      label: 'False promise',
+      premise: 'Kai discovers a friend used his identity for a secret engagement and must confront them before the ceremony begins. Why was his name necessary?',
+      mood: 'romantic',
+      characterName: 'Kai',
+    },
+    {
+      label: 'Hidden room',
+      premise: 'Linh finds a sealed room marked with her name and must enter before the house is demolished at dawn. What did her family hide there?',
+      mood: 'hopeful',
+      characterName: 'Linh',
+    },
+  ];
+}
 
 function summaryPayload(updatedAt: number) {
   return {

@@ -4,6 +4,8 @@ import type {
   DramaDraft,
   DramaExperienceClient,
   DramaHistory,
+  DramaSeedSuggestionBatch,
+  DramaSeedSuggestionInput,
   DramaHistoryItem,
   DramaHomeSnapshot,
   DramaLibrarySnapshot,
@@ -16,6 +18,8 @@ const PREVIEW_SEED_DRAMA_ID = 'preview-midnight-message';
 
 export class PreviewDramaState {
   readonly createdDramas = new Map<string, Drama>();
+  readonly creationsByKey = new Map<string, { dramaId: string; fingerprint: string }>();
+  readonly suggestionsByKey = new Map<string, { fingerprint: string; suggestions: DramaSeedSuggestionBatch }>();
   readonly seedDramas = new Map<DramaLocale, Drama>();
   readonly archivedDramaIds = new Set<string>();
   readonly histories = new Map<string, DramaHistoryItem[]>();
@@ -52,7 +56,10 @@ export class PreviewDramaExperienceClient implements DramaExperienceClient {
         currentStreakDays: 2,
         choicesMade: 4,
         activeDramas: active.length,
-        dailyPrompt: previewDailyPrompt(this.dramaLocale, all.map((drama) => drama.premise)),
+        dailyPrompt: previewDailyPrompt(this.dramaLocale, all.map((drama) => ({
+          id: this.state.archivedDramaIds.has(drama.id) ? undefined : drama.id,
+          premise: drama.premise,
+        }))),
       },
     };
   }
@@ -65,10 +72,19 @@ export class PreviewDramaExperienceClient implements DramaExperienceClient {
     };
   }
 
-  async createDrama(draft: DramaDraft): Promise<Drama> {
+  async createDrama(draft: DramaDraft, creationKey?: string): Promise<Drama> {
     const normalized = normalizeDramaDraft(draft);
     if (hasDraftErrors(validateDramaDraft(normalized, this.uiLocale))) {
       throw new DramaClientError('invalid_input', 'The drama setup is incomplete.');
+    }
+    const normalizedCreationKey = creationKey?.trim();
+    const fingerprint = JSON.stringify(normalized);
+    const existing = normalizedCreationKey ? this.state.creationsByKey.get(normalizedCreationKey) : undefined;
+    if (existing) {
+      if (existing.fingerprint !== fingerprint) {
+        throw new DramaClientError('choice_required', 'This creation request already belongs to a different drama setup.');
+      }
+      return cloneDrama(this.requireDrama(existing.dramaId));
     }
 
     this.state.createdDramaCount += 1;
@@ -84,7 +100,32 @@ export class PreviewDramaExperienceClient implements DramaExperienceClient {
     this.state.createdDramas.set(dramaId, drama);
     this.state.dramaLocales.set(dramaId, this.dramaLocale);
     this.state.histories.set(dramaId, [historyItem(drama.currentScene)]);
+    if (normalizedCreationKey) this.state.creationsByKey.set(normalizedCreationKey, { dramaId, fingerprint });
     return cloneDrama(drama);
+  }
+
+  async suggestDramaSeeds(input: DramaSeedSuggestionInput, requestKey: string): Promise<DramaSeedSuggestionBatch> {
+    const key = requestKey.normalize('NFKC').trim();
+    if (!key) throw new DramaClientError('invalid_input', 'A suggestion request key is required.');
+    const characterName = normalizeOptionalText(input.characterName);
+    const inspiration = normalizeOptionalText(input.inspiration);
+    const normalizedInput: DramaSeedSuggestionInput = {
+      mood: input.mood,
+      ...(characterName.length >= 2 && characterName.length <= 50 ? { characterName } : {}),
+      ...(inspiration ? { inspiration } : {}),
+    };
+    const fingerprint = JSON.stringify(normalizedInput);
+    const existing = this.state.suggestionsByKey.get(key);
+    if (existing) {
+      if (existing.fingerprint !== fingerprint) {
+        throw new DramaClientError('suggestion_conflict', 'This suggestion request already belongs to different inspiration.');
+      }
+      return cloneSuggestionBatch(existing.suggestions);
+    }
+
+    const suggestions = previewSuggestionBatch(this.dramaLocale, normalizedInput, key);
+    this.state.suggestionsByKey.set(key, { fingerprint, suggestions: cloneSuggestionBatch(suggestions) });
+    return cloneSuggestionBatch(suggestions);
   }
 
   async loadDrama(dramaId: string): Promise<Drama> {
@@ -192,7 +233,7 @@ export const previewDramaExperienceClient: DramaExperienceClient = new PreviewDr
 
 function previewDailyPrompt(
   dramaLocale: DramaLocale,
-  usedPremises: readonly string[] = [],
+  usedDramas: readonly { id?: string; premise: string }[] = [],
 ): DramaHomeSnapshot['retention']['dailyPrompt'] {
   const prompts = [
     {
@@ -241,16 +282,24 @@ function previewDailyPrompt(
       characterName: 'Ari',
     },
   ] as const;
-  const used = new Set(usedPremises.map(normalizePromptText).filter(Boolean));
+  const used = new Set(usedDramas.map((drama) => normalizePromptText(drama.premise)).filter(Boolean));
   const selected = prompts.find((candidate) =>
     !Object.values(candidate.premise).some((premise) => used.has(normalizePromptText(premise)))) ?? prompts[0];
   const localeKey = dramaLocale === 'vi-VN' ? 'vi' : 'en';
-  return {
+  const result: DramaHomeSnapshot['retention']['dailyPrompt'] = {
     label: selected.label[localeKey],
     premise: selected.premise[localeKey],
     mood: selected.mood,
     characterName: selected.characterName,
   };
+  const allPromptsUsed = prompts.every((candidate) =>
+    Object.values(candidate.premise).some((premise) => used.has(normalizePromptText(premise))));
+  if (allPromptsUsed) {
+    const selectedPremises = new Set(Object.values(selected.premise).map(normalizePromptText));
+    const existing = usedDramas.find((drama) => drama.id && selectedPremises.has(normalizePromptText(drama.premise)));
+    if (existing?.id) result.resumeDramaId = existing.id;
+  }
+  return result;
 }
 
 function normalizePromptText(value: string): string {
@@ -417,6 +466,90 @@ function titleFromPremise(premise: string): string {
 function lowercaseFirst(value: string): string {
   if (!value) return value;
   return `${value[0].toLocaleLowerCase()}${value.slice(1)}`;
+}
+
+function previewSuggestionBatch(
+  dramaLocale: DramaLocale,
+  input: DramaSeedSuggestionInput,
+  requestKey: string,
+): DramaSeedSuggestionBatch {
+  const vi = dramaLocale === 'vi-VN';
+  const defaultName = vi ? 'Linh' : 'Mina';
+  const characterName = normalizeOptionalText(input.characterName) || defaultName;
+  const inspiration = normalizeOptionalText(input.inspiration);
+  const context = inspiration
+    ? (vi ? `Từ mầm “${trimPreviewInspiration(inspiration)}”, ` : `Building from “${trimPreviewInspiration(inspiration)}”, `)
+    : '';
+  const catalog = vi ? [
+    {
+      label: 'Cuộc gọi bị xóa',
+      premise: `${context}${characterName} nhận cuộc gọi trực tiếp từ người đã biến mất nhiều năm, nhưng nhật ký điện thoại tự xóa sau mỗi phút. Nếu giữ bí mật, ${characterName} có thể mất cơ hội cứu người đó; nếu báo cảnh sát, một bí mật gia đình sẽ lộ ra. Điện thoại chỉ còn đủ pin cho một cuộc gọi trả lời nên ${characterName} phải chọn ngay. Ai thực sự đang ở đầu dây bên kia?`,
+      mood: 'mysterious' as const,
+    },
+    {
+      label: 'Lời hứa mang tên mình',
+      premise: `${context}${characterName} phát hiện người bạn thân đã dùng tên mình để ký một lời hứa có thể phá hủy sự nghiệp của cả hai. Im lặng sẽ giữ tình bạn nhưng biến ${characterName} thành người chịu trách nhiệm; công khai sự thật sẽ làm mọi thứ sụp đổ ngay tối nay. Cuộc họp quyết định bắt đầu trong một giờ nên ${characterName} phải chọn cách đối mặt. Vì sao người bạn cần danh tính của ${characterName} đến vậy?`,
+      mood: 'tense' as const,
+    },
+    {
+      label: 'Căn phòng có tên mình',
+      premise: `${context}${characterName} tìm thấy một căn phòng bị niêm kín trong ngôi nhà tuổi thơ, với tên mình viết ở mặt trong cánh cửa. Bước vào có thể chứng minh ký ức gia đình là giả nhưng cũng có thể phá vỡ mối quan hệ cuối cùng còn đáng tin. Ngôi nhà sẽ bị phá lúc bình minh nên ${characterName} không thể trì hoãn. Điều gì đã xảy ra trong căn phòng khiến mọi người cùng im lặng?`,
+      mood: 'hopeful' as const,
+    },
+    {
+      label: 'Đám cưới sai người',
+      premise: `${context}${characterName} đến một đám cưới và nhận ra cô dâu hoặc chú rể đang dùng câu chuyện tình từng thuộc về chính mình. Nếu lên tiếng, ${characterName} có thể cứu một người khỏi lời nói dối nhưng cũng phơi bày điều đã cố quên. Lời thề sắp bắt đầu nên chỉ còn vài phút để hành động. Ai đã viết lại quá khứ của ${characterName}, và để làm gì?`,
+      mood: 'romantic' as const,
+    },
+  ] : [
+    {
+      label: 'The erased call',
+      premise: `${context}${characterName} receives a live call from someone who vanished years ago, but the call log erases itself every minute. Keeping quiet may cost the only chance to save them; involving police will expose a family secret. The phone has power for one reply, so ${characterName} must choose now. Who is really on the other end?`,
+      mood: 'mysterious' as const,
+    },
+    {
+      label: 'A promise in your name',
+      premise: `${context}${characterName} learns a closest friend used their name to sign a promise that could destroy both careers. Silence protects the friendship but makes ${characterName} responsible; exposing the truth detonates everything tonight. A deciding meeting starts in one hour, forcing ${characterName} to act. Why did the friend need ${characterName}’s identity so badly?`,
+      mood: 'tense' as const,
+    },
+    {
+      label: 'The room with your name',
+      premise: `${context}${characterName} finds a sealed room in the childhood home with their name written inside the door. Entering could prove the family story is false but destroy the last relationship ${characterName} still trusts. The house will be demolished at dawn, so there is no time to wait. What happened in that room that made everyone agree to stay silent?`,
+      mood: 'hopeful' as const,
+    },
+    {
+      label: 'The wrong wedding story',
+      premise: `${context}${characterName} attends a wedding and realizes the couple is repeating a love story that once belonged to ${characterName}. Speaking up might save someone from a lie but expose the past ${characterName} worked to bury. The vows begin in minutes, leaving one chance to intervene. Who rewrote ${characterName}’s past, and why?`,
+      mood: 'romantic' as const,
+    },
+  ];
+  const offset = stablePreviewOffset(requestKey, catalog.length);
+  const selected = [catalog[offset], catalog[(offset + 1) % catalog.length], catalog[(offset + 2) % catalog.length]];
+  return selected.map((item, index) => ({
+    label: item.label,
+    premise: item.premise,
+    mood: index === 0 ? input.mood : item.mood,
+    characterName,
+  })) as DramaSeedSuggestionBatch;
+}
+
+function normalizeOptionalText(value: string | undefined): string {
+  return value?.normalize('NFKC').trim().replace(/\s+/gu, ' ') ?? '';
+}
+
+function trimPreviewInspiration(value: string): string {
+  const codePoints = Array.from(value);
+  return codePoints.length <= 72 ? value : `${codePoints.slice(0, 69).join('').trim()}…`;
+}
+
+function stablePreviewOffset(value: string, modulo: number): number {
+  let hash = 0;
+  for (const character of value) hash = ((hash * 31) + character.codePointAt(0)!) >>> 0;
+  return hash % modulo;
+}
+
+function cloneSuggestionBatch(batch: DramaSeedSuggestionBatch): DramaSeedSuggestionBatch {
+  return batch.map((suggestion) => ({ ...suggestion })) as DramaSeedSuggestionBatch;
 }
 
 function cloneDrama(drama: Drama): Drama {

@@ -6,6 +6,13 @@ export interface RetentionActivityDay {
   choicesMade: number;
 }
 
+export interface DailyPromptDrama {
+  id: string;
+  premise: string;
+}
+
+type DailyPromptUsage = string | DailyPromptDrama;
+
 interface LocalizedDailyPrompt {
   label: Record<UiLocale, string>;
   premise: Record<UiLocale, string>;
@@ -61,12 +68,16 @@ const DAILY_PROMPTS: readonly LocalizedDailyPrompt[] = [
   },
 ] as const;
 
+export function dailyPromptCatalogPremises(): string[] {
+  return DAILY_PROMPTS.flatMap((prompt) => Object.values(prompt.premise));
+}
+
 export function buildRetentionSnapshot(
   days: readonly RetentionActivityDay[],
   activeDramas: number,
   nowMs: number,
   uiLocale: UiLocale = 'en',
-  usedPremises: readonly string[] = [],
+  usedDramas: readonly DailyPromptUsage[] = [],
 ): DramaRetention {
   const normalized = [...days]
     .filter((day) => /^\d{4}-\d{2}-\d{2}$/u.test(day.utcDay) && Number.isInteger(day.choicesMade) && day.choicesMade > 0)
@@ -76,32 +87,41 @@ export function buildRetentionSnapshot(
     currentStreakDays: currentStreak(normalized.map((day) => day.utcDay), utcDay),
     choicesMade: normalized.reduce((total, day) => total + day.choicesMade, 0),
     activeDramas,
-    dailyPrompt: promptForUtcDay(utcDay, uiLocale, usedPremises),
+    dailyPrompt: promptForUtcDay(utcDay, uiLocale, usedDramas),
   };
 }
 
 export function promptForUtcDay(
   utcDay: string,
   uiLocale: UiLocale = 'en',
-  usedPremises: readonly string[] = [],
+  usedDramas: readonly DailyPromptUsage[] = [],
 ): DramaDailyPrompt {
   const startIndex = hash(utcDay) % DAILY_PROMPTS.length;
-  const used = new Set(usedPremises.map(normalizePromptText).filter(Boolean));
+  const used = new Set(usedDramas.map((drama) => normalizePromptText(typeof drama === 'string' ? drama : drama.premise)).filter(Boolean));
   let prompt = DAILY_PROMPTS[startIndex]!;
+  let foundUnused = false;
   for (let offset = 0; offset < DAILY_PROMPTS.length; offset += 1) {
     const candidate = DAILY_PROMPTS[(startIndex + offset) % DAILY_PROMPTS.length]!;
     const alreadyUsed = Object.values(candidate.premise).some((premise) => used.has(normalizePromptText(premise)));
     if (!alreadyUsed) {
       prompt = candidate;
+      foundUnused = true;
       break;
     }
   }
-  return {
+  const result: DramaDailyPrompt = {
     label: prompt.label[uiLocale],
     premise: prompt.premise[uiLocale],
     mood: prompt.mood,
     characterName: prompt.characterName,
   };
+  if (!foundUnused) {
+    const promptPremises = new Set(Object.values(prompt.premise).map(normalizePromptText));
+    const resumeDrama = usedDramas.find((drama): drama is DailyPromptDrama =>
+      typeof drama !== 'string' && Boolean(drama.id.trim()) && promptPremises.has(normalizePromptText(drama.premise)));
+    if (resumeDrama) result.resumeDramaId = resumeDrama.id;
+  }
+  return result;
 }
 
 function normalizePromptText(value: string): string {

@@ -20,6 +20,7 @@ export interface DramaDailyPrompt {
   premise: string;
   mood: DramaMood;
   characterName: string;
+  resumeDramaId?: string;
 }
 
 export interface DramaRetention {
