@@ -12,6 +12,7 @@ import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?r
 import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import migrationEleven from '../migrations/0011_arc_checkpoints.sql?raw';
 import migrationTwelve from '../migrations/0012_scene_artworks.sql?raw';
+import migrationThirteen from '../migrations/0013_drama_suggestion_cache.sql?raw';
 import type { SceneGenerationInput, SceneGenerator } from '../src/ai/contracts';
 import type { CreativeSceneProposal } from '../src/ai/creative-scene-schema';
 import { compileCreativeScene } from '../src/ai/scene-compiler';
@@ -47,6 +48,7 @@ const migrations = [
   migrationTen,
   migrationEleven,
   migrationTwelve,
+  migrationThirteen,
 ];
 
 beforeAll(async () => {

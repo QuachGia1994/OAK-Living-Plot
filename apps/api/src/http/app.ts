@@ -1,6 +1,7 @@
 import type { SceneGenerator } from '../ai/contracts';
 import { D1AccountService } from '../account/d1-account-service';
 import { createSceneGenerator } from '../ai/scene-generator-factory';
+import { WorkersAiDramaSeedSuggester } from '../ai/workers-ai-drama-seed-suggester';
 import { D1SceneArtworkService } from '../artwork/d1-scene-artwork-service';
 import type { SceneArtworkQueue } from '../artwork/contracts';
 import { D1AudioService } from '../audio/d1-audio-service';
@@ -14,6 +15,8 @@ import type { AppEnv } from '../env';
 import type { DramaMood } from '../domain/drama';
 import type { DramaError } from '../drama-runtime/contracts';
 import { DramaService } from '../drama-runtime/drama-service';
+import { DramaSuggestionService } from '../drama-runtime/drama-suggestion-service';
+import type { DramaSeedSuggester, DramaSuggestionTelemetrySink } from '../drama-runtime/suggestion-contracts';
 import { D1UserRepository } from '../persistence/d1-user-repository';
 import { D1CharacterPortraitService } from '../portrait/d1-character-portrait-service';
 import { isDramaLocale, isNarratorVariant, isUiLocale } from '../preferences/contracts';
@@ -21,6 +24,7 @@ import { quotaModeFromEnv } from '../quota/policy';
 import { D1VoiceQuota } from '../quota/voice-quota';
 import { D1ReferralService } from '../referrals/d1-referral-service';
 import { D1UserPreferencesRepository } from '../preferences/d1-user-preferences';
+import { CloudflareDramaSuggestionTelemetrySink } from '../telemetry/cloudflare-drama-suggestion-telemetry';
 import { CloudflareProductTelemetrySink } from '../telemetry/cloudflare-product-telemetry';
 import type { ProductTelemetrySink } from '../telemetry/product-events';
 
@@ -32,6 +36,8 @@ export interface RequestDependencies {
   revenueCatSubscriberProvider?: RevenueCatSubscriberProvider;
   revenueCatWebhookClock?: () => number;
   sceneGenerator?: SceneGenerator;
+  dramaSeedSuggester?: DramaSeedSuggester;
+  dramaSuggestionTelemetry?: DramaSuggestionTelemetrySink;
   sceneArtworkQueue?: SceneArtworkQueue;
   dramaClock?: () => number;
   productTelemetry?: ProductTelemetrySink;
@@ -86,6 +92,7 @@ export async function handleRequest(
     return json({ export: url.searchParams.get('schema') === '3' ? snapshot : legacyAccountExportV2(snapshot) });
   }
   if (route.kind === 'account_delete') return handleAccountDelete(request, env, user.id, dependencies.dramaClock);
+  if (route.kind === 'drama_suggestions') return handleDramaSuggestions(request, env, user.id, dependencies);
   if (route.kind === 'scene_artwork_status') return handleSceneArtworkStatus(env, user.id, route.sceneId);
   if (route.kind === 'scene_artwork') return handleSceneArtwork(request, env, user.id, route.sceneId);
   if (route.kind === 'drama_portrait_status') return handlePortraitStatus(env, user.id, route.dramaId);
@@ -125,6 +132,7 @@ type DramaRoute =
 type ProtectedRoute =
   | { kind: 'me' }
   | { kind: 'entitlement' }
+  | { kind: 'drama_suggestions' }
   | { kind: 'preferences' }
   | { kind: 'referral' }
   | { kind: 'referral_claim' }
@@ -147,6 +155,7 @@ function matchProtectedRoute(pathname: string): ProtectedRoute | null {
   if (pathname === '/v1/referrals/claim') return { kind: 'referral_claim' };
   if (pathname === '/v1/account/export') return { kind: 'account_export' };
   if (pathname === '/v1/account/delete') return { kind: 'account_delete' };
+  if (pathname === '/v1/dramas/suggestions') return { kind: 'drama_suggestions' };
   if (pathname === '/v1/dramas/home') return { kind: 'drama_home' };
   if (pathname === '/v1/dramas/library') return { kind: 'drama_library' };
   if (pathname === '/v1/dramas') return { kind: 'drama_collection' };
@@ -213,7 +222,7 @@ function methodAllowed(route: ProtectedRoute, method: string): boolean {
   if (route.kind === 'scene_artwork_status') return method === 'GET';
   if (route.kind === 'scene_artwork') return method === 'GET' || method === 'POST';
   if (
-    route.kind === 'scene_voice' || route.kind === 'drama_collection' || route.kind === 'drama_generate' ||
+    route.kind === 'scene_voice' || route.kind === 'drama_collection' || route.kind === 'drama_suggestions' || route.kind === 'drama_generate' ||
     route.kind === 'drama_choice' || route.kind === 'drama_archive' || route.kind === 'drama_restore' ||
     route.kind === 'account_delete'
   ) {
@@ -342,6 +351,60 @@ function dramaErrorResponse(error: DramaError): Response {
     currentStateVersion: error.currentStateVersion,
     committedChoiceId: error.committedChoiceId,
   }, 409);
+}
+
+async function handleDramaSuggestions(
+  request: Request,
+  env: AppEnv,
+  userId: string,
+  dependencies: RequestDependencies,
+): Promise<Response> {
+  const body = await parseJsonObject(request);
+  if (
+    !body
+    || typeof body.requestKey !== 'string'
+    || !isDramaMood(body.mood)
+    || (body.characterName !== undefined && typeof body.characterName !== 'string')
+    || (body.inspiration !== undefined && typeof body.inspiration !== 'string')
+  ) return json({ error: 'invalid_request' }, 400);
+
+  const suggester = dependencies.dramaSeedSuggester
+    ?? (env.AI ? new WorkersAiDramaSeedSuggester(env.AI) : unavailableDramaSeedSuggester());
+  const service = new DramaSuggestionService(
+    env.DB,
+    suggester,
+    dependencies.dramaClock,
+    dependencies.dramaSuggestionTelemetry ?? new CloudflareDramaSuggestionTelemetrySink(env.ANALYTICS),
+  );
+  const result = await service.suggest(userId, {
+    requestKey: body.requestKey,
+    mood: body.mood,
+    ...(typeof body.characterName === 'string' ? { characterName: body.characterName } : {}),
+    ...(typeof body.inspiration === 'string' ? { inspiration: body.inspiration } : {}),
+  });
+  if (result.ok) return json({ suggestions: result.value.suggestions });
+  if (result.error.code === 'invalid_input') return json({ error: result.error.code }, 400);
+  if (result.error.code === 'suggestion_rate_limited') return json({ error: result.error.code }, 429);
+  if (result.error.code === 'provider_unavailable') return json({ error: result.error.code }, 503);
+  if (result.error.code === 'invalid_suggestion_response') return json({ error: result.error.code }, 502);
+  if (result.error.code === 'persistence_error') return json({ error: 'internal_error' }, 500);
+  const response = json({ error: result.error.code }, 409);
+  if (result.error.code === 'suggestion_in_progress') response.headers.set('Retry-After', '1');
+  return response;
+}
+
+function unavailableDramaSeedSuggester(): DramaSeedSuggester {
+  return {
+    async suggest() {
+      return {
+        ok: false,
+        error: {
+          code: 'provider_unavailable',
+          metrics: { providerMs: 0, parseMs: 0, validateMs: 0, providerCalls: 0, repairs: 0 },
+        },
+      };
+    },
+  };
 }
 
 async function handlePortraitStatus(env: AppEnv, userId: string, dramaId: string): Promise<Response> {

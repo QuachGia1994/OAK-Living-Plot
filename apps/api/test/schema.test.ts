@@ -12,6 +12,7 @@ import migrationNine from '../migrations/0009_retryable_quota_reservations.sql?r
 import migrationTen from '../migrations/0010_referrals_portraits.sql?raw';
 import migrationEleven from '../migrations/0011_arc_checkpoints.sql?raw';
 import migrationTwelve from '../migrations/0012_scene_artworks.sql?raw';
+import migrationThirteen from '../migrations/0013_drama_suggestion_cache.sql?raw';
 import type { AppEnv } from '../src/env';
 import { D1DramaRepository } from '../src/drama-runtime/d1-drama-repository';
 import { applySqlMigration, resetStoryData } from './d1-test-utils';
@@ -42,6 +43,7 @@ beforeAll(async () => {
     migrationTen,
     migrationEleven,
     migrationTwelve,
+    migrationThirteen,
   ]) {
     await applySqlMigration(db, migration);
   }
@@ -79,6 +81,7 @@ describe('D1 schema', () => {
         'daily_usage',
         'arc_checkpoints',
         'scene_artworks',
+        'drama_suggestion_cache',
       ]),
     );
 
@@ -92,7 +95,7 @@ describe('D1 schema', () => {
     expect(checkpointIndex?.name).toBe('idx_arc_checkpoints_plot_scene');
   });
 
-  it('applies migrations 0001 through 0012 without losing legacy rows', () => {
+  it('applies migrations 0001 through 0013 without losing legacy rows', () => {
     expect(legacyRowsPreserved).toBe(true);
   });
 
@@ -137,6 +140,25 @@ describe('D1 schema', () => {
     } finally {
       await applySqlMigration(db, migrationEleven);
     }
+  });
+
+  it('enforces the noncanonical suggestion-cache lifecycle and owner cascade', async () => {
+    await seedUser();
+    await db.prepare(
+      `INSERT INTO drama_suggestion_cache
+         (user_id, request_key, input_fingerprint, status, lease_token, lease_expires_at)
+       VALUES (?, ?, ?, 'pending', ?, ?)`,
+    ).bind('user-1', 'suggestion-schema-001', 'a'.repeat(64), 'lease-token', 1234).run();
+    expect(await db.prepare("SELECT status FROM drama_suggestion_cache WHERE request_key = 'suggestion-schema-001'").first()).toEqual({ status: 'pending' });
+
+    await expect(db.prepare(
+      `INSERT INTO drama_suggestion_cache
+         (user_id, request_key, input_fingerprint, status, suggestions_json, ready_at)
+       VALUES (?, ?, ?, 'ready', ?, ?)`,
+    ).bind('user-1', 'suggestion-schema-bad', 'b'.repeat(64), 'not-json', 1234).run()).rejects.toThrow();
+
+    await db.prepare("DELETE FROM users WHERE id = 'user-1'").run();
+    expect(await db.prepare('SELECT COUNT(*) AS count FROM drama_suggestion_cache').first()).toEqual({ count: 0 });
   });
 
   it('writes derived Scene artwork metadata and cascades it with the canonical Scene', async () => {

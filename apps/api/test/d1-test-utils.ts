@@ -10,6 +10,7 @@ export async function applySqlMigration(db: D1Database, sql: string): Promise<vo
 
 export async function resetStoryData(db: D1Database): Promise<void> {
   const tables = [
+    'drama_suggestion_cache',
     'scene_artworks',
     'character_portraits',
     'voice_bonus_reservations',

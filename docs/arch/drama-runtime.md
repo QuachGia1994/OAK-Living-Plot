@@ -8,6 +8,7 @@ Living Plot has one product vocabulary above persistence: **Drama → Scene → 
 
 | Transition | Owner | Canonical state/result |
 | --- | --- | --- |
+| optional draft inspiration → three editable AI seeds | mobile suggestion coordinator + API `DramaSeedSuggester` | noncanonical `{label,premise,mood,characterName}` ×3; form only |
 | user premise/mood/lead → generation request | mobile `features/drama/setup.ts` + `HttpDramaExperienceClient` | `DramaDraft`, idempotency keys, `DramaLocale` |
 | generation request → provider-neutral scene proposal | API `SceneGenerator` | `SceneGenerationInput` → `SceneProposal` or normalized generation error |
 | provider payload → validated proposal | `SceneGenerator` adapter + `scene-compiler.ts` + `scene-schema.ts` | strict `SceneProposal`; raw provider JSON never reaches domain/UI |
@@ -47,9 +48,21 @@ A branch can be:
 
 The mobile selection before commit is provisional playback state, not a canonical branch. Replaying the same committed choice is idempotent. A different second choice returns a conflict and the client resynchronizes from the canonical drama.
 
+## Pre-story AI suggestion boundary
+
+AI suggestions are an optional **noncanonical form helper**, not a Scene-generation mode. `POST /v1/dramas/suggestions` authenticates the owner server-side, reads the saved `dramaLocale`, normalizes bounded optional inspiration/preferred mood/lead name, and returns exactly three public items containing only `label`, `premise`, `mood`, and a normalized 2–50 character `characterName`. Raw provider output, model/provider names, prompts, usage, IDs, scripts, choices, state deltas, facts, threads, relationships, and Scene context never cross this boundary.
+
+`DramaSeedSuggester` is separate from `SceneGenerator`. The Workers AI adapter makes exactly one structured call on the happy path and at most one repair for malformed/invalid output. Primary + repair share one 24-second total provider deadline using the supported Workers AI `AbortSignal`; timeout normalizes to `provider_unavailable`. The D1 lease is 35 seconds, so the configured provider pipeline must terminate before a stale lease can be reclaimed; a live lease returns retryable `suggestion_in_progress`, while stale recovery uses a conditional lease-token update and an old owner cannot overwrite a newer ready row.
+
+Migration `0013_drama_suggestion_cache` is rebuildable/derived data only. `(user_id, request_key)` is unique; `input_fingerprint` distinguishes conflicting reuse; `pending|ready` lifecycle checks constrain lease/suggestion fields; ready rows store only the validated public DTO for byte-equivalent semantic replay. Same owner/key/fingerprint ready replay makes zero provider calls and does not count against the abuse cap. A different fingerprint conflicts; different owners are isolated. Invalid provider results/failures are not cached ready and release the reservation for safe same-key retry. Malformed ready-cache DTOs fail closed instead of becoming application state. Cache cleanup is opportunistic with a 24-hour retention window, account erasure cascades it with the owner, and account export deliberately excludes it because it is transient provider-derived helper data rather than user-authored or canonical story state.
+
+The separate operational cap is 12 **successful new suggestion batches** per owner per UTC day. Replay, provider failure, invalid output, and rate-limited attempts do not consume it. The UTC day is recomputed immediately before the atomic ready transition so a request that crosses midnight cannot finalize as batch 13 of the new day. This cap has no relation to Scene or voice quota and never blocks manual Drama/Scene creation.
+
+Suggestion telemetry records only provider/parse/validate/total timings, provider-call count, repair count, and normalized outcome. It contains no user ID, request key, premise/inspiration, lead name, or suggestion text and is fail-open.
+
 ## Generation boundary
 
-`SceneGenerator` is provider-neutral. The non-production live-development Worker uses the Workers AI binding with `@cf/meta/llama-3.1-8b-instruct-fast` (slim creative schema, no `stateDelta` in provider output); deployments without that binding retain `GeminiSceneGenerator` as the adapter. `DramaService`, D1 projection, and mobile code depend on neither provider response type.
+`SceneGenerator` is provider-neutral. Canonical provider selection is explicit through `SCENE_GENERATOR_PROVIDER`; merely binding Workers AI for suggestions cannot switch Scene generation. The default environment is configured for `gemini`, while development is explicitly configured for `workers_ai` with `@cf/meta/llama-3.1-8b-instruct-fast` (slim creative schema, no `stateDelta` in provider output). Both environments may expose the `AI` binding for noncanonical suggestions. `DramaService`, D1 projection, and mobile code depend on neither provider response type.
 
 Provider flow is `bounded context -> one 8B creative call -> deterministic compiler -> structural/publication gate -> targeted repair when appropriate -> atomic persistence`:
 
@@ -68,6 +81,7 @@ Provider/model names may exist in adapter telemetry and persistence provenance. 
 Mobile `GenerationJob` represents user-visible generation state. Server mutation idempotency is owned by stable creation/generation keys and D1 uniqueness/version guards.
 
 - initial drama creation reuses the caller creation key and a stable generation key;
+- mobile persists the pending normalized-draft fingerprint + creation key in owner-scoped secure device storage before sending Scene 1, so an app/route remount after an uncertain response replays the same canonical request; success or a definite invalid/conflicting response clears it;
 - continuation reuses its generation key after a lost response;
 - provider failure releases the reservation; retrying the same logical generation key re-arms that released reservation without creating duplicate work, and Scene reservations never block on a daily text limit;
 - a published-but-response-lost mutation converges on persisted state rather than generating a second canonical scene;
