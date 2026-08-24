@@ -5,7 +5,11 @@
   "compatibility_date": "2026-08-16",
   "vars": {
     "TTS_DLQ_NAME": "living-plot-tts-dlq",
-    "QUOTA_MODE": "enforced"
+    "QUOTA_MODE": "enforced",
+    "SCENE_GENERATOR_PROVIDER": "gemini"
+  },
+  "ai": {
+    "binding": "AI"
   },
   "d1_databases": [
     {
@@ -56,7 +60,8 @@
       "name": "living-plot-api-dev",
       "vars": {
         "TTS_DLQ_NAME": "living-plot-tts-dlq-dev",
-        "QUOTA_MODE": "preview_unlimited"
+        "QUOTA_MODE": "preview_unlimited",
+        "SCENE_GENERATOR_PROVIDER": "workers_ai"
       },
       "ai": {
         "binding": "AI"

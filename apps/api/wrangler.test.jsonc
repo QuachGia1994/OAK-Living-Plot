@@ -1,0 +1,50 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "living-plot-api-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-16",
+  "vars": {
+    "TTS_DLQ_NAME": "living-plot-tts-dlq-test",
+    "QUOTA_MODE": "enforced",
+    "SCENE_GENERATOR_PROVIDER": "gemini",
+    "GEMINI_API_KEY": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "living-plot-test",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "preview_database_id": "living-plot-test",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AUDIO_BUCKET",
+      "bucket_name": "living-plot-audio-test"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "TTS_QUEUE",
+        "queue": "living-plot-tts-test"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "living-plot-tts-test",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "retry_delay": 30,
+        "dead_letter_queue": "living-plot-tts-dlq-test"
+      },
+      {
+        "queue": "living-plot-tts-dlq-test",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5
+      }
+    ]
+  }
+}

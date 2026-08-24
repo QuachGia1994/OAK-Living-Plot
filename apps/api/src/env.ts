@@ -15,4 +15,5 @@ export interface AppEnv {
   REVENUECAT_WEBHOOK_AUTHORIZATION: string;
   REVENUECAT_WEBHOOK_SIGNING_SECRET: string;
   QUOTA_MODE?: string;
+  SCENE_GENERATOR_PROVIDER?: string;
 }
