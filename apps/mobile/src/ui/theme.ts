@@ -71,9 +71,9 @@ export const cinematic = {
   overlay: {
     top: 'rgba(6, 7, 5, 0.28)',
     middle: 'rgba(8, 8, 6, 0.16)',
-    subtitle: 'rgba(10, 10, 8, 0.88)',
-    strong: 'rgba(7, 8, 6, 0.94)',
-    glass: 'rgba(18, 18, 14, 0.8)',
+    subtitle: 'rgba(10, 10, 8, 0.78)',
+    strong: 'rgba(7, 8, 6, 0.84)',
+    glass: 'rgba(18, 18, 14, 0.55)',
     hairline: 'rgba(240, 216, 167, 0.18)',
     violetHairline: 'rgba(211, 162, 93, 0.38)',
   },

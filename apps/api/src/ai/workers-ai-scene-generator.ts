@@ -95,13 +95,13 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
       const retryParsed = timedParse(() => parseCreativeSceneProposal(retry.value.text), timings);
       if (!retryParsed.ok) {
         this.recordAttempt(2, 'rejected', retry.value.usage, retry.value.model);
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model, retryParsed.error);
         return invalidResponse(2);
       }
       const retryValidated = validateCreative(input, retryParsed.value, timings);
       if (!retryValidated.ok) {
         this.recordAttempt(2, 'rejected', retry.value.usage, retry.value.model);
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model, retryValidated.errors);
         return invalidResponse(2);
       }
       this.recordAttempt(2, 'accepted', retry.value.usage, retry.value.model);
@@ -142,14 +142,14 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
       const repairParsed = timedParse(() => parseCreativeSceneRepair(repaired.value.text), timings);
       if (!repairParsed.ok) {
         this.recordAttempt(2, 'rejected', repaired.value.usage, repaired.value.model);
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', repaired.value.model);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', repaired.value.model, repairParsed.error);
         return invalidResponse(2);
       }
       const merged = applyCreativeSceneRepair(firstParsed.value, repairParsed.value);
       const repairValidated = validateCreative(input, merged, timings);
       if (!repairValidated.ok) {
         this.recordAttempt(2, 'rejected', repaired.value.usage, repaired.value.model);
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', repaired.value.model);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', repaired.value.model, repairValidated.errors);
         return invalidResponse(2);
       }
       this.recordAttempt(2, 'accepted', repaired.value.usage, repaired.value.model);
@@ -180,13 +180,13 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
     const retryParsed = timedParse(() => parseCreativeSceneProposal(retry.value.text), timings);
     if (!retryParsed.ok) {
       this.recordAttempt(2, 'rejected', retry.value.usage, retry.value.model);
-      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model, retryParsed.error);
       return invalidResponse(2);
     }
     const retryValidated = validateCreative(input, retryParsed.value, timings);
     if (!retryValidated.ok) {
       this.recordAttempt(2, 'rejected', retry.value.usage, retry.value.model);
-      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model, retryValidated.errors);
       return invalidResponse(2);
     }
     this.recordAttempt(2, 'accepted', retry.value.usage, retry.value.model);
@@ -301,6 +301,7 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
     repairs: number,
     outcome: 'accepted' | 'invalid_response' | 'provider_error',
     model: string,
+    errors?: string[],
   ): void {
     try {
       this.telemetry.recordGenerationPipeline?.({
@@ -320,7 +321,42 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
     } catch {
       // Pipeline telemetry is fail-open and contains timing/count metadata only.
     }
+    if (outcome === 'invalid_response' && errors && errors.length > 0) {
+      safePipelineDiagnostic(errors, model, providerCalls, repairs);
+    }
   }
+}
+
+function safePipelineDiagnostic(
+  errors: string[],
+  model: string,
+  providerCalls: number,
+  repairs: number,
+): void {
+  try {
+    console.info('[scene-generation][invalid_response]', {
+      provider: 'workers-ai',
+      model,
+      providerCalls,
+      repairs,
+      stage: repairs > 0 ? 'after_repair' : 'initial_or_retry',
+      errorCount: errors.length,
+      errors: errors.map((error) => redactValidationMessage(error)).slice(0, 20),
+    });
+  } catch {
+    // Diagnostics are observational only.
+  }
+}
+
+/**
+ * Server-side validation messages occasionally include short provider echo fragments
+ * that may contain quoted user-facing tokens. We strip them down to a structural
+ * shape so the log cannot leak the canonical drama prose.
+ */
+function redactValidationMessage(message: string): string {
+  const trimmed = message.trim();
+  if (trimmed.length <= 160) return trimmed;
+  return `${trimmed.slice(0, 80)}…[truncated, ${trimmed.length} chars]`;
 }
 
 function validateCreative(

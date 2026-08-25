@@ -430,7 +430,9 @@ function failureMessage(failure: DramaFailure | null, locale: 'en' | 'vi'): stri
   if (failure.code === 'auth_required') return vi ? 'Đăng nhập lại trước khi tiếp tục drama.' : 'Sign in again before continuing this drama.';
   if (failure.code === 'quota_exceeded') return vi ? 'Máy chủ đang giới hạn tạm thời việc tạo cảnh. Cốt truyện hiện tại vẫn được giữ nguyên để bạn thử lại.' : 'The server is temporarily limiting Scene generation. Current story state is unchanged so you can retry.';
   if (failure.code === 'provider_unavailable') return vi ? 'Tạo drama tạm thời không khả dụng. Nhánh đã chốt vẫn được giữ nguyên.' : 'Drama generation is temporarily unavailable. Your committed branch is unchanged.';
-  if (failure.code === 'invalid_generation') return vi ? 'Cảnh được tạo không đạt hợp đồng drama chuẩn. Trạng thái hiện tại vẫn được giữ nguyên để bạn thử lại.' : 'The generated scene did not satisfy the canonical drama contract. Current state is unchanged so you can retry.';
+  if (failure.code === 'invalid_generation') return vi
+    ? 'Bộ máy AI chưa sinh được cảnh tiếp theo khớp với hợp đồng drama. Trạng thái hiện tại vẫn được giữ nguyên; bấm "Thử lại" để yêu cầu lại.'
+    : 'The drama engine could not author the next scene that satisfies the contract. Current state is preserved; tap "Try again" to retry the same request.';
   if (failure.code === 'backend_unavailable' && failure.message?.includes('too long')) {
     return vi
       ? 'Bộ máy tạo cảnh phản hồi quá chậm. Nhánh chuẩn và khóa tạo vẫn được giữ an toàn; thử lại sẽ tiếp tục cùng yêu cầu.'
