@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { UiLocale } from '@/features/preferences/contracts';
 import { colors, radius, spacing } from './theme';
 
@@ -27,7 +28,7 @@ export class AppErrorBoundary extends Component<Props, State> {
     if (!this.state.failed) return this.props.children;
     const vi = this.props.locale === 'vi';
     return (
-      <View style={styles.screen} accessibilityLiveRegion="assertive">
+      <SafeAreaView style={styles.screen} edges={['top', 'right', 'bottom', 'left']} accessibilityLiveRegion="assertive">
         <Text style={styles.eyebrow}>{vi ? 'KHÔI PHỤC GIAO DIỆN' : 'UI RECOVERY'}</Text>
         <Text style={styles.title}>{vi ? 'Living Plot gặp lỗi hiển thị.' : 'Living Plot hit a display error.'}</Text>
         <Text style={styles.body}>
@@ -43,7 +44,7 @@ export class AppErrorBoundary extends Component<Props, State> {
         >
           <Text style={styles.buttonText}>{vi ? 'Thử lại giao diện' : 'Retry interface'}</Text>
         </Pressable>
-      </View>
+      </SafeAreaView>
     );
   }
 }

@@ -5,10 +5,12 @@ import type { PreferencesClient, UserPreferences } from './contracts';
 import { deviceDefaultPreferences } from './device-locale';
 import { preferenceSeedForUnsavedRemote } from './locale-policy';
 
+export type PreferencesErrorCode = 'load_failed' | 'save_failed';
+
 interface PreferencesContextValue {
   preferences: UserPreferences;
   loading: boolean;
-  error: string | null;
+  error: PreferencesErrorCode | null;
   save(next: Omit<UserPreferences, 'updatedAt'>): Promise<void>;
   refresh(): Promise<void>;
 }
@@ -33,7 +35,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState<UserPreferences>(initialDevicePreferences);
   const preferencesRef = useRef(preferences);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<PreferencesErrorCode | null>(null);
 
   const applyPreferences = useCallback((next: UserPreferences) => {
     preferencesRef.current = next;
@@ -53,7 +55,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     try {
       applyPreferences(await loadResolvedPreferences(client));
     } catch {
-      setError('Preferences could not be loaded. Existing dramas are unchanged.');
+      setError('load_failed');
     } finally {
       setLoading(false);
     }
@@ -68,7 +70,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
         setError(null);
       })
       .catch(() => {
-        if (active) setError('Preferences could not be loaded. Existing dramas are unchanged.');
+        if (active) setError('load_failed');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -82,7 +84,7 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     try {
       applyPreferences(await client.save(next));
     } catch {
-      setError('Preferences could not be saved. Existing dramas are unchanged.');
+      setError('save_failed');
       throw new Error('preferences_save_failed');
     } finally {
       setLoading(false);

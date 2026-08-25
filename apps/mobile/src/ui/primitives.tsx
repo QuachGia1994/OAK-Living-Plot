@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ANDROID_MINI_NAV_METRICS, useAndroidTabBarState } from './android-tab-bar-state';
+import { useAccessibilityAnnouncement } from './use-accessibility-announce';
 import { classical, colors, radius, spacing, typography } from './theme';
 
 export function Screen({
@@ -101,52 +102,21 @@ function readScrollOffsetY(event: NativeSyntheticEvent<NativeScrollEvent>): numb
 
 export function SectionHeader({
   title,
-  eyebrow,
   meta,
   index,
 }: {
   title: string;
-  eyebrow?: string;
-  meta?: string;
-  index?: string;
+  meta: string;
+  index: string;
 }) {
   return (
     <View style={styles.sectionHeader}>
-      {index ? <Text style={styles.sectionIndex}>{index}</Text> : null}
+      <Text style={styles.sectionIndex}>{index}</Text>
       <View style={styles.sectionHeaderCopy}>
-        {eyebrow ? <Text style={styles.sectionEyebrow}>{eyebrow}</Text> : null}
         <Text style={styles.sectionTitle}>{title}</Text>
-        {meta ? <Text style={styles.sectionMeta}>{meta}</Text> : null}
+        <Text style={styles.sectionMeta}>{meta}</Text>
       </View>
     </View>
-  );
-}
-
-export function SettingsRow({
-  label,
-  value,
-  onPress,
-  trailing,
-}: {
-  label: string;
-  value?: string;
-  onPress?: () => void;
-  trailing?: ReactNode;
-}) {
-  const body = (
-    <View style={styles.settingsRow}>
-      <View style={styles.settingsRowCopy}>
-        <Text style={styles.settingsRowLabel}>{label}</Text>
-        {value ? <Text style={styles.settingsRowValue}>{value}</Text> : null}
-      </View>
-      {trailing ?? (onPress ? <Text style={styles.settingsRowChevron}>›</Text> : null)}
-    </View>
-  );
-  if (!onPress) return body;
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [pressed && styles.settingsRowPressed]}>
-      {body}
-    </Pressable>
   );
 }
 
@@ -182,19 +152,6 @@ export function OrnamentDivider({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function ClassicalFrame({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return (
-    <View style={[styles.classicalFrame, style]}>
-      <View pointerEvents="none" style={styles.classicalFrameInner} />
-      <Text pointerEvents="none" style={[styles.frameCorner, styles.frameCornerTopLeft]}>⌜</Text>
-      <Text pointerEvents="none" style={[styles.frameCorner, styles.frameCornerTopRight]}>⌝</Text>
-      <Text pointerEvents="none" style={[styles.frameCorner, styles.frameCornerBottomLeft]}>⌞</Text>
-      <Text pointerEvents="none" style={[styles.frameCorner, styles.frameCornerBottomRight]}>⌟</Text>
-      {children}
-    </View>
-  );
-}
-
 export function StoryFlowRail({
   steps,
   activeStep = 0,
@@ -203,14 +160,18 @@ export function StoryFlowRail({
   activeStep?: number;
 }) {
   return (
-    <View style={styles.flowRailShell} accessibilityRole="summary">
+    <View style={styles.flowRailShell}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.flowRail}>
         {steps.map((label, index) => {
           const step = index + 1;
           const active = step === activeStep;
           const complete = activeStep > 0 && step < activeStep;
           return (
-            <View key={`${step}-${label}`} style={[styles.flowStep, active && styles.flowStepActive]}>
+            <View
+              key={`${step}-${label}`}
+              style={[styles.flowStep, active && styles.flowStepActive]}
+              accessibilityLabel={`${step}/${steps.length} ${label}`}
+            >
               <View style={[styles.flowNumber, complete && styles.flowNumberComplete, active && styles.flowNumberActive]}>
                 <Text style={[styles.flowNumberText, (complete || active) && styles.flowNumberTextActive]}>{step}</Text>
               </View>
@@ -391,6 +352,7 @@ export function ErrorState({
   onRetry?: () => void;
   retryLabel?: string;
 }) {
+  useAccessibilityAnnouncement(`${title}. ${message}`);
   return (
     <View accessibilityLiveRegion="assertive">
       <Card style={styles.errorCard}>
@@ -399,6 +361,20 @@ export function ErrorState({
         {onRetry ? <ActionButton label={retryLabel} variant="secondary" onPress={onRetry} /> : null}
       </Card>
     </View>
+  );
+}
+
+export type StatusTone = 'info' | 'success' | 'danger';
+
+export function StatusMessage({ message, tone = 'info' }: { message: string; tone?: StatusTone }) {
+  useAccessibilityAnnouncement(message);
+  return (
+    <Text
+      style={[styles.statusMessage, tone === 'success' && styles.statusSuccess, tone === 'danger' && styles.statusDanger]}
+      accessibilityLiveRegion="polite"
+    >
+      {message}
+    </Text>
   );
 }
 
@@ -471,7 +447,7 @@ const styles = StyleSheet.create({
   sectionIndex: {
     width: 28,
     flexShrink: 0,
-    color: colors.violetStrong,
+    color: colors.accentStrong,
     fontFamily: typography.mono,
     fontSize: 9,
     lineHeight: 17,
@@ -483,20 +459,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  sectionEyebrow: {
-    color: colors.accentStrong,
-    fontFamily: typography.mono,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.7,
-    textTransform: 'uppercase',
-  },
   sectionTitle: {
     flexShrink: 1,
     color: colors.ink,
     fontFamily: typography.display,
-    fontSize: 25,
-    lineHeight: 29,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: '700',
   },
   sectionMeta: {
@@ -506,41 +474,6 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     fontWeight: '900',
     letterSpacing: 0.8,
-  },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceGlass,
-  },
-  settingsRowCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  settingsRowLabel: {
-    color: colors.ink,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  settingsRowValue: {
-    color: colors.inkMuted,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  settingsRowChevron: {
-    color: colors.quietInk,
-    fontSize: 22,
-    fontWeight: '300',
-  },
-  settingsRowPressed: {
-    opacity: 0.78,
   },
   brandRow: {
     alignItems: 'center',
@@ -622,36 +555,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: classical.goldPale,
   },
-  classicalFrame: {
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: classical.goldDeep,
-    borderRadius: radius.lg,
-    backgroundColor: classical.inkGlass,
-  },
-  classicalFrameInner: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    bottom: 4,
-    left: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: classical.hairlineSoft,
-    borderRadius: Math.max(1, radius.lg - 3),
-  },
-  frameCorner: {
-    position: 'absolute',
-    zIndex: 2,
-    color: classical.gold,
-    fontFamily: typography.display,
-    fontSize: 18,
-    lineHeight: 20,
-  },
-  frameCornerTopLeft: { top: 3, left: 5 },
-  frameCornerTopRight: { top: 3, right: 5 },
-  frameCornerBottomLeft: { bottom: 3, left: 5 },
-  frameCornerBottomRight: { right: 5, bottom: 3 },
   flowRailShell: {
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
@@ -944,5 +847,17 @@ const styles = StyleSheet.create({
   },
   errorCard: {
     marginTop: spacing.xl,
+  },
+  statusMessage: {
+    color: colors.inkMuted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  statusSuccess: {
+    color: colors.success,
+  },
+  statusDanger: {
+    color: colors.danger,
   },
 });

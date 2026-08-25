@@ -14,8 +14,8 @@ import {
 import type { UiLocale } from '@/features/preferences/contracts';
 import type { Choice, DramaMood } from '@/features/drama/domain';
 import { dramaVisualCopyFor } from './drama-copy';
-import { buildSubtitleBeats, clampSceneBeat, moveSceneBeat, sceneMotifForText, type SceneMotif } from './drama-storyboard';
-import { cinematic, classical, colors, radius, spacing, typography } from './theme';
+import { buildSubtitleBeats, clampSceneBeat, moveSceneBeat } from './drama-storyboard';
+import { cinematic, classical, colors, parchment, radius, spacing, typography } from './theme';
 
 type SceneTone = (typeof cinematic.scene)[DramaMood];
 const classicalFallbackArtwork = require('../../assets/living-plot-scene-fallback-classical.jpg') as ImageSourcePropType;
@@ -49,7 +49,7 @@ export function DramaPoster({
       onPress={onPress}
       style={({ pressed }) => [styles.poster, { backgroundColor: tone.base }, style, pressed && styles.posterPressed]}
     >
-      {artwork ?? <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${premise}`} />}
+      {artwork ?? <SceneArtwork mood={mood} />}
       <View style={styles.posterTopFade} />
       <View pointerEvents="none" style={styles.posterInnerFrame} />
       <View style={styles.posterMetaRow}>
@@ -106,7 +106,7 @@ export function DramaCoverTile({
         pressed && styles.coverTilePressed,
       ]}
     >
-      {artwork ?? <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${premise}`} compact />}
+      {artwork ?? <SceneArtwork mood={mood} />}
       <View style={styles.coverShade} />
       <View pointerEvents="none" style={styles.coverInnerFrame} />
       <View style={styles.coverMetaRow}>
@@ -138,7 +138,7 @@ export function DramaEmptyStage({
   const copy = dramaVisualCopyFor(locale);
   return (
     <View style={[styles.emptyStage, { backgroundColor: tone.base }]}>
-      <SceneArtwork mood={mood} characterName="Lead" sceneText={detail} compact />
+      <SceneArtwork mood={mood} />
       <View style={styles.emptyShade} />
       <View style={styles.emptyCopy}>
         <Text style={[styles.emptyKicker, { color: tone.rim }]}>{copy.emptyKicker}</Text>
@@ -170,7 +170,7 @@ export function DramaComposerPreview({
   const sceneText = premise.trim() || copy.composerFallbackScene;
   return (
     <View style={[styles.composerPreview, compact && styles.composerPreviewCompact, { backgroundColor: tone.base }]} accessibilityLabel={`${label}. ${lead}.`}>
-      <SceneArtwork mood={mood} characterName={lead} sceneText={sceneText} compact />
+      <SceneArtwork mood={mood} />
       <View style={styles.composerShade} />
       <View style={styles.composerMetaRow}>
         <Text style={styles.composerMeta}>{label}</Text>
@@ -184,95 +184,17 @@ export function DramaComposerPreview({
   );
 }
 
-export function DramaMoodSwatch({
-  mood,
-  label,
-  description,
-  selected,
-  locale,
-  onPress,
-}: {
-  mood: DramaMood;
-  label: string;
-  description: string;
-  selected: boolean;
-  locale: UiLocale;
-  onPress: () => void;
-}) {
-  const tone = cinematic.scene[mood];
-  const copy = dramaVisualCopyFor(locale);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}. ${description}`}
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.moodSwatch,
-        { backgroundColor: tone.deep, borderColor: selected ? tone.rim : cinematic.overlay.hairline },
-        pressed && styles.moodSwatchPressed,
-      ]}
-    >
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <View style={[styles.moodSwatchGlow, { backgroundColor: tone.glow }]} />
-        <View style={[styles.moodSwatchRim, { backgroundColor: tone.rim }]} />
-        <View style={styles.moodSwatchSilhouette} />
-        <View style={styles.moodSwatchShade} />
-      </View>
-      <View style={styles.moodSwatchTopRow}>
-        <Text style={styles.moodSwatchState}>{selected ? copy.moodSelected : copy.moodKicker}</Text>
-        <View style={[styles.moodSwatchSignal, { backgroundColor: tone.rim }]} />
-      </View>
-      <View style={styles.moodSwatchCopy}>
-        <Text style={[styles.moodSwatchLabel, selected && { color: tone.rim }]}>{label}</Text>
-        <Text style={styles.moodSwatchDescription} numberOfLines={2}>{description}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-export function DramaCastingPreview({
-  characterName,
-  mood,
-  premise,
-  label,
-  locale,
-}: {
-  characterName: string;
-  mood: DramaMood;
-  premise: string;
-  label: string;
-  locale: UiLocale;
-}) {
-  const tone = cinematic.scene[mood];
-  const copy = dramaVisualCopyFor(locale);
-  const lead = characterName.trim() || copy.castingUncast;
-  return (
-    <View style={[styles.castingPreview, { backgroundColor: tone.base }]}>
-      <SceneArtwork mood={mood} characterName={lead} sceneText={premise} compact />
-      <View style={styles.castingShade} />
-      <View style={styles.castingCopy}>
-        <Text style={[styles.castingKicker, { color: tone.rim }]}>{label}</Text>
-        <Text style={styles.castingName} numberOfLines={1}>{lead}</Text>
-        <Text style={styles.castingMeta}>{characterName.trim() ? copy.castingLocked : copy.castingPrompt}</Text>
-      </View>
-    </View>
-  );
-}
-
 export function DramaUtilityHero({
   kicker,
   title,
   detail,
   mood = 'mysterious',
-  characterName = 'Living Plot',
   artworkSource,
 }: {
   kicker: string;
   title: string;
   detail?: string;
   mood?: DramaMood;
-  characterName?: string;
   artworkSource?: ImageSourcePropType;
 }) {
   const tone = cinematic.scene[mood];
@@ -281,7 +203,7 @@ export function DramaUtilityHero({
       {artworkSource ? (
         <Image source={artworkSource} style={styles.utilityHeroImage} resizeMode="cover" accessibilityIgnoresInvertColors />
       ) : (
-        <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${detail ?? ''}`} compact />
+        <SceneArtwork mood={mood} />
       )}
       <View style={styles.utilityHeroShade} />
       <View style={styles.utilityHeroCopy}>
@@ -311,11 +233,10 @@ export function DramaRecapFrame({
   locale: UiLocale;
 }) {
   const tone = cinematic.scene.mysterious;
-  const sceneText = `${title} ${summary} ${consequence ?? ''}`;
   return (
     <View style={styles.recapFrame}>
       <View style={[styles.recapVisual, { backgroundColor: tone.base }]}>
-        <SceneArtwork mood="mysterious" characterName={`${locale === 'vi' ? 'CẢNH' : 'SCENE'} ${sceneNumber}`} sceneText={sceneText} compact />
+        <SceneArtwork mood="mysterious" />
         <View style={styles.recapShade} />
         <View style={styles.recapVisualMeta}>
           <Text style={styles.recapScene}>{locale === 'vi' ? 'CẢNH' : 'SCENE'} {String(sceneNumber).padStart(2, '0')}</Text>
@@ -388,7 +309,7 @@ export function DramaSceneStage({
 
   return (
     <View style={[styles.sceneStage, { backgroundColor: tone.base }]}>
-      {artwork ?? <SceneArtwork mood={mood} characterName={characterName} sceneText={`${title} ${body}`} />}
+      {artwork ?? <SceneArtwork mood={mood} />}
       <View pointerEvents="none" style={styles.sceneTopShade} />
       <View pointerEvents="none" style={styles.sceneInnerFrame} />
       <View pointerEvents="box-none" style={styles.sceneHeader}>
@@ -409,16 +330,20 @@ export function DramaSceneStage({
               accessibilityLabel={locale === 'vi' ? `Mở đoạn ${index + 1}` : `Open beat ${index + 1}`}
               accessibilityState={{ selected: index === beatIndex }}
               disabled={Boolean(consequence)}
-              hitSlop={8}
+              hitSlop={{ top: 12, bottom: 12 }}
               onPress={(event) => {
                 event.stopPropagation();
                 selectBeat(index);
               }}
-              style={[
-                styles.sceneProgressSegment,
-                index <= beatIndex && { backgroundColor: index === beatIndex ? tone.rim : colors.inkMuted },
-              ]}
-            />
+              style={styles.sceneProgressSegment}
+            >
+              <View
+                style={[
+                  styles.sceneProgressSegmentBar,
+                  index <= beatIndex && { backgroundColor: index === beatIndex ? tone.rim : colors.inkMuted },
+                ]}
+              />
+            </Pressable>
           ))}
         </View>
       </View>
@@ -500,13 +425,11 @@ export function DramaChoiceCard({
 }
 
 export function DramaGenerationState({
-  characterName,
   mood,
   label,
   detail,
   locale,
 }: {
-  characterName: string;
   mood: DramaMood;
   label: string;
   detail: string;
@@ -517,7 +440,7 @@ export function DramaGenerationState({
   const pulse = usePulse();
   return (
     <View style={[styles.generationCard, { backgroundColor: tone.base }]} accessibilityRole="progressbar" accessibilityLabel={label} accessibilityLiveRegion="polite">
-      <SceneArtwork mood={mood} characterName={characterName || 'Lead'} compact />
+      <SceneArtwork mood={mood} />
       <View style={styles.generationShade} />
       <View style={styles.generationCopy}>
         <Text style={[styles.generationEyebrow, { color: tone.rim }]}>{copy.generationKicker}</Text>
@@ -535,7 +458,6 @@ export function DramaLoadingStage({ label, detail, locale }: { label: string; de
   const copy = dramaVisualCopyFor(locale);
   return (
     <DramaGenerationState
-      characterName="Lead"
       mood="mysterious"
       label={label}
       detail={detail ?? copy.loadingDefaultDetail}
@@ -544,41 +466,12 @@ export function DramaLoadingStage({ label, detail, locale }: { label: string; de
   );
 }
 
-type ArtworkVariant = 'hero' | 'card' | 'scene';
-
-function SceneArtwork({
-  mood,
-  characterName,
-  sceneText = '',
-  compact = false,
-  variant,
-}: {
-  mood: DramaMood;
-  characterName: string;
-  sceneText?: string;
-  compact?: boolean;
-  variant?: ArtworkVariant;
-}) {
+function SceneArtwork({ mood }: { mood: DramaMood }) {
   const tone = cinematic.scene[mood];
-  const alignRight = characterName.length % 2 === 0;
-  const motif = sceneMotifForText(sceneText);
-  const artworkVariant: ArtworkVariant = variant ?? (compact ? 'card' : 'scene');
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Image source={classicalFallbackArtwork} style={styles.sceneFallbackArtwork} resizeMode="cover" accessibilityIgnoresInvertColors />
-      {artworkVariant === 'hero' ? (
-        <>
-          <View style={[styles.sceneBase, { backgroundColor: tone.deep }]} />
-          <View style={[styles.lightOrb, styles.lightOrbPrimary, { backgroundColor: tone.glow, opacity: compact ? 0.5 : 0.7 }]} />
-          <View style={[styles.lightOrb, styles.lightOrbSecondary, { backgroundColor: tone.rim, opacity: compact ? 0.13 : 0.2 }]} />
-          <View style={[styles.horizonGlow, { backgroundColor: tone.haze }]} />
-          <SceneMotifLayer motif={motif} tone={tone} />
-          <View style={[styles.setPanel, styles.setPanelOne, { borderColor: tone.rim }]} />
-          <View style={[styles.setPanel, styles.setPanelTwo, { borderColor: tone.glow }]} />
-          <CharacterPortrait characterName={characterName} tone={tone} alignRight={alignRight} compact={compact} variant={artworkVariant} />
-          <View style={styles.floorShadow} />
-        </>
-      ) : <View style={[styles.sceneImageTint, { backgroundColor: tone.deep }]} />}
+      <View style={[styles.sceneImageTint, { backgroundColor: tone.deep }]} />
     </View>
   );
 }
@@ -587,23 +480,23 @@ function choicePalette(key: Choice['key']) {
   if (key === 'B') {
     return {
       sigil: '✦',
-      border: 'rgba(151, 164, 174, 0.62)',
-      activeBorder: '#D5DEE4',
-      innerBorder: 'rgba(213, 222, 228, 0.22)',
-      background: 'rgba(17, 23, 26, 0.88)',
-      activeBackground: 'rgba(39, 52, 58, 0.94)',
-      badge: 'rgba(151, 164, 174, 0.09)',
+      border: 'rgba(189, 175, 147, 0.6)',
+      activeBorder: parchment.pale,
+      innerBorder: 'rgba(243, 231, 207, 0.2)',
+      background: 'rgba(26, 23, 16, 0.88)',
+      activeBackground: 'rgba(48, 41, 26, 0.94)',
+      badge: 'rgba(243, 231, 207, 0.08)',
     };
   }
   if (key === 'C') {
     return {
       sigil: '❧',
-      border: 'rgba(92, 143, 102, 0.66)',
-      activeBorder: '#A7D2A7',
-      innerBorder: 'rgba(167, 210, 167, 0.22)',
-      background: 'rgba(12, 27, 17, 0.88)',
-      activeBackground: 'rgba(24, 55, 32, 0.94)',
-      badge: 'rgba(92, 143, 102, 0.1)',
+      border: 'rgba(143, 104, 55, 0.66)',
+      activeBorder: colors.violetStrong,
+      innerBorder: 'rgba(211, 162, 93, 0.22)',
+      background: 'rgba(27, 17, 8, 0.88)',
+      activeBackground: 'rgba(58, 40, 18, 0.94)',
+      badge: 'rgba(211, 162, 93, 0.1)',
     };
   }
   return {
@@ -615,94 +508,6 @@ function choicePalette(key: Choice['key']) {
     activeBackground: 'rgba(69, 46, 19, 0.94)',
     badge: 'rgba(201, 154, 84, 0.1)',
   };
-}
-
-function CharacterPortrait({
-  characterName,
-  tone,
-  alignRight,
-  compact,
-  variant,
-}: {
-  characterName: string;
-  tone: SceneTone;
-  alignRight: boolean;
-  compact: boolean;
-  variant: ArtworkVariant;
-}) {
-  const clothingAccent = characterClothingAccentFor(characterName);
-  return (
-    <View style={[
-      styles.portraitRig,
-      alignRight ? styles.portraitRight : styles.portraitLeft,
-      compact && styles.portraitRigCompact,
-      variant === 'hero' && styles.portraitRigHero,
-    ]}>
-      <View style={[styles.portraitAura, { backgroundColor: tone.rim, borderColor: clothingAccent }]} />
-      <View style={styles.portraitCrop}>
-        <Image
-          source={require('../../assets/living-plot-scene-mina-3d.jpg')}
-          style={[
-            styles.portraitArtwork,
-            variant === 'hero' && styles.portraitArtworkHero,
-            variant === 'card' && styles.portraitArtworkCard,
-            variant === 'scene' && styles.portraitArtworkScene,
-          ]}
-          resizeMode="cover"
-          accessibilityIgnoresInvertColors
-        />
-      </View>
-    </View>
-  );
-}
-
-function characterClothingAccentFor(characterName: string): string {
-  const value = [...characterName].reduce((total, character) => total + character.charCodeAt(0), 0);
-  const accents = ['#24304C', '#4A2437', '#283D38', '#3A2E54'] as const;
-  return accents[value % accents.length];
-}
-
-function SceneMotifLayer({ motif, tone }: { motif: SceneMotif; tone: SceneTone }) {
-  if (motif === 'signal') {
-    return (
-      <View style={styles.signalRig}>
-        <View style={[styles.signalHalo, { backgroundColor: tone.rim }]} />
-        <View style={[styles.signalDevice, { borderColor: tone.rim }]}>
-          <View style={[styles.signalLine, { backgroundColor: tone.rim }]} />
-          <View style={styles.signalLineMuted} />
-          <View style={styles.signalLineMutedShort} />
-        </View>
-      </View>
-    );
-  }
-  if (motif === 'threshold') {
-    return (
-      <View style={styles.thresholdRig}>
-        <View style={[styles.thresholdFrame, { borderColor: tone.rim }]} />
-        <View style={[styles.thresholdGap, { backgroundColor: tone.glow }]} />
-      </View>
-    );
-  }
-  if (motif === 'table') {
-    return (
-      <View style={styles.tableRig}>
-        <View style={[styles.tableLampGlow, { backgroundColor: tone.rim }]} />
-        <View style={styles.tableTop} />
-        <View style={styles.tableStem} />
-      </View>
-    );
-  }
-  if (motif === 'street') {
-    return (
-      <View style={styles.streetRig}>
-        <View style={[styles.streetLight, { backgroundColor: tone.rim }]} />
-        <View style={styles.streetLine} />
-        <View style={styles.streetLineTwo} />
-        <View style={styles.streetLineThree} />
-      </View>
-    );
-  }
-  return <View style={[styles.interiorWindow, { borderColor: tone.rim }]} />;
 }
 
 function SubtitleBeat({ text }: { text: string }) {
@@ -841,8 +646,8 @@ const styles = StyleSheet.create({
     backgroundColor: cinematic.overlay.strong,
   },
   posterCharacter: { fontFamily: typography.mono, fontSize: 10, fontWeight: '800', letterSpacing: 1.7, textTransform: 'uppercase' },
-  posterTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 28, lineHeight: 33, fontWeight: '700', letterSpacing: -0.5 },
-  posterPremise: { color: '#DDD5CA', fontSize: 14, lineHeight: 21 },
+  posterTitle: { color: parchment.pale, fontFamily: typography.display, fontSize: 28, lineHeight: 33, fontWeight: '700', letterSpacing: -0.5 },
+  posterPremise: { color: parchment.fog, fontSize: 14, lineHeight: 21 },
   posterActionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing.xs },
   posterAction: { color: colors.accentStrong, fontSize: 15, fontWeight: '900' },
   posterArrow: { fontSize: 24, fontWeight: '400' },
@@ -878,7 +683,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  coverScene: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  coverScene: { color: parchment.pale, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   coverSignal: { width: 22, height: 2, borderRadius: radius.pill },
   coverCopy: {
     position: 'absolute',
@@ -891,8 +696,8 @@ const styles = StyleSheet.create({
     backgroundColor: cinematic.overlay.strong,
   },
   coverCharacter: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
-  coverTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 18, lineHeight: 22, fontWeight: '700', letterSpacing: -0.3 },
-  coverPremise: { color: '#CFC7BC', fontSize: 11, lineHeight: 16 },
+  coverTitle: { color: parchment.pale, fontFamily: typography.display, fontSize: 18, lineHeight: 22, fontWeight: '700', letterSpacing: -0.3 },
+  coverPremise: { color: parchment.ash, fontSize: 11, lineHeight: 16 },
   coverStatus: { paddingTop: 3, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.75, textTransform: 'uppercase' },
   emptyStage: {
     minHeight: 330,
@@ -905,8 +710,8 @@ const styles = StyleSheet.create({
   emptyShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.32)' },
   emptyCopy: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg, gap: spacing.sm },
   emptyKicker: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
-  emptyTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 30, lineHeight: 34, fontWeight: '700' },
-  emptyDetail: { color: '#D6CEC3', fontSize: 13, lineHeight: 20 },
+  emptyTitle: { color: parchment.pale, fontFamily: typography.display, fontSize: 30, lineHeight: 34, fontWeight: '700' },
+  emptyDetail: { color: parchment.haze, fontSize: 13, lineHeight: 20 },
   composerPreview: {
     minHeight: 300,
     overflow: 'hidden',
@@ -931,7 +736,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  composerMeta: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
+  composerMeta: { color: parchment.pale, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
   composerSignal: { width: 28, height: 2, borderRadius: radius.pill },
   composerCopy: {
     position: 'absolute',
@@ -946,42 +751,7 @@ const styles = StyleSheet.create({
     backgroundColor: cinematic.overlay.glass,
   },
   composerCharacter: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
-  composerPremise: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 20, lineHeight: 27, fontWeight: '700' },
-  moodSwatch: {
-    minWidth: 145,
-    minHeight: 120,
-    flex: 1,
-    flexBasis: '46%',
-    overflow: 'hidden',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-    borderRadius: cinematic.radius.choice,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  moodSwatchPressed: { opacity: 0.8, transform: [{ scale: 0.99 }] },
-  moodSwatchGlow: { position: 'absolute', width: 190, height: 190, top: -90, right: -72, borderRadius: 95, opacity: 0.6 },
-  moodSwatchRim: { position: 'absolute', width: 52, height: 52, top: 49, right: 30, borderRadius: 26, opacity: 0.34 },
-  moodSwatchSilhouette: { position: 'absolute', width: 28, height: 48, right: 16, bottom: 18, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: 'rgba(5,5,5,0.45)', opacity: 0.7 },
-  moodSwatchShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.18)' },
-  moodSwatchTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  moodSwatchState: { color: '#BDB5AA', fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
-  moodSwatchSignal: { width: 22, height: 2, borderRadius: radius.pill },
-  moodSwatchCopy: { gap: 5, paddingTop: spacing.lg },
-  moodSwatchLabel: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 18, lineHeight: 22, fontWeight: '700' },
-  moodSwatchDescription: { color: '#C8C0B5', fontSize: 11, lineHeight: 16 },
-  castingPreview: {
-    minHeight: 250,
-    overflow: 'hidden',
-    borderRadius: cinematic.radius.scene,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderGlow,
-    backgroundColor: colors.surfaceGlass,
-  },
-  castingShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.28)' },
-  castingCopy: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg, gap: 5 },
-  castingKicker: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
-  castingName: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 34, lineHeight: 38, fontWeight: '700' },
-  castingMeta: { color: '#BDB5AA', fontFamily: typography.mono, fontSize: 8, lineHeight: 14, fontWeight: '900', letterSpacing: 0.8 },
+  composerPremise: { color: parchment.pale, fontFamily: typography.display, fontSize: 20, lineHeight: 27, fontWeight: '700' },
   utilityHero: {
     minHeight: 340,
     overflow: 'hidden',
@@ -1017,8 +787,8 @@ const styles = StyleSheet.create({
     backgroundColor: cinematic.overlay.glass,
   },
   utilityHeroKicker: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
-  utilityHeroTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700', letterSpacing: -0.5 },
-  utilityHeroDetail: { color: '#D3CBC0', fontSize: 13, lineHeight: 20 },
+  utilityHeroTitle: { color: parchment.pale, fontFamily: typography.display, fontSize: 26, lineHeight: 31, fontWeight: '700', letterSpacing: -0.5 },
+  utilityHeroDetail: { color: parchment.smoke, fontSize: 13, lineHeight: 20 },
   recapFrame: {
     overflow: 'hidden',
     borderRadius: cinematic.radius.choice,
@@ -1029,9 +799,9 @@ const styles = StyleSheet.create({
   recapVisual: { minHeight: 230, overflow: 'hidden' },
   recapShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.24)' },
   recapVisualMeta: { position: 'absolute', top: spacing.md, left: spacing.md, right: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  recapScene: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
+  recapScene: { color: parchment.pale, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
   recapSignal: { width: 24, height: 2, borderRadius: radius.pill },
-  recapTitle: { position: 'absolute', left: spacing.md, right: spacing.md, bottom: spacing.md, color: '#FFF9EF', fontFamily: typography.display, fontSize: 25, lineHeight: 29, fontWeight: '700', letterSpacing: -0.45 },
+  recapTitle: { position: 'absolute', left: spacing.md, right: spacing.md, bottom: spacing.md, color: parchment.pale, fontFamily: typography.display, fontSize: 25, lineHeight: 29, fontWeight: '700', letterSpacing: -0.45 },
   recapCopy: { gap: spacing.md, padding: spacing.md },
   recapSummary: { color: colors.narrativeInk, fontSize: 14, lineHeight: 22 },
   recapChoice: { gap: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
@@ -1056,45 +826,6 @@ const styles = StyleSheet.create({
   },
   sceneFallbackArtwork: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
   sceneImageTint: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0.2 },
-  sceneBase: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0.5 },
-  lightOrb: { position: 'absolute', borderRadius: radius.pill },
-  lightOrbPrimary: { width: 430, height: 430, top: -105, right: -145 },
-  lightOrbSecondary: { width: 320, height: 320, top: 150, left: -150 },
-  horizonGlow: { position: 'absolute', left: -80, right: -80, bottom: 120, height: 170, opacity: 0.42, borderRadius: radius.pill },
-  portraitRig: { position: 'absolute', bottom: 70, width: 290, height: 430, alignItems: 'center', justifyContent: 'flex-end' },
-  portraitRigCompact: { bottom: 8, transform: [{ scale: 0.68 }] },
-  portraitRigHero: { bottom: 40, width: 320, height: 460 },
-  portraitLeft: { left: -18 },
-  portraitRight: { right: -18 },
-  portraitAura: { position: 'absolute', top: 34, width: 230, height: 300, borderRadius: 116, borderWidth: StyleSheet.hairlineWidth, opacity: 0.16 },
-  portraitCrop: { width: '100%', height: '100%', overflow: 'hidden', borderRadius: 24 },
-  portraitArtwork: { width: '100%', height: '100%' },
-  portraitArtworkHero: { transform: [{ scale: 1.02 }, { translateY: 6 }] },
-  portraitArtworkCard: { transform: [{ scale: 1.08 }, { translateY: 14 }] },
-  portraitArtworkScene: { transform: [{ scale: 1.0 }, { translateY: 4 }] },
-  signalRig: { position: 'absolute', top: 170, right: 38, width: 96, height: 168, alignItems: 'center', justifyContent: 'center' },
-  signalHalo: { position: 'absolute', width: 132, height: 132, borderRadius: 66, opacity: 0.14 },
-  signalDevice: { width: 72, height: 132, gap: 10, paddingHorizontal: 12, paddingTop: 24, borderRadius: 16, borderWidth: 1, backgroundColor: 'rgba(3,3,3,0.72)' },
-  signalLine: { width: '68%', height: 3, borderRadius: radius.pill, opacity: 0.8 },
-  signalLineMuted: { width: '100%', height: 2, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.22)' },
-  signalLineMutedShort: { width: '56%', height: 2, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.16)' },
-  thresholdRig: { position: 'absolute', top: 92, right: 24, width: 150, height: 300 },
-  thresholdFrame: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderWidth: 2, opacity: 0.34 },
-  thresholdGap: { position: 'absolute', top: 18, right: 18, bottom: 0, width: 22, opacity: 0.22 },
-  tableRig: { position: 'absolute', left: 34, right: 34, bottom: 144, height: 126, alignItems: 'center' },
-  tableLampGlow: { width: 96, height: 96, borderRadius: 48, opacity: 0.12 },
-  tableTop: { position: 'absolute', left: 0, right: 0, bottom: 28, height: 18, borderRadius: 9, backgroundColor: '#080808' },
-  tableStem: { position: 'absolute', bottom: -8, width: 18, height: 42, backgroundColor: '#080808' },
-  streetRig: { position: 'absolute', top: 100, right: 16, width: 150, height: 300 },
-  streetLight: { position: 'absolute', top: 22, right: 28, width: 64, height: 64, borderRadius: 32, opacity: 0.13 },
-  streetLine: { position: 'absolute', left: 18, bottom: 0, width: 2, height: 250, backgroundColor: 'rgba(255,255,255,0.16)' },
-  streetLineTwo: { position: 'absolute', left: 64, bottom: 0, width: 2, height: 210, backgroundColor: 'rgba(255,255,255,0.11)' },
-  streetLineThree: { position: 'absolute', right: 20, bottom: 0, width: 2, height: 270, backgroundColor: 'rgba(255,255,255,0.08)' },
-  interiorWindow: { position: 'absolute', top: 120, right: 28, width: 132, height: 198, borderWidth: StyleSheet.hairlineWidth, opacity: 0.2 },
-  setPanel: { position: 'absolute', borderWidth: StyleSheet.hairlineWidth, opacity: 0.18 },
-  setPanelOne: { width: 180, height: 290, top: 70, right: -55, transform: [{ rotate: '8deg' }] },
-  setPanelTwo: { width: 130, height: 220, top: 150, left: -35, transform: [{ rotate: '-7deg' }] },
-  floorShadow: { position: 'absolute', left: -40, right: -40, bottom: -70, height: 210, borderRadius: radius.pill, backgroundColor: '#030303', opacity: 0.88 },
   sceneTopShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: cinematic.overlay.top },
   sceneInnerFrame: {
     position: 'absolute',
@@ -1108,10 +839,11 @@ const styles = StyleSheet.create({
     borderRadius: Math.max(1, cinematic.radius.scene - 4),
   },
   sceneHeader: { position: 'absolute', zIndex: 2, top: spacing.lg, left: spacing.lg, right: spacing.lg, gap: spacing.md },
-  sceneIndex: { color: '#FFF9EF', fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
-  sceneTitle: { maxWidth: 300, color: '#FFF9EF', fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: -0.5 },
+  sceneIndex: { color: parchment.pale, fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
+  sceneTitle: { maxWidth: 300, color: parchment.pale, fontFamily: typography.display, fontSize: 24, lineHeight: 29, fontWeight: '700', letterSpacing: -0.5 },
   sceneProgress: { flexDirection: 'row', gap: 5 },
-  sceneProgressSegment: { flex: 1, height: 2, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.16)' },
+  sceneProgressSegment: { flex: 1, minHeight: 20, justifyContent: 'center' },
+  sceneProgressSegmentBar: { height: 2, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.16)' },
   subtitleDock: {
     position: 'absolute',
     left: spacing.md,
@@ -1128,8 +860,8 @@ const styles = StyleSheet.create({
   },
   subtitleLabelRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   subtitleSpeaker: { fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
-  subtitleCue: { color: '#918B83', fontFamily: typography.mono, fontSize: 8, fontWeight: '800', letterSpacing: 0.8 },
-  subtitleText: { color: '#FFF9EF', fontSize: 18, lineHeight: 27, fontWeight: '700' },
+  subtitleCue: { color: parchment.dusk, fontFamily: typography.mono, fontSize: 8, fontWeight: '800', letterSpacing: 0.8 },
+  subtitleText: { color: parchment.pale, fontSize: 18, lineHeight: 27, fontWeight: '700' },
   choiceCard: {
     position: 'relative',
     minHeight: 78,
@@ -1207,8 +939,8 @@ const styles = StyleSheet.create({
   },
   consequenceBeam: { position: 'absolute', top: -80, bottom: -80, width: 120, opacity: 0.16 },
   consequenceKicker: { fontFamily: typography.mono, fontSize: 10, fontWeight: '900', letterSpacing: 1.7 },
-  consequenceHeadline: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 27, lineHeight: 31, fontWeight: '700' },
-  consequenceText: { color: '#E7DFD4', fontSize: 15, lineHeight: 23 },
+  consequenceHeadline: { color: parchment.pale, fontFamily: typography.display, fontSize: 27, lineHeight: 31, fontWeight: '700' },
+  consequenceText: { color: parchment.mist, fontSize: 15, lineHeight: 23 },
   generationCard: {
     minHeight: 360,
     overflow: 'hidden',
@@ -1219,8 +951,8 @@ const styles = StyleSheet.create({
   generationShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.34)' },
   generationCopy: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg, gap: spacing.sm },
   generationEyebrow: { fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
-  generationTitle: { color: '#FFF9EF', fontFamily: typography.display, fontSize: 31, lineHeight: 35, fontWeight: '700' },
-  generationDetail: { color: '#D6CEC3', fontSize: 14, lineHeight: 21 },
+  generationTitle: { color: parchment.pale, fontFamily: typography.display, fontSize: 31, lineHeight: 35, fontWeight: '700' },
+  generationDetail: { color: parchment.haze, fontSize: 14, lineHeight: 21 },
   generationTrack: { height: 3, overflow: 'hidden', borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.14)' },
   generationTrackLight: { width: '42%', height: '100%', borderRadius: radius.pill },
 });

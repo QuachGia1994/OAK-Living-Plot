@@ -125,3 +125,15 @@ export const classical = {
   hairlineSoft: 'rgba(218, 174, 103, 0.2)',
   patina: 'rgba(111, 74, 35, 0.18)',
 } as const;
+
+export const parchment = {
+  pale: '#FFF9EF',
+  mist: '#E7DFD4',
+  fog: '#DDD5CA',
+  haze: '#D6CEC3',
+  smoke: '#D3CBC0',
+  ash: '#CFC7BC',
+  stone: '#C8C0B5',
+  shadow: '#BDB5AA',
+  dusk: '#918B83',
+} as const;

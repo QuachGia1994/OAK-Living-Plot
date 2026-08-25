@@ -22,17 +22,6 @@ export function buildSubtitleBeats(body: string, maxBeats = DEFAULT_MAX_BEATS): 
   return beats;
 }
 
-export type SceneMotif = 'signal' | 'threshold' | 'table' | 'street' | 'interior';
-
-export function sceneMotifForText(text: string): SceneMotif {
-  const normalized = text.toLocaleLowerCase();
-  if (/phone|message|voice note|voicemail|recording|screen|call|email|text\b/u.test(normalized)) return 'signal';
-  if (/door|hallway|elevator|apartment|room|building|corridor|keycard/u.test(normalized)) return 'threshold';
-  if (/restaurant|chef|kitchen|table|dinner|café|cafe|meal/u.test(normalized)) return 'table';
-  if (/street|car|train|station|city|rain|alley|bridge/u.test(normalized)) return 'street';
-  return 'interior';
-}
-
 export function clampSceneBeat(index: number, beatCount: number): number {
   if (beatCount <= 0) return 0;
   return Math.max(0, Math.min(index, beatCount - 1));
