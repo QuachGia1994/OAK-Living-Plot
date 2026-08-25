@@ -64,6 +64,29 @@ describe('applyCommittedChoiceState', () => {
     expect(result).toEqual({ ok: false, error: 'Unknown fact key during commit: missing-fact' });
   });
 
+  it('resolves a canonical thread once when both the scene and selected choice close it', () => {
+    const proposal = makeValidProposal();
+    proposal.threadChanges.resolve = ['thread-trust'];
+    proposal.choices[0].stateDelta.threadKeysToResolve = ['thread-trust'];
+
+    const result = applyCommittedChoiceState(
+      initialState(),
+      'episode-1',
+      'choice-a',
+      proposal,
+      proposal.choices[0].stateDelta,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.openThreads).not.toContainEqual(
+      expect.objectContaining({ key: 'thread-trust' }),
+    );
+    expect(result.value.openThreads).toContainEqual(
+      expect.objectContaining({ key: 'scene:episode-1:thread:1' }),
+    );
+  });
+
   it('rejects a relationship delta that would exceed canonical bounds', () => {
     const proposal = makeValidProposal();
     proposal.choices[0].stateDelta.relationships[0].trustDelta = 20;

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -26,18 +26,36 @@ export function Screen({
   children,
   contentStyle,
   footer,
+  scrollToEndSignal,
 }: {
   children: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   footer?: ReactNode;
+  scrollToEndSignal?: string;
 }) {
   const androidTabBar = useAndroidTabBarState();
   const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
   const usesCustomTabBar = Platform.OS !== 'ios' && androidTabBar !== null;
   const androidTabOffset = usesCustomTabBar
     ? (androidTabBar.compact ? ANDROID_MINI_NAV_METRICS.compactRailHeight : ANDROID_MINI_NAV_METRICS.expandedHeight) + Math.max(insets.bottom, spacing.xs)
     : undefined;
   const androidBottomInset = androidTabOffset === undefined ? undefined : androidTabOffset + spacing.lg;
+
+  useEffect(() => {
+    if (!scrollToEndSignal) return;
+    let secondFrame: number | undefined;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame !== undefined) cancelAnimationFrame(secondFrame);
+    };
+  }, [scrollToEndSignal]);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={footer && !usesCustomTabBar ? ['top', 'right', 'bottom', 'left'] : ['top', 'right', 'left']}>
       <View pointerEvents="none" style={styles.screenAtmosphere}>
@@ -46,6 +64,7 @@ export function Screen({
       </View>
       <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
+          ref={scrollViewRef}
           automaticallyAdjustKeyboardInsets
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={[

@@ -30,7 +30,11 @@ export function applyCommittedChoiceState(
   state.facts = factResolution.value;
   state.facts = appendUniqueFacts(state.facts, createFacts(`choice:${choiceId}:fact`, delta.factsToAdd));
 
-  const threadResolution = resolveThreads(state.openThreads, delta.threadKeysToResolve);
+  const sceneResolvedThreadKeys = new Set(scene.threadChanges.resolve);
+  const choiceOnlyThreadResolutions = delta.threadKeysToResolve.filter(
+    (key) => !sceneResolvedThreadKeys.has(key),
+  );
+  const threadResolution = resolveThreads(state.openThreads, choiceOnlyThreadResolutions);
   if (!threadResolution.ok) return threadResolution;
   state.openThreads = threadResolution.value;
   state.openThreads = appendUniqueThreads(state.openThreads, createThreads(`choice:${choiceId}:thread`, delta.threadsToOpen));

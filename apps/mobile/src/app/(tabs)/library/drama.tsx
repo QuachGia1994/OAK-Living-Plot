@@ -6,6 +6,11 @@ import { SceneVoiceCard } from '@/features/audio/scene-voice-card';
 import type { DramaMood } from '@/features/drama/domain';
 import { useDramaPlayback, type DramaFailure } from '@/features/drama/use-drama-playback';
 import { canViewSceneSheet, liveSceneSheet, sceneSheetAfterSwipe, type SceneSheet } from '@/features/drama/scene-sheet-navigation';
+import {
+  closedSceneToolsDisclosure,
+  sceneToolsRevealSignal,
+  toggleSceneToolsDisclosure,
+} from '@/features/drama/scene-tools-disclosure';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeDramaShareText } from '@/features/share/drama-share';
@@ -24,10 +29,12 @@ export default function DramaScreen() {
   const authReady = !auth.configured || (auth.isLoaded && auth.isSignedIn);
   const playback = useDramaPlayback({ dramaId, enabled: authReady });
   const [sheet, setSheet] = useState<SceneSheet>('scene');
-  const [utilitiesOpen, setUtilitiesOpen] = useState(false);
+  const [sceneToolsDisclosure, setSceneToolsDisclosure] = useState(closedSceneToolsDisclosure);
+  const utilitiesOpen = sceneToolsDisclosure.expanded;
   const liveSheet = liveSceneSheet(playback.playbackState.phase);
   const activeConceptStep = conceptFlowStep(locale, sheet === 'scene' ? 'scene' : sheet === 'choice' ? 'choice' : 'consequence');
   const sceneKey = playback.drama?.currentScene.id ?? '';
+  const utilityRevealSignal = sceneToolsRevealSignal(sceneToolsDisclosure, sceneKey);
   const lastSceneKey = useRef('');
   const lastLiveSheet = useRef<SceneSheet>('scene');
 
@@ -168,7 +175,7 @@ export default function DramaScreen() {
   );
 
   return (
-    <Screen contentStyle={styles.playerScreen} footer={footer}>
+    <Screen contentStyle={styles.playerScreen} footer={footer} scrollToEndSignal={utilityRevealSignal}>
       <View style={styles.topBar}>
         <BrandMark />
         <ActionButton label={t('My dramas', 'Drama của tôi')} variant="ghost" onPress={() => router.push('/library')} />
@@ -333,7 +340,7 @@ export default function DramaScreen() {
               accessibilityRole="button"
               accessibilityState={{ expanded: utilitiesOpen }}
               accessibilityLabel={t('Toggle scene tools', 'Bật tắt công cụ cảnh')}
-              onPress={() => setUtilitiesOpen((current) => !current)}
+              onPress={() => setSceneToolsDisclosure(toggleSceneToolsDisclosure)}
               style={({ pressed }) => [styles.utilityCard, pressed && styles.utilityCardPressed]}
             >
               <Text style={styles.utilityNumber}>••</Text>
@@ -347,7 +354,7 @@ export default function DramaScreen() {
 
           {utilitiesOpen ? (
             <MotionReveal>
-              <View style={styles.utilityPanel}>
+              <View accessibilityLiveRegion="polite" style={styles.utilityPanel}>
                 <SceneVoiceCard key={scene.id} sceneId={scene.id} sceneText={scene.script} />
                 <ActionButton
                   label={t('Share this drama', 'Chia sẻ drama này')}

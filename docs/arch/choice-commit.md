@@ -1,6 +1,6 @@
 # Phase 1 branch / choice-commit boundary
 
-> updated 2026-08-18 · current application contract
+> updated 2026-08-25 · current application contract
 
 ## Responsibility
 
@@ -26,7 +26,7 @@ The choice application order is deterministic:
 4. set next tone;
 5. reject duplicate keys or scores outside canonical bounds.
 
-Unknown references or malformed persisted data return an explicit failure and write no canonical branch.
+If the Scene transition and selected choice both resolve the same canonical thread, that overlap is one logical resolution within the commit. Unknown references outside that exact overlap or malformed persisted data return an explicit failure and write no canonical branch.
 
 ## Idempotency and concurrency
 
