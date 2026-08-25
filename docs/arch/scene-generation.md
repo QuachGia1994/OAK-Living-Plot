@@ -1,6 +1,6 @@
 # Scene-generation boundary
 
-> updated 2026-08-23 · 0.0.0
+> updated 2026-08-25 · 0.0.0
 
 ## Provider-neutral contract
 
@@ -8,7 +8,7 @@ Pre-story **AI drama-seed suggestions are outside this boundary**. They use the 
 
 Application code generates one drama scene through `SceneGenerator` in `apps/api/src/ai/contracts.ts`. Its input/output are `SceneGenerationInput` and `SceneProposal`; neither contains provider-native response types.
 
-Scene-provider selection is explicit through `SCENE_GENERATOR_PROVIDER`, not inferred from the presence of the Worker `AI` binding. The default environment is configured for Gemini and development explicitly selects `WorkersAiSceneGenerator` with `@cf/meta/llama-3.1-8b-instruct-fast`; both may bind Workers AI for the separate suggestion helper without changing canonical Scene routing. The Workers AI Scene adapter receives `response_format.type = json_schema` with the slim Living Plot creative JSON Schema directly in `json_schema` (`durableFact`, natural-language resolution hints, `establishedFacts`/`threadsToOpen`, no `stateDelta`/`affinityDelta`/`trustDelta`/`tensionDelta` or canonical DB keys), a 2300-token output ceiling on the happy path, and temperature 0.45. Targeted repair uses a smaller 1200-token repair schema that omits `script` entirely and merges byte-for-byte back into the original script. An explicit `workers_ai` Scene selection fails closed if the `AI` binding is missing, and an unknown provider value also fails closed rather than silently switching adapters. A configured Gemini key is not used as failover for an explicitly selected Workers AI Scene path because the deployed Worker region currently receives a Gemini HTTP 400 location restriction; routing a deterministic Workers AI validation failure into that endpoint only changed the user-visible error to `provider_unavailable`. Both provider adapters retain the same structural parser and narrative publication decision, but the live path is now optimized for one 8B creative call.
+Scene-provider selection is explicit through `SCENE_GENERATOR_PROVIDER`, not inferred from the presence of the Worker `AI` binding. The default environment is configured for Gemini and development explicitly selects `WorkersAiSceneGenerator`; that adapter uses `@cf/meta/llama-3.1-8b-instruct-fast` for the one-call happy path and `@cf/meta/llama-3.3-70b-instruct-fp8-fast` only for the already-bounded second recovery call. Both environments may bind Workers AI for the separate suggestion helper without changing canonical Scene routing. The Workers AI Scene adapter receives `response_format.type = json_schema` with the slim Living Plot creative JSON Schema directly in `json_schema` (`durableFact`, natural-language resolution hints, `establishedFacts`/`threadsToOpen`, no `stateDelta`/`affinityDelta`/`trustDelta`/`tensionDelta` or canonical DB keys), a 2300-token output ceiling on the happy path, and temperature 0.45. Targeted recovery uses a smaller 1200-token repair schema that omits `script` entirely and merges byte-for-byte back into the original script. An explicit `workers_ai` Scene selection fails closed if the `AI` binding is missing, and an unknown provider value also fails closed rather than silently switching adapters. A configured Gemini key is not used as failover for an explicitly selected Workers AI Scene path because the deployed Worker region currently receives a Gemini HTTP 400 location restriction; routing a deterministic Workers AI validation failure into that endpoint only changed the user-visible error to `provider_unavailable`. Both provider adapters retain the same structural parser and narrative publication decision; the Workers AI path keeps the fast 8B primary while using the stronger 70B model to improve second-call contract convergence.
 
 ## Canonical input
 
@@ -67,12 +67,13 @@ Offline `evaluateNarrative().passed` (average ≥80 and every dimension ≥60) i
 
 ## Pipeline
 
-`bounded context -> one 8B creative call -> deterministic compiler -> structural/publication gate -> targeted repair when appropriate -> atomic persistence`
+`bounded context -> one 8B creative call -> deterministic compiler -> structural/publication gate -> at most one 70B recovery call -> atomic persistence`
 
 - `WorkersAiSceneGenerator` makes exactly one provider call on the happy path (8B slim creative schema).
-- Malformed/unrecoverable JSON on the first attempt triggers one full regeneration with the 2300-token creative schema (no repair).
-- A first-attempt publication rejection that does not require rewriting `script` (e.g., excluded beat, missing durable commitment that can be repaired without new prose) triggers one targeted repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation via `applyCreativeSceneRepair`).
+- Malformed/unrecoverable JSON on the first attempt triggers one full 70B regeneration with the 2300-token creative schema (no repair).
+- A first-attempt publication rejection that does not require rewriting `script` (e.g., excluded beat, missing durable commitment that can be repaired without new prose) triggers one targeted 70B repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation via `applyCreativeSceneRepair`).
 - Any second failure normalizes to `invalid_response` (attempts=2); provider/binding exceptions normalize to `provider_unavailable` without exposing internals.
+- The pipeline never makes a third provider call. Successful results and attempt/pipeline telemetry report the model that produced the accepted or terminal response; combined token usage still covers both calls.
 - Pipeline telemetry (`providerCalls`, `repairs`, `timings.providerMs/parseMs/compileMs/validateMs/totalMs`, `outcome`) is observational and fail-open; a telemetry write failure never changes generation behavior.
 - Only a publication-accepted `SceneProposal` reaches the episode publisher (server IDs, generation-key idempotency, optimistic state version).
 
@@ -108,7 +109,7 @@ Idempotent scene-generation mutations use a 120-second request budget as a defen
 
 - `test/creative-scene-schema.test.ts`, `test/scene-compiler.test.ts` — slim schema, durableFact quality, exact-map compilation, no invented relationships, bounded resolved tombstones.
 - `test/scene-prompt.test.ts`, `test/scene-schema.test.ts`
-- `test/workers-ai-scene-generator.test.ts` — one 8B call happy path, no `stateDelta` in primary schema, targeted repair with smaller schema and immutable script, malformed→`invalid_response`, exception→`provider_unavailable`, pipeline telemetry counts/timings and fail-open behavior, old episode rows readable.
+- `test/workers-ai-scene-generator.test.ts` — one 8B call happy path; one 70B second-call ceiling for full regeneration or targeted repair; no `stateDelta` in the primary schema; immutable repair script; actual model provenance; malformed→`invalid_response`; exception→`provider_unavailable`; pipeline telemetry counts/timings and fail-open behavior.
 - `test/long-run-soak.test.ts` — 50-scene D1 soak through the real HTTP/service/repository/publisher/committer path with deterministic creative compilation; provider-facing context bytes are recorded at Scenes 1/10/25/50 and exact resolved-state resurrection is attempted again at Scene 50.
 - `test/schema.test.ts` — local migration sequence 0001→0012, legacy-row survival, checkpoint/artwork read-write constraints, cascades, and pre-0011 checkpoint-reader fail-open behavior.
 - `test/scene-artwork.test.ts`, `test/http-artwork.test.ts`, `test/scene-artwork-queue.test.ts` — Scene-specific prompt material, one-call replay, primary/fallback behavior, concurrency convergence, stale refresh, owner isolation, private delivery, fail-open canonical state, Queue ack/retry.

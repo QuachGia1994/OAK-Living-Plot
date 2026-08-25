@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CreativeSceneProposal, CreativeSceneRepair } from '../src/ai/creative-scene-schema';
 import type { GenerationTelemetrySink } from '../src/telemetry/contracts';
-import { WORKERS_AI_SCENE_MODEL, WorkersAiSceneGenerator } from '../src/ai/workers-ai-scene-generator';
+import {
+  WORKERS_AI_SCENE_MODEL,
+  WORKERS_AI_SCENE_RECOVERY_MODEL,
+  WorkersAiSceneGenerator,
+} from '../src/ai/workers-ai-scene-generator';
 import { makeGenerationInput, makeValidProposal } from './drama-fixtures';
 
 function creativeProposal(): CreativeSceneProposal {
@@ -84,7 +88,16 @@ describe('WorkersAiSceneGenerator', () => {
     const result = await generator.generate(makeGenerationInput());
 
     expect(run).toHaveBeenCalledTimes(2);
-    expect(result).toMatchObject({ ok: true, value: { attempts: 2, usage: { inputTokens: 30, outputTokens: 20 } } });
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        attempts: 2,
+        model: WORKERS_AI_SCENE_RECOVERY_MODEL,
+        usage: { inputTokens: 30, outputTokens: 20 },
+      },
+    });
+    expect(run.mock.calls[0]?.[0]).toBe(WORKERS_AI_SCENE_MODEL);
+    expect(run.mock.calls[1]?.[0]).toBe(WORKERS_AI_SCENE_RECOVERY_MODEL);
     const second = run.mock.calls[1][1] as { max_tokens: number; messages: Array<{ content: string }> };
     expect(second.max_tokens).toBe(2300);
     expect(second.messages[0].content).toContain('prior draft was rejected');
@@ -118,12 +131,15 @@ describe('WorkersAiSceneGenerator', () => {
       messages: Array<{ content: string }>;
     };
     expect(repairRequest.max_tokens).toBe(1200);
+    expect(run.mock.calls[0]?.[0]).toBe(WORKERS_AI_SCENE_MODEL);
+    expect(run.mock.calls[1]?.[0]).toBe(WORKERS_AI_SCENE_RECOVERY_MODEL);
     expect(JSON.stringify(repairRequest.response_format.json_schema)).not.toContain('"script"');
     expect(repairRequest.messages[0].content).toContain('script is immutable');
     expect(repairRequest.messages[1].content).not.toContain(recycled.script.slice(0, 80));
     if (result.ok) {
       expect(result.value.proposal.beat).toBe('alliance');
       expect(result.value.proposal.script).toBe(recycled.script);
+      expect(result.value.model).toBe(WORKERS_AI_SCENE_RECOVERY_MODEL);
     }
   });
 
@@ -156,8 +172,14 @@ describe('WorkersAiSceneGenerator', () => {
       incomplete.choices[1].consequence,
     );
     expect(telemetry.recordGenerationPipeline).toHaveBeenCalledWith(expect.objectContaining({
+      model: WORKERS_AI_SCENE_RECOVERY_MODEL,
       providerCalls: 2,
       repairs: 1,
+      outcome: 'accepted',
+    }));
+    expect(telemetry.recordGenerationAttempt).toHaveBeenLastCalledWith(expect.objectContaining({
+      attempt: 2,
+      model: WORKERS_AI_SCENE_RECOVERY_MODEL,
       outcome: 'accepted',
     }));
   });

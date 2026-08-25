@@ -28,10 +28,13 @@ import {
 
 /** Fast primary model; the slim schema leaves canonical state compilation to the server. */
 export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
+/** Stronger recovery model; used only after the fast primary proposal is rejected. */
+export const WORKERS_AI_SCENE_RECOVERY_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 interface ProviderResponse {
   text: string;
   usage: SceneGenerationUsage;
+  model: string;
 }
 
 interface PipelineTimings {
@@ -62,108 +65,146 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
     const first = await this.requestCreative(input, [], timings);
     providerCalls += 1;
     if (!first.ok) {
-      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'provider_error');
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'provider_error', WORKERS_AI_SCENE_MODEL);
       return first;
     }
     addUsage(usage, first.value.usage);
 
     const firstParsed = timedParse(() => parseCreativeSceneProposal(first.value.text), timings);
     if (!firstParsed.ok) {
-      this.recordAttempt(1, 'rejected', first.value.usage);
-      const retry = await this.requestCreative(input, firstParsed.error, timings);
+      this.recordAttempt(1, 'rejected', first.value.usage, first.value.model);
+      const retry = await this.requestCreative(
+        input,
+        firstParsed.error,
+        timings,
+        WORKERS_AI_SCENE_RECOVERY_MODEL,
+      );
       providerCalls += 1;
       if (!retry.ok) {
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'provider_error');
+        this.recordPipeline(
+          timings,
+          startedAt,
+          providerCalls,
+          repairs,
+          'provider_error',
+          WORKERS_AI_SCENE_RECOVERY_MODEL,
+        );
         return retry;
       }
       addUsage(usage, retry.value.usage);
       const retryParsed = timedParse(() => parseCreativeSceneProposal(retry.value.text), timings);
       if (!retryParsed.ok) {
-        this.recordAttempt(2, 'rejected', retry.value.usage);
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+        this.recordAttempt(2, 'rejected', retry.value.usage, retry.value.model);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model);
         return invalidResponse(2);
       }
       const retryValidated = validateCreative(input, retryParsed.value, timings);
       if (!retryValidated.ok) {
-        this.recordAttempt(2, 'rejected', retry.value.usage);
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+        this.recordAttempt(2, 'rejected', retry.value.usage, retry.value.model);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model);
         return invalidResponse(2);
       }
-      this.recordAttempt(2, 'accepted', retry.value.usage);
-      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted');
-      return success(retryValidated.proposal, usage, 2);
+      this.recordAttempt(2, 'accepted', retry.value.usage, retry.value.model);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted', retry.value.model);
+      return success(retryValidated.proposal, usage, 2, retry.value.model);
     }
 
     const firstValidated = validateCreative(input, firstParsed.value, timings);
     if (firstValidated.ok) {
-      this.recordAttempt(1, 'accepted', first.value.usage);
-      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted');
-      return success(firstValidated.proposal, usage, 1);
+      this.recordAttempt(1, 'accepted', first.value.usage, first.value.model);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted', first.value.model);
+      return success(firstValidated.proposal, usage, 1, first.value.model);
     }
 
-    this.recordAttempt(1, 'rejected', first.value.usage);
+    this.recordAttempt(1, 'rejected', first.value.usage, first.value.model);
     if (canTargetRepair(firstValidated.errors)) {
-      const repaired = await this.requestRepair(input, firstParsed.value, firstValidated.errors, timings);
+      const repaired = await this.requestRepair(
+        input,
+        firstParsed.value,
+        firstValidated.errors,
+        timings,
+        WORKERS_AI_SCENE_RECOVERY_MODEL,
+      );
       providerCalls += 1;
       repairs += 1;
       if (!repaired.ok) {
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'provider_error');
+        this.recordPipeline(
+          timings,
+          startedAt,
+          providerCalls,
+          repairs,
+          'provider_error',
+          WORKERS_AI_SCENE_RECOVERY_MODEL,
+        );
         return repaired;
       }
       addUsage(usage, repaired.value.usage);
       const repairParsed = timedParse(() => parseCreativeSceneRepair(repaired.value.text), timings);
       if (!repairParsed.ok) {
-        this.recordAttempt(2, 'rejected', repaired.value.usage);
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+        this.recordAttempt(2, 'rejected', repaired.value.usage, repaired.value.model);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', repaired.value.model);
         return invalidResponse(2);
       }
       const merged = applyCreativeSceneRepair(firstParsed.value, repairParsed.value);
       const repairValidated = validateCreative(input, merged, timings);
       if (!repairValidated.ok) {
-        this.recordAttempt(2, 'rejected', repaired.value.usage);
-        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+        this.recordAttempt(2, 'rejected', repaired.value.usage, repaired.value.model);
+        this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', repaired.value.model);
         return invalidResponse(2);
       }
-      this.recordAttempt(2, 'accepted', repaired.value.usage);
-      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted');
-      return success(repairValidated.proposal, usage, 2);
+      this.recordAttempt(2, 'accepted', repaired.value.usage, repaired.value.model);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted', repaired.value.model);
+      return success(repairValidated.proposal, usage, 2, repaired.value.model);
     }
 
     // Full regeneration is reserved for failures that cannot be repaired without rewriting the script.
-    const retry = await this.requestCreative(input, firstValidated.errors, timings);
+    const retry = await this.requestCreative(
+      input,
+      firstValidated.errors,
+      timings,
+      WORKERS_AI_SCENE_RECOVERY_MODEL,
+    );
     providerCalls += 1;
     if (!retry.ok) {
-      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'provider_error');
+      this.recordPipeline(
+        timings,
+        startedAt,
+        providerCalls,
+        repairs,
+        'provider_error',
+        WORKERS_AI_SCENE_RECOVERY_MODEL,
+      );
       return retry;
     }
     addUsage(usage, retry.value.usage);
     const retryParsed = timedParse(() => parseCreativeSceneProposal(retry.value.text), timings);
     if (!retryParsed.ok) {
-      this.recordAttempt(2, 'rejected', retry.value.usage);
-      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+      this.recordAttempt(2, 'rejected', retry.value.usage, retry.value.model);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model);
       return invalidResponse(2);
     }
     const retryValidated = validateCreative(input, retryParsed.value, timings);
     if (!retryValidated.ok) {
-      this.recordAttempt(2, 'rejected', retry.value.usage);
-      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response');
+      this.recordAttempt(2, 'rejected', retry.value.usage, retry.value.model);
+      this.recordPipeline(timings, startedAt, providerCalls, repairs, 'invalid_response', retry.value.model);
       return invalidResponse(2);
     }
-    this.recordAttempt(2, 'accepted', retry.value.usage);
-    this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted');
-    return success(retryValidated.proposal, usage, 2);
+    this.recordAttempt(2, 'accepted', retry.value.usage, retry.value.model);
+    this.recordPipeline(timings, startedAt, providerCalls, repairs, 'accepted', retry.value.model);
+    return success(retryValidated.proposal, usage, 2, retry.value.model);
   }
 
   private async requestCreative(
     input: SceneGenerationInput,
     validationErrors: string[],
     timings: PipelineTimings,
+    model = WORKERS_AI_SCENE_MODEL,
   ): Promise<Result<ProviderResponse, SceneGenerationError>> {
     const prompt = buildCreativeScenePrompt(input, validationErrors);
     const startedAt = Date.now();
     let payload: unknown;
     try {
-      payload = await this.ai.run(WORKERS_AI_SCENE_MODEL, {
+      payload = await this.ai.run(model, {
         messages: [
           { role: 'system', content: prompt.systemInstruction },
           { role: 'user', content: prompt.userContent },
@@ -180,7 +221,7 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
       };
     }
     timings.providerMs += Date.now() - startedAt;
-    return { ok: true, value: { text: extractResponseText(payload), usage: extractUsage(payload) } };
+    return { ok: true, value: { text: extractResponseText(payload), usage: extractUsage(payload), model } };
   }
 
   private async requestRepair(
@@ -188,6 +229,7 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
     creative: CreativeSceneProposal,
     validationErrors: string[],
     timings: PipelineTimings,
+    model = WORKERS_AI_SCENE_RECOVERY_MODEL,
   ): Promise<Result<ProviderResponse, SceneGenerationError>> {
     const prompt = buildCreativeScenePrompt(input, validationErrors);
     const repairDraft = {
@@ -203,7 +245,7 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
     const startedAt = Date.now();
     let payload: unknown;
     try {
-      payload = await this.ai.run(WORKERS_AI_SCENE_MODEL, {
+      payload = await this.ai.run(model, {
         messages: [
           {
             role: 'system',
@@ -230,18 +272,19 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
       };
     }
     timings.providerMs += Date.now() - startedAt;
-    return { ok: true, value: { text: extractResponseText(payload), usage: extractUsage(payload) } };
+    return { ok: true, value: { text: extractResponseText(payload), usage: extractUsage(payload), model } };
   }
 
   private recordAttempt(
     attempt: 1 | 2,
     outcome: GenerationAttemptOutcome,
     usage: SceneGenerationUsage,
+    model: string,
   ): void {
     try {
       this.telemetry.recordGenerationAttempt({
         provider: 'workers-ai',
-        model: WORKERS_AI_SCENE_MODEL,
+        model,
         attempt,
         outcome,
         usage,
@@ -257,11 +300,12 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
     providerCalls: number,
     repairs: number,
     outcome: 'accepted' | 'invalid_response' | 'provider_error',
+    model: string,
   ): void {
     try {
       this.telemetry.recordGenerationPipeline?.({
         provider: 'workers-ai',
-        model: WORKERS_AI_SCENE_MODEL,
+        model,
         providerCalls,
         repairs,
         outcome,
@@ -324,6 +368,7 @@ function success(
   proposal: SceneProposal,
   usage: SceneGenerationUsage,
   attempts: 1 | 2,
+  model: string,
 ): Result<SceneGenerationSuccess, SceneGenerationError> {
   return {
     ok: true,
@@ -332,7 +377,7 @@ function success(
       usage,
       attempts,
       provider: 'workers-ai',
-      model: WORKERS_AI_SCENE_MODEL,
+      model,
     },
   };
 }
