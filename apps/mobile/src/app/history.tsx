@@ -1,4 +1,5 @@
 import { Redirect, useLocalSearchParams } from 'expo-router';
+import { readParam } from '@/lib/route-params';
 
 export default function LegacyHistoryRedirect() {
   const params = useLocalSearchParams<{ dramaId?: string | string[] }>();
@@ -14,7 +15,3 @@ export default function LegacyHistoryRedirect() {
   );
 }
 
-function readParam(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) return value[0]?.trim() || undefined;
-  return value?.trim() || undefined;
-}

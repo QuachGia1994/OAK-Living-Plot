@@ -11,7 +11,8 @@ import { useUiCopy } from '@/features/localization/ui-copy';
 import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config';
 import type { DramaLocale, NarratorVariant, UiLocale } from '@/features/preferences/contracts';
 import { useUserPreferences } from '@/features/preferences/preferences-context';
-import { ActionButton, BrandMark, ErrorState, Pill, Screen } from '@/ui/primitives';
+import type { PreferencesErrorCode } from '@/features/preferences/preferences-context';
+import { ActionButton, BrandMark, ErrorState, Pill, Screen, SectionHeader, StatusMessage, type StatusTone } from '@/ui/primitives';
 import { colors, cinematic, radius, spacing, typography } from '@/ui/theme';
 
 const unavailableAccount = new UnavailableAccountDataClient();
@@ -35,6 +36,11 @@ export default function SettingsScreen() {
   const dramaLocale = preferenceDraft.dramaLocale ?? preferences.dramaLocale;
   const narratorVariant = preferenceDraft.narratorVariant ?? preferences.narratorVariant;
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<StatusTone>('info');
+  const say = (text: string | null, tone: StatusTone = 'info') => {
+    setMessage(text);
+    setMessageTone(tone);
+  };
   const [busy, setBusy] = useState<'preferences' | 'export' | 'delete' | 'signout' | 'health' | null>(null);
   const [confirmation, setConfirmation] = useState('');
   const [postDeleteSignOutFailed, setPostDeleteSignOutFailed] = useState(false);
@@ -43,15 +49,15 @@ export default function SettingsScreen() {
 
   async function savePreferences() {
     setBusy('preferences');
-    setMessage(null);
+    say(null);
     try {
       await save({ uiLocale, dramaLocale, narratorVariant });
       setPreferenceDraft({});
-      setMessage(uiLocale === 'vi'
+      say(uiLocale === 'vi'
         ? 'Đã lưu tùy chọn. Drama hiện có vẫn giữ ngôn ngữ ban đầu.'
-        : 'Preferences saved. Existing dramas keep their original drama language.');
+        : 'Preferences saved. Existing dramas keep their original drama language.', 'success');
     } catch {
-      setMessage(t('Preferences could not be saved.', 'Không thể lưu tùy chọn.'));
+      say(t('Preferences could not be saved.', 'Không thể lưu tùy chọn.'), 'danger');
     } finally {
       setBusy(null);
     }
@@ -59,13 +65,13 @@ export default function SettingsScreen() {
 
   async function exportData() {
     setBusy('export');
-    setMessage(null);
+    say(null);
     try {
       const snapshot = await account.loadExport();
       await Share.share({ title: t('Living Plot data export', 'Xuất dữ liệu Living Plot'), message: JSON.stringify(snapshot, null, 2) });
-      setMessage(t('Your export was prepared locally for the share sheet.', 'Bản xuất dữ liệu đã được chuẩn bị cục bộ cho bảng chia sẻ.'));
+      say(t('Your export was prepared locally for the share sheet.', 'Bản xuất dữ liệu đã được chuẩn bị cục bộ cho bảng chia sẻ.'), 'success');
     } catch (caught) {
-      setMessage(caught instanceof Error && locale === 'en' ? caught.message : t('Account export could not be prepared.', 'Không thể chuẩn bị bản xuất dữ liệu.'));
+      say(caught instanceof Error && locale === 'en' ? caught.message : t('Account export could not be prepared.', 'Không thể chuẩn bị bản xuất dữ liệu.'), 'danger');
     } finally {
       setBusy(null);
     }
@@ -73,17 +79,17 @@ export default function SettingsScreen() {
 
   async function deleteData() {
     setBusy('delete');
-    setMessage(null);
+    say(null);
     try {
       const result = await deleteAccountThenSignOut(account, confirmation, auth.signOut);
       if (result === 'deleted_and_signed_out') {
         router.replace('/');
       } else {
         setPostDeleteSignOutFailed(true);
-        setMessage(t('Your Living Plot data was deleted, but this device could not sign out of Clerk. Retry sign-out before continuing to use the app.', 'Dữ liệu Living Plot đã bị xóa nhưng thiết bị này chưa thể đăng xuất Clerk. Hãy thử đăng xuất lại trước khi tiếp tục dùng ứng dụng.'));
+        say(t('Your Living Plot data was deleted, but this device could not sign out of Clerk. Retry sign-out before continuing to use the app.', 'Dữ liệu Living Plot đã bị xóa nhưng thiết bị này chưa thể đăng xuất Clerk. Hãy thử đăng xuất lại trước khi tiếp tục dùng ứng dụng.'), 'danger');
       }
     } catch (caught) {
-      setMessage(caught instanceof Error && locale === 'en' ? caught.message : t('Account data could not be deleted.', 'Không thể xóa dữ liệu tài khoản.'));
+      say(caught instanceof Error && locale === 'en' ? caught.message : t('Account data could not be deleted.', 'Không thể xóa dữ liệu tài khoản.'), 'danger');
     } finally {
       setBusy(null);
     }
@@ -96,7 +102,7 @@ export default function SettingsScreen() {
       setPostDeleteSignOutFailed(false);
       router.replace('/');
     } catch {
-      setMessage(t('Your Living Plot data is already deleted, but Clerk sign-out is still unavailable on this device.', 'Dữ liệu Living Plot đã được xóa nhưng đăng xuất Clerk vẫn chưa khả dụng trên thiết bị này.'));
+      say(t('Your Living Plot data is already deleted, but Clerk sign-out is still unavailable on this device.', 'Dữ liệu Living Plot đã được xóa nhưng đăng xuất Clerk vẫn chưa khả dụng trên thiết bị này.'), 'danger');
     } finally {
       setBusy(null);
     }
@@ -138,7 +144,7 @@ export default function SettingsScreen() {
         <Text style={styles.settingsBody}>{t('Language and narration affect new scenes. Your existing drama canon stays untouched.', 'Ngôn ngữ và giọng kể áp dụng cho cảnh mới. Cốt truyện đã có vẫn được giữ nguyên.')}</Text>
       </View>
 
-      {preferenceError ? <ErrorState title={t('Preferences unavailable', 'Tùy chọn không khả dụng')} message={locale === 'vi' ? t('Preferences could not be loaded.', 'Không thể tải tùy chọn.') : preferenceError} /> : null}
+      {preferenceError ? <ErrorState title={t('Preferences unavailable', 'Tùy chọn không khả dụng')} message={preferenceErrorMessage(preferenceError, t)} /> : null}
 
       <View style={styles.section}>
         <SectionHeader index="01" title={t('Drama defaults', 'Mặc định drama')} meta={t('NEW REQUESTS', 'YÊU CẦU MỚI')} />
@@ -240,20 +246,8 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
-      {message ? <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text> : null}
+      {message ? <StatusMessage message={message} tone={messageTone} /> : null}
     </Screen>
-  );
-}
-
-function SectionHeader({ index, title, meta }: { index: string; title: string; meta: string }) {
-  return (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionIndex}>{index}</Text>
-      <View style={styles.sectionHeaderCopy}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <Text style={styles.sectionMeta}>{meta}</Text>
-      </View>
-    </View>
   );
 }
 
@@ -264,14 +258,15 @@ function PreferenceRow({ label, children }: { label: string; children: ReactNode
 function Option({ locale, label, selected, onPress }: { locale: UiLocale; label: string; selected: boolean; onPress: () => void }) {
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole="radio"
+      accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && styles.pressed]}
     >
       <View style={[styles.optionSignal, selected && styles.optionSignalSelected]} />
       <Text style={[styles.optionText, selected && styles.optionTextSelected]} numberOfLines={2}>{label}</Text>
-      <Text style={styles.optionState}>{selected ? (locale === 'vi' ? 'ĐÃ CHỌN' : 'SELECTED') : (locale === 'vi' ? 'TÙY CHỌN' : 'OPTION')}</Text>
+      <Text style={styles.optionState} accessibilityElementsHidden>{selected ? (locale === 'vi' ? 'ĐÃ CHỌN' : 'SELECTED') : (locale === 'vi' ? 'TÙY CHỌN' : 'OPTION')}</Text>
     </Pressable>
   );
 }
@@ -295,6 +290,11 @@ function revenueCatStoreModeFromEnvForRuntime(): string {
   try { return revenueCatStoreModeFromEnv(Platform.OS); } catch { return 'not_configured'; }
 }
 
+function preferenceErrorMessage(code: PreferencesErrorCode, t: (en: string, vi: string) => string): string {
+  if (code === 'save_failed') return t('Preferences could not be saved. Existing dramas are unchanged.', 'Không thể lưu tùy chọn. Drama hiện có vẫn giữ nguyên.');
+  return t('Preferences could not be loaded. Existing dramas are unchanged.', 'Không thể tải tùy chọn. Drama hiện có vẫn giữ nguyên.');
+}
+
 const styles = StyleSheet.create({
   settingsIntro: { gap: spacing.sm, paddingVertical: spacing.md },
   settingsKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
@@ -305,11 +305,6 @@ const styles = StyleSheet.create({
   advancedTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 20, lineHeight: 24, fontWeight: '700' },
   section: { gap: spacing.md, paddingVertical: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderStrong },
   sectionStatusHeader: { gap: spacing.sm },
-  sectionHeader: { width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  sectionIndex: { width: 28, flexShrink: 0, color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 17, fontWeight: '900', letterSpacing: 1.2 },
-  sectionHeaderCopy: { minWidth: 0, flex: 1, gap: 2 },
-  sectionTitle: { flexShrink: 1, color: colors.ink, fontFamily: typography.display, fontSize: 20, lineHeight: 24, fontWeight: '700' },
-  sectionMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 13, fontWeight: '900', letterSpacing: 0.8 },
   preferenceRow: { gap: spacing.sm },
   preferenceLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -319,7 +314,7 @@ const styles = StyleSheet.create({
   optionSignalSelected: { backgroundColor: colors.accentStrong },
   optionText: { color: colors.inkMuted, fontFamily: typography.display, fontSize: 17, lineHeight: 21, fontWeight: '700' },
   optionTextSelected: { color: colors.ink },
-  optionState: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
+  optionState: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
   pressed: { opacity: 0.76 },
   compactNote: { color: colors.quietInk, fontSize: 11, lineHeight: 17 },
   policyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -344,5 +339,4 @@ const styles = StyleSheet.create({
   diagnosticValue: { color: colors.ink, fontFamily: typography.mono, fontSize: 9, lineHeight: 14, fontWeight: '900' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   flexAction: { minWidth: 150, flexGrow: 1 },
-  message: { color: colors.inkMuted, fontSize: 13, lineHeight: 20, textAlign: 'center' },
 });

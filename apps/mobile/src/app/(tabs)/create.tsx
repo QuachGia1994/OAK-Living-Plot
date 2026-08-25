@@ -25,7 +25,9 @@ import { useDramaExperienceClient } from '@/features/drama/drama-client-context'
 import { DramaComposerPreview, DramaGenerationState, DramaUtilityHero } from '@/ui/drama-visuals';
 import { conceptFlowStep } from '@/ui/concept-flow';
 import { ActionButton, BrandMark, ConceptStageHeader, Screen, TaskActionDock } from '@/ui/primitives';
+import { useAccessibilityAnnouncement } from '@/ui/use-accessibility-announce';
 import { cinematic, classical, colors, radius, spacing, typography } from '@/ui/theme';
+import { readParam } from '@/lib/route-params';
 
 const initialDraft: DramaDraft = {
   premise: '',
@@ -54,6 +56,7 @@ export default function CreateDramaScreen() {
   const [showValidation, setShowValidation] = useState(false);
   const [generationJob, setGenerationJob] = useState<GenerationJob>({ state: 'idle' });
   const [submitError, setSubmitError] = useState<string | null>(null);
+  useAccessibilityAnnouncement(submitError);
   const [suggestionPanel, setSuggestionPanel] = useState(initialSuggestionPanelState);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null);
 
@@ -158,9 +161,8 @@ export default function CreateDramaScreen() {
           title={auth.isLoaded ? t('Sign in before directing a new drama.', 'Đăng nhập trước khi dựng drama mới.') : t('Opening your account…', 'Đang mở tài khoản…')}
           detail={t('Your choices stay linked when you return on another device.', 'Lựa chọn vẫn được liên kết khi bạn quay lại trên thiết bị khác.')}
           mood="mysterious"
-          characterName="Create"
         />
-        {auth.isLoaded ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} onPress={() => router.replace('/auth')} /> : null}
+        {auth.isLoaded ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} onPress={() => router.push({ pathname: '/auth', params: { returnTo: 'create' } })} /> : null}
       </Screen>
     );
   }
@@ -327,7 +329,6 @@ export default function CreateDramaScreen() {
 
       {generationJob.state === 'running' ? (
         <DramaGenerationState
-          characterName={draft.characterName || t('Your lead', 'Nhân vật chính')}
           mood={draft.mood}
           label={t('Generating scene 1…', 'Đang tạo cảnh 1…')}
           detail={t('Creating the canonical script and first branch. Voice remains a separate media step.', 'Đang tạo kịch bản chuẩn và nhánh đầu tiên. Giọng đọc là một bước media riêng.')}
@@ -360,11 +361,6 @@ function createErrorMessage(error: unknown, locale: 'en' | 'vi'): string {
   if (error.code === 'invalid_generation') return vi ? 'Cảnh được tạo chưa đạt hợp đồng drama. Thiết lập vẫn được giữ để thử lại.' : 'The generated scene did not satisfy the drama contract. Your setup is still here so you can retry.';
   if (error.code === 'invalid_input') return vi ? 'Thiết lập cảnh chưa hợp lệ. Kiểm tra mầm drama và tên nhân vật rồi thử lại.' : 'The scene setup is invalid. Check the drama spark and lead name, then retry.';
   return error.message;
-}
-
-function readParam(value: string | string[] | undefined): string | null {
-  if (Array.isArray(value)) return value[0]?.trim() || null;
-  return value?.trim() || null;
 }
 
 function readMood(value: string | string[] | undefined): DramaMood | null {

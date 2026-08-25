@@ -9,6 +9,7 @@ import { DramaEmptyStage, DramaLoadingStage, DramaRecapFrame } from '@/ui/drama-
 import { conceptFlowStep } from '@/ui/concept-flow';
 import { ActionButton, BrandMark, ConceptStageHeader, ErrorState, Pill, Screen, TaskActionDock } from '@/ui/primitives';
 import { classical, colors, spacing, typography } from '@/ui/theme';
+import { readParam } from '@/lib/route-params';
 
 export default function DramaHistoryScreen() {
   const router = useRouter();
@@ -48,7 +49,10 @@ export default function DramaHistoryScreen() {
     return () => { active = false; };
   }, [client, dramaId, t]);
 
-  const backToDrama = () => dramaId ? router.replace({ pathname: '/library/drama', params: { dramaId } }) : router.replace('/');
+  const backToDrama = () => {
+    if (router.canGoBack()) return router.back();
+    router.replace(dramaId ? { pathname: '/library/drama', params: { dramaId } } : '/');
+  };
   const currentItem = history?.items[history.items.length - 1];
   const footer = dramaId ? (
     <TaskActionDock
@@ -175,11 +179,6 @@ function BranchJourney({ items, locale }: { items: DramaHistoryItem[]; locale: '
       ) : null}
     </View>
   );
-}
-
-function readParam(value: string | string[] | undefined): string | null {
-  if (Array.isArray(value)) return value[0]?.trim() || null;
-  return value?.trim() || null;
 }
 
 const styles = StyleSheet.create({

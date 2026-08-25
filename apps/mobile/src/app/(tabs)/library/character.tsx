@@ -4,12 +4,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { buildCharacterProfile } from '@/features/drama/character-profile';
 import type { Drama, DramaHistory } from '@/features/drama/contracts';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
+import { dramaMoodLabel } from '@/features/localization/drama-labels';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { CharacterPortraitCard } from '@/features/portrait/character-portrait-card';
 import { DramaLoadingStage } from '@/ui/drama-visuals';
 import { conceptFlowStep } from '@/ui/concept-flow';
 import { ActionButton, BrandMark, ConceptStageHeader, ErrorState, Eyebrow, OrnamentDivider, Pill, Screen, TaskActionDock } from '@/ui/primitives';
 import { classical, colors, radius, spacing, typography } from '@/ui/theme';
+import { readParam } from '@/lib/route-params';
 
 type ProfileTab = 'identity' | 'journey' | 'memory';
 
@@ -66,9 +68,10 @@ export default function CharacterScreen() {
     () => drama && history ? buildCharacterProfile(drama, history) : null,
     [drama, history],
   );
-  const backToDrama = () => dramaId
-    ? router.replace({ pathname: '/library/drama', params: { dramaId } })
-    : router.replace('/');
+  const backToDrama = () => {
+    if (router.canGoBack()) return router.back();
+    router.replace(dramaId ? { pathname: '/library/drama', params: { dramaId } } : '/');
+  };
   const footer = profile ? (
     <TaskActionDock
       eyebrow={t(`Current scene ${profile.currentSceneNumber}`, `Cảnh hiện tại ${profile.currentSceneNumber}`)}
@@ -134,7 +137,7 @@ export default function CharacterScreen() {
               <View style={styles.factList}>
                 <ProfileFact label={t('Role', 'Vai trò')} value={t('Protagonist', 'Nhân vật chính')} />
                 <ProfileFact label={t('Drama', 'Drama')} value={profile.dramaTitle} />
-                <ProfileFact label={t('Mood', 'Không khí')} value={moodLabel(profile.mood, locale)} />
+                <ProfileFact label={t('Mood', 'Không khí')} value={dramaMoodLabel(profile.mood, locale)} />
                 <ProfileFact label={t('Current scene', 'Cảnh hiện tại')} value={`${profile.currentSceneNumber} · ${profile.currentSceneTitle}`} />
               </View>
             </View>
@@ -230,18 +233,6 @@ function ProfileMetric({ label, value }: { label: string; value: number }) {
   );
 }
 
-function moodLabel(mood: Drama['mood'], locale: 'en' | 'vi'): string {
-  const labels = locale === 'vi'
-    ? { tense: 'Căng thẳng', romantic: 'Lãng mạn', mysterious: 'Bí ẩn', hopeful: 'Hy vọng' }
-    : { tense: 'Tense', romantic: 'Romantic', mysterious: 'Mysterious', hopeful: 'Hopeful' };
-  return labels[mood];
-}
-
-function readParam(value: string | string[] | undefined): string | null {
-  if (Array.isArray(value)) return value[0]?.trim() || null;
-  return value?.trim() || null;
-}
-
 const styles = StyleSheet.create({
   screen: { gap: spacing.md },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
@@ -280,7 +271,7 @@ const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', gap: spacing.xs },
   metric: { minWidth: 0, flex: 1, gap: 3, padding: spacing.sm, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: classical.hairline, backgroundColor: colors.surfaceQuiet },
   metricValue: { color: colors.violetStrong, fontFamily: typography.display, fontSize: 24, lineHeight: 28, fontWeight: '700' },
-  metricLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 7, lineHeight: 11, fontWeight: '900', letterSpacing: 0.55, textTransform: 'uppercase' },
+  metricLabel: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, lineHeight: 11, fontWeight: '900', letterSpacing: 0.55, textTransform: 'uppercase' },
   journeyCard: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: classical.hairlineSoft, backgroundColor: colors.surfaceQuiet },
   journeyKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.75 },
   journeyText: { color: colors.narrativeInk, fontFamily: typography.display, fontSize: 17, lineHeight: 25, fontWeight: '600' },

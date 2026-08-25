@@ -80,7 +80,6 @@ export default function HomeScreen() {
           title={t('Pick what happens. Return for the consequence.', 'Chọn điều xảy ra. Quay lại để xem hậu quả.')}
           detail={t('One email code keeps dramas and choices linked across devices.', 'Một mã email giữ drama và lựa chọn liên kết giữa các thiết bị.')}
           mood="mysterious"
-          characterName="Identity"
         />
         <ActionButton label={sharedUiCopy.signIn[locale]} onPress={() => router.push('/auth')} />
       </Screen>

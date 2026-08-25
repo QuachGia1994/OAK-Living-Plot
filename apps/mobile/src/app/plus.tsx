@@ -11,7 +11,7 @@ import { revenueCatStoreModeFromEnv } from '@/features/billing/revenuecat-config
 import { createBillingCoordinator } from '@/features/billing/runtime';
 import { HttpReferralClient, type ReferralSnapshot } from '@/features/referrals/referral-client';
 import { DramaUtilityHero } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, ErrorState, Eyebrow, Pill, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, ErrorState, Eyebrow, Pill, Screen, StatusMessage, type StatusTone } from '@/ui/primitives';
 import { colors, cinematic, radius, spacing, typography } from '@/ui/theme';
 
 export default function PlusScreen() {
@@ -29,67 +29,76 @@ export default function PlusScreen() {
   const [busyAction, setBusyAction] = useState<'paywall' | 'restore' | 'refresh' | null>(null);
   const [entitlement, setEntitlement] = useState<BackendEntitlement | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<StatusTone>('info');
+  const say = (text: string | null, tone: StatusTone = 'info') => {
+    setMessage(text);
+    setMessageTone(tone);
+  };
   const [referral, setReferral] = useState<ReferralSnapshot | null>(null);
   const [referralBusy, setReferralBusy] = useState(false);
+  const [referralLoadFailed, setReferralLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!referralClient || !auth.isLoaded || !auth.isSignedIn) return;
     let active = true;
-    void referralClient.load().then((value) => { if (active) setReferral(value); }).catch(() => undefined);
+    void referralClient.load()
+      .then((value) => { if (active) setReferral(value); })
+      .catch(() => { if (active) setReferralLoadFailed(true); });
     return () => { active = false; };
   }, [auth.isLoaded, auth.isSignedIn, referralClient]);
 
   async function presentPaywall() {
-    if (!session) return setMessage(t('A signed-in development build is required before the store paywall can use your canonical account ID.', 'Cần bản development đã đăng nhập để paywall dùng đúng tài khoản chuẩn của bạn.'));
+    if (!session) return say(t('A signed-in development build is required before the store paywall can use your canonical account ID.', 'Cần bản development đã đăng nhập để paywall dùng đúng tài khoản chuẩn của bạn.'), 'danger');
     setBusyAction('paywall');
-    setMessage(null);
+    say(null);
     try {
       const result = await coordinator.presentPaywall(session);
       setEntitlement(result.entitlement);
-      setMessage(result.entitlement.plusActive
+      say(result.entitlement.plusActive
         ? t('Plus access is active.', 'Quyền Plus đã hoạt động.')
-        : t('The store action finished, but Plus access is still syncing. Refresh access in a moment.', 'Thao tác cửa hàng đã xong nhưng quyền Plus vẫn đang đồng bộ. Hãy làm mới sau một chút.'));
+        : t('The store action finished, but Plus access is still syncing. Refresh access in a moment.', 'Thao tác cửa hàng đã xong nhưng quyền Plus vẫn đang đồng bộ. Hãy làm mới sau một chút.'),
+      result.entitlement.plusActive ? 'success' : 'info');
     } catch (error) {
-      setMessage(billingMessage(error, locale));
+      say(billingMessage(error, locale), 'danger');
     } finally {
       setBusyAction(null);
     }
   }
 
   async function refreshAccess() {
-    if (!session) return setMessage(t('Sign in first so the backend entitlement can be read for the canonical user.', 'Đăng nhập trước để backend đọc quyền truy cập của đúng người dùng chuẩn.'));
+    if (!session) return say(t('Sign in first so the backend entitlement can be read for the canonical user.', 'Đăng nhập trước để backend đọc quyền truy cập của đúng người dùng chuẩn.'), 'danger');
     setBusyAction('refresh');
-    setMessage(null);
+    say(null);
     try {
       const result = await coordinator.refresh(session);
       setEntitlement(result.entitlement);
-      setMessage(result.entitlement.plusActive ? t('Plus access is active.', 'Quyền Plus đang hoạt động.') : t('Your account is still on Free.', 'Tài khoản của bạn vẫn ở gói miễn phí.'));
+      say(result.entitlement.plusActive ? t('Plus access is active.', 'Quyền Plus đang hoạt động.') : t('Your account is still on Free.', 'Tài khoản của bạn vẫn ở gói miễn phí.'), result.entitlement.plusActive ? 'success' : 'info');
     } catch (error) {
-      setMessage(billingMessage(error, locale));
+      say(billingMessage(error, locale), 'danger');
     } finally {
       setBusyAction(null);
     }
   }
 
   async function restore() {
-    if (!session) return setMessage(t('Sign in first. Restore must be linked to the same canonical Living Plot user.', 'Đăng nhập trước. Khôi phục phải gắn với cùng người dùng Living Plot chuẩn.'));
+    if (!session) return say(t('Sign in first. Restore must be linked to the same canonical Living Plot user.', 'Đăng nhập trước. Khôi phục phải gắn với cùng người dùng Living Plot chuẩn.'), 'danger');
     setBusyAction('restore');
-    setMessage(null);
+    say(null);
     try {
       const result = await coordinator.restore(session);
       setEntitlement(result.entitlement);
-      setMessage(result.entitlement.plusActive ? t('Purchases restored and Plus is active.', 'Đã khôi phục giao dịch và Plus đang hoạt động.') : t('Restore completed; this account is still on Free.', 'Đã khôi phục; tài khoản này vẫn ở gói miễn phí.'));
+      say(result.entitlement.plusActive ? t('Purchases restored and Plus is active.', 'Đã khôi phục giao dịch và Plus đang hoạt động.') : t('Restore completed; this account is still on Free.', 'Đã khôi phục; tài khoản này vẫn ở gói miễn phí.'), result.entitlement.plusActive ? 'success' : 'info');
     } catch (error) {
-      setMessage(billingMessage(error, locale));
+      say(billingMessage(error, locale), 'danger');
     } finally {
       setBusyAction(null);
     }
   }
 
   async function shareInvite() {
-    if (!referralClient || !auth.isSignedIn) return setMessage(t('Sign in before sharing a Plus invite.', 'Đăng nhập trước khi chia sẻ lời mời Plus.'));
+    if (!referralClient || !auth.isSignedIn) return say(t('Sign in before sharing a Plus invite.', 'Đăng nhập trước khi chia sẻ lời mời Plus.'), 'danger');
     setReferralBusy(true);
-    setMessage(null);
+    say(null);
     try {
       const current = referral ?? await referralClient.load();
       setReferral(current);
@@ -101,7 +110,7 @@ export default function PlusScreen() {
         ),
       });
     } catch {
-      setMessage(t('The invite could not be shared right now.', 'Hiện chưa thể chia sẻ lời mời.'));
+      say(t('The invite could not be shared right now.', 'Hiện chưa thể chia sẻ lời mời.'), 'danger');
     } finally {
       setReferralBusy(false);
     }
@@ -113,7 +122,7 @@ export default function PlusScreen() {
     <Screen>
       <View style={styles.topBar}>
         <BrandMark />
-        <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => router.back()} />
+        <ActionButton label={sharedUiCopy.back[locale]} variant="ghost" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       </View>
 
       <DramaUtilityHero
@@ -121,7 +130,6 @@ export default function PlusScreen() {
         title={t('Stay for the next scene.', 'Ở lại cho cảnh tiếp theo.')}
         detail={t('Scenes stay unlimited. Plus gives you more fresh narration when the cliffhanger should not end here.', 'Cảnh luôn không giới hạn. Plus cho thêm giọng đọc mới khi cao trào chưa nên dừng lại.')}
         mood="romantic"
-        characterName="Plus"
         artworkSource={require('../../assets/living-plot-scene-mina-3d.jpg')}
       />
 
@@ -174,6 +182,8 @@ export default function PlusScreen() {
         <Text style={styles.referralDetail}>{t('When someone uses your invite and their account activates Plus, your account receives 50 persistent cloud narration credits. The reward is granted by the backend, not by the share tap.', 'Khi người khác dùng lời mời của bạn và tài khoản của họ kích hoạt Plus, tài khoản của bạn nhận 50 lượt giọng cloud dùng lâu dài. Phần thưởng do backend xác nhận, không phát chỉ vì bấm chia sẻ.')}</Text>
         {referral ? (
           <Text style={styles.referralMeta}>{t('CODE', 'MÃ')} · {referral.code}   ·   {t('SUCCESSFUL', 'THÀNH CÔNG')} · {referral.successfulReferrals}</Text>
+        ) : referralLoadFailed ? (
+          <Text style={styles.referralUnavailable}>{t('Your invite code could not be loaded right now. Try refreshing access.', 'Hiện chưa tải được mã giới thiệu của bạn. Hãy thử làm mới quyền truy cập.')}</Text>
         ) : null}
         <View style={styles.referralActions}>
           <ActionButton label={t('Share my invite', 'Chia sẻ lời mời')} variant="secondary" busy={referralBusy} onPress={() => void shareInvite()} style={styles.referralAction} />
@@ -191,7 +201,7 @@ export default function PlusScreen() {
       ) : null}
 
       <View style={styles.primaryAction}>
-        {auth.configured && !auth.isSignedIn ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} variant="secondary" onPress={() => router.push('/auth')} /> : null}
+        {auth.configured && !auth.isSignedIn ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} variant="secondary" onPress={() => router.push({ pathname: '/auth', params: { returnTo: 'plus' } })} /> : null}
         <ActionButton label={entitlementActive ? t('Plus is ready', 'Plus đã sẵn sàng') : t('Upgrade Plus', 'Nâng cấp Plus')} busy={busyAction === 'paywall'} disabled={busyAction !== null && busyAction !== 'paywall'} onPress={presentPaywall} />
       </View>
 
@@ -206,7 +216,7 @@ export default function PlusScreen() {
         </View>
       </View>
 
-      {message ? <Text style={styles.message} accessibilityLiveRegion="polite">{message}</Text> : null}
+      {message ? <StatusMessage message={message} tone={messageTone} /> : null}
     </Screen>
   );
 }
@@ -289,6 +299,7 @@ const styles = StyleSheet.create({
   referralTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 22, lineHeight: 27, fontWeight: '700' },
   referralDetail: { color: colors.inkMuted, fontSize: 12, lineHeight: 19 },
   referralMeta: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, lineHeight: 15, fontWeight: '900', letterSpacing: 0.7 },
+  referralUnavailable: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, lineHeight: 15, fontWeight: '800', letterSpacing: 0.4 },
   referralActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   referralAction: { minWidth: 150, flexGrow: 1 },
   primaryAction: { gap: spacing.sm },
@@ -298,5 +309,4 @@ const styles = StyleSheet.create({
   utilityDetail: { color: colors.quietInk, fontSize: 11, lineHeight: 17 },
   utilityActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   utilityButton: { minWidth: 145, flexGrow: 1 },
-  message: { color: colors.inkMuted, fontSize: 13, lineHeight: 20, textAlign: 'center' },
 });

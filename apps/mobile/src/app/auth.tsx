@@ -16,13 +16,15 @@ import {
 } from '@/features/auth/passwordless-email-otp';
 import { useUiCopy } from '@/features/localization/ui-copy';
 import { DramaLoadingStage, DramaUtilityHero } from '@/ui/drama-visuals';
-import { ActionButton, BrandMark, Screen } from '@/ui/primitives';
+import { ActionButton, BrandMark, Screen, StatusMessage } from '@/ui/primitives';
 import { colors, cinematic, spacing, typography } from '@/ui/theme';
 
 export default function AuthScreen() {
   const auth = useMobileAuth();
   const router = useRouter();
-  const params = useLocalSearchParams<{ returnTo?: string | string[]; referralCode?: string | string[] }>();
+  const params = useLocalSearchParams<{ returnTo?: string | string[]; referralCode?: string | string[]; dramaId?: string | string[] }>();
+  const returnTo = readReturnTarget(params.returnTo);
+  const returnDramaId = readReturnDramaId(params.dramaId);
   const referralCode = readReturnReferralCode(params.returnTo, params.referralCode);
   const { locale, t } = useUiCopy();
 
@@ -35,9 +37,8 @@ export default function AuthScreen() {
           title={t('The drama works. Account sync waits for live services.', 'Drama vẫn chạy. Đồng bộ tài khoản chờ dịch vụ live.')}
           detail={t('Explore the complete drama flow now; sign-in appears when Clerk is connected.', 'Khám phá toàn bộ luồng drama ngay; đăng nhập sẽ xuất hiện khi Clerk được kết nối.')}
           mood="mysterious"
-          characterName="Preview"
         />
-        <ActionButton label={t('Back to preview', 'Quay lại bản xem trước')} onPress={() => router.replace('/')} />
+        <ActionButton label={t('Back to preview', 'Quay lại bản xem trước')} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       </Screen>
     );
   }
@@ -60,17 +61,23 @@ export default function AuthScreen() {
           title={t('Your stories can follow you.', 'Câu chuyện có thể đi cùng bạn.')}
           detail={t('Return to Living Plot and continue from your canonical choices.', 'Quay lại Living Plot và tiếp tục từ những lựa chọn chuẩn của bạn.')}
           mood="hopeful"
-          characterName="Signed in"
         />
-        <ActionButton label={referralCode ? t('Continue invite', 'Tiếp tục lời mời') : t('Open Living Plot', 'Mở Living Plot')} onPress={() => finishAuth(router, referralCode)} />
+        <ActionButton
+          label={referralCode
+            ? t('Continue invite', 'Tiếp tục lời mời')
+            : returnTo
+              ? t('Continue where you left off', 'Tiếp tục nơi bạn đang ở')
+              : t('Open Living Plot', 'Mở Living Plot')}
+          onPress={() => finishAuth(router, { returnTo, referralCode, dramaId: returnDramaId })}
+        />
       </Screen>
     );
   }
 
-  return <ClerkEmailOtpForm referralCode={referralCode} />;
+  return <ClerkEmailOtpForm returnTo={returnTo} referralCode={referralCode} dramaId={returnDramaId} />;
 }
 
-function ClerkEmailOtpForm({ referralCode }: { referralCode: string | null }) {
+function ClerkEmailOtpForm({ returnTo, referralCode, dramaId }: { returnTo: AuthReturnTarget | null; referralCode: string | null; dramaId: string | null }) {
   const router = useRouter();
   const { locale, t } = useUiCopy();
   const { signIn, fetchStatus } = useSignIn();
@@ -107,7 +114,7 @@ function ClerkEmailOtpForm({ referralCode }: { referralCode: string | null }) {
         signIn as unknown as PasswordlessSignInResource,
         signUp as unknown as PasswordlessSignUpResource,
         normalizedCode,
-        () => finishAuth(router, referralCode),
+        () => finishAuth(router, { returnTo, referralCode, dramaId }),
       );
       if (outcome.kind === 'configuration_error') {
         setMessage(passwordlessConfigurationMessage(outcome.missingFields, locale));
@@ -159,7 +166,6 @@ function ClerkEmailOtpForm({ referralCode }: { referralCode: string | null }) {
           ? t(`Code sent to ${email.trim()}.`, `Mã đã gửi tới ${email.trim()}.`)
           : t('One email code links plots, choices and progress to your account.', 'Một mã email sẽ liên kết cốt truyện, lựa chọn và tiến độ với tài khoản.')}
         mood={verifying ? 'hopeful' : 'mysterious'}
-        characterName={verifying ? 'Verify' : 'Identity'}
       />
 
       <View style={styles.authDock}>
@@ -195,7 +201,7 @@ function ClerkEmailOtpForm({ referralCode }: { referralCode: string | null }) {
           />
         )}
 
-        {message ? <Text style={styles.error} accessibilityLiveRegion="polite">{message}</Text> : null}
+        {message ? <StatusMessage message={message} tone="danger" /> : null}
 
         <ActionButton
           label={verifying ? t('Verify code', 'Xác minh mã') : t('Send email code', 'Gửi mã email')}
@@ -214,15 +220,50 @@ function ClerkEmailOtpForm({ referralCode }: { referralCode: string | null }) {
   );
 }
 
+const AUTH_RETURN_TARGETS = ['referral', 'create', 'drama', 'plus'] as const;
+type AuthReturnTarget = (typeof AUTH_RETURN_TARGETS)[number];
+
+function readReturnTarget(value: string | string[] | undefined): AuthReturnTarget | null {
+  const target = Array.isArray(value) ? value[0] : value;
+  return AUTH_RETURN_TARGETS.includes(target as AuthReturnTarget) ? target as AuthReturnTarget : null;
+}
+
+function readReturnDramaId(value: string | string[] | undefined): string | null {
+  const id = (Array.isArray(value) ? value[0] : value)?.trim() ?? '';
+  return id.length > 0 && id.length <= 200 ? id : null;
+}
+
 function readReturnReferralCode(returnTo: string | string[] | undefined, referralCode: string | string[] | undefined): string | null {
   const target = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   const code = (Array.isArray(referralCode) ? referralCode[0] : referralCode)?.trim().toUpperCase() ?? '';
   return target === 'referral' && /^[A-Z0-9]{8,24}$/u.test(code) ? code : null;
 }
 
-function finishAuth(router: ReturnType<typeof useRouter>, referralCode: string | null): void {
-  if (referralCode) router.replace({ pathname: '/referral', params: { code: referralCode } });
-  else router.replace('/');
+function finishAuth(
+  router: ReturnType<typeof useRouter>,
+  options: { returnTo: AuthReturnTarget | null; referralCode: string | null; dramaId: string | null },
+): void {
+  if (options.referralCode && !router.canGoBack()) {
+    router.replace({ pathname: '/referral', params: { code: options.referralCode } });
+    return;
+  }
+  if (router.canGoBack()) {
+    router.back();
+    return;
+  }
+  switch (options.returnTo) {
+    case 'create':
+      router.replace('/create');
+      break;
+    case 'drama':
+      router.replace(options.dramaId ? { pathname: '/library/drama', params: { dramaId: options.dramaId } } : '/library');
+      break;
+    case 'plus':
+      router.replace('/plus');
+      break;
+    default:
+      router.replace('/');
+  }
 }
 
 const styles = StyleSheet.create({
@@ -241,5 +282,4 @@ const styles = StyleSheet.create({
   codeInput: { minHeight: 70, paddingHorizontal: 0, borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.accentSoft, color: colors.ink, fontFamily: typography.mono, fontSize: 28, fontWeight: '900', letterSpacing: 8 },
   secondaryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   secondaryButton: { minWidth: 140, flexGrow: 1 },
-  error: { color: colors.danger, fontSize: 13, lineHeight: 19 },
 });

@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PanResponder, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SceneArtworkBackdrop } from '@/features/artwork/scene-artwork-backdrop';
 import { SceneVoiceCard } from '@/features/audio/scene-voice-card';
-import type { DramaMood } from '@/features/drama/domain';
 import { useDramaPlayback, type DramaFailure } from '@/features/drama/use-drama-playback';
 import { canViewSceneSheet, liveSceneSheet, sceneSheetAfterSwipe, type SceneSheet } from '@/features/drama/scene-sheet-navigation';
 import {
@@ -12,12 +11,14 @@ import {
   toggleSceneToolsDisclosure,
 } from '@/features/drama/scene-tools-disclosure';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
+import { dramaMoodLabel } from '@/features/localization/drama-labels';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { buildSpoilerSafeDramaShareText } from '@/features/share/drama-share';
 import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
 import { conceptFlowStep } from '@/ui/concept-flow';
 import { ActionButton, BrandMark, ConceptStageHeader, ErrorState, Eyebrow, MotionReveal, Screen, TaskActionDock } from '@/ui/primitives';
 import { classical, colors, radius, spacing, typography } from '@/ui/theme';
+import { readParam } from '@/lib/route-params';
 
 export default function DramaScreen() {
   const router = useRouter();
@@ -67,7 +68,7 @@ export default function DramaScreen() {
           title={auth.isLoaded ? t('Sign in to continue this drama', 'Đăng nhập để tiếp tục drama') : t('Opening your account…', 'Đang mở tài khoản…')}
           message={t('Sign in so Living Plot can restore your choices and continue from the canonical scene.', 'Đăng nhập để Living Plot khôi phục các lựa chọn và tiếp tục đúng cảnh chuẩn.')}
         />
-        {auth.isLoaded ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} onPress={() => router.replace('/auth')} /> : null}
+        {auth.isLoaded ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} onPress={() => router.push({ pathname: '/auth', params: { returnTo: 'drama', dramaId } })} /> : null}
         <ActionButton label={t('Back to home', 'Về trang chủ')} variant="ghost" onPress={() => router.replace('/')} />
       </Screen>
     );
@@ -304,7 +305,7 @@ export default function DramaScreen() {
           <View style={styles.dramaUtilityCopy}>
             <Text style={styles.dramaUtilityKicker}>{playbackLabel(playback.playbackState.phase, locale)}</Text>
             <Text style={styles.dramaUtilityTitle} numberOfLines={2}>{drama.title}</Text>
-            <Text style={styles.dramaUtilityMeta}>{drama.leadCharacter.name} · {moodLabel(drama.mood, locale)}</Text>
+            <Text style={styles.dramaUtilityMeta}>{drama.leadCharacter.name} · {dramaMoodLabel(drama.mood, locale)}</Text>
           </View>
 
           <View style={styles.utilityGrid}>
@@ -420,18 +421,6 @@ function playbackLabel(phase: string, locale: 'en' | 'vi'): string {
   return 'BRANCH COMMITTED';
 }
 
-function moodLabel(mood: DramaMood, locale: 'en' | 'vi'): string {
-  const labels = locale === 'vi'
-    ? { tense: 'Căng thẳng', romantic: 'Lãng mạn', mysterious: 'Bí ẩn', hopeful: 'Hy vọng' }
-    : { tense: 'Tense', romantic: 'Romantic', mysterious: 'Mysterious', hopeful: 'Hopeful' };
-  return labels[mood];
-}
-
-function readParam(value: string | string[] | undefined): string | null {
-  if (Array.isArray(value)) return value[0]?.trim() || null;
-  return value?.trim() || null;
-}
-
 function failureMessage(failure: DramaFailure | null, locale: 'en' | 'vi'): string {
   const vi = locale === 'vi';
   if (!failure) return vi ? 'Không thể tải drama này.' : 'This drama could not be loaded.';
@@ -497,7 +486,7 @@ const styles = StyleSheet.create({
   sheetTabSelected: { borderBottomColor: classical.gold, backgroundColor: classical.patina },
   sheetTabDisabled: { opacity: 0.32 },
   sheetTabPressed: { opacity: 0.72 },
-  sheetTabIndex: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
+  sheetTabIndex: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
   sheetTabIndexSelected: { color: colors.violetStrong },
   sheetTabLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
   sheetTabLabelSelected: { color: colors.ink },
