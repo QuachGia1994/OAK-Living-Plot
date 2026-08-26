@@ -21,8 +21,8 @@ describe('narrative quality eval suite', () => {
     const report = evaluateNarrative(fixture.input, fixture.proposal);
 
     expect(report.passed).toBe(false);
-    expect(report.findings.some((finding) => finding.code === 'STRUCTURAL_OR_CANONICAL_FAILURE')).toBe(true);
-    expect(report.findings.some((finding) => finding.message.includes('materially distinct'))).toBe(true);
+    expect(report.findings.some((finding) => finding.code === 'CHOICES_SEMANTICALLY_NEAR_DUPLICATE')).toBe(true);
+    expect(report.findings.some((finding) => finding.message.includes('too similar'))).toBe(true);
   });
 
   it('rejects an episode that ignores the prior committed consequence in its opening', () => {

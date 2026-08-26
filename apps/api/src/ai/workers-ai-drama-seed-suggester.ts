@@ -9,7 +9,8 @@ import {
   type DramaSeedSuggestionProviderSuccess,
 } from '../drama-runtime/suggestion-contracts';
 import { boundedNormalizedText, validatePublicSuggestions } from '../drama-runtime/suggestion-validation';
-import { WORKERS_AI_SCENE_MODEL } from './workers-ai-scene-generator';
+
+const WORKERS_AI_DRAMA_SEED_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
 
 interface SeedProposal {
   label: string;
@@ -88,7 +89,7 @@ export class WorkersAiDramaSeedSuggester implements DramaSeedSuggester {
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      const provider = this.ai.run(WORKERS_AI_SCENE_MODEL, {
+      const provider = this.ai.run(WORKERS_AI_DRAMA_SEED_MODEL, {
         messages: [
           { role: 'system', content: prompt.system },
           { role: 'user', content: prompt.user },
