@@ -38,8 +38,9 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const usesCustomTabBar = Platform.OS !== 'ios' && androidTabBar !== null;
+  const androidTabSafeInset = Math.max(Math.min(insets.bottom, spacing.sm), spacing.xs);
   const androidTabOffset = usesCustomTabBar
-    ? (androidTabBar.compact ? ANDROID_MINI_NAV_METRICS.compactRailHeight : ANDROID_MINI_NAV_METRICS.expandedHeight) + Math.max(insets.bottom, spacing.xs)
+    ? (androidTabBar.compact ? ANDROID_MINI_NAV_METRICS.compactRailHeight : ANDROID_MINI_NAV_METRICS.expandedHeight) + androidTabSafeInset
     : undefined;
   const androidBottomInset = androidTabOffset === undefined ? undefined : androidTabOffset + spacing.lg;
 
@@ -256,6 +257,7 @@ type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 
 interface ActionButtonProps extends Omit<PressableProps, 'children' | 'style'> {
   label: string;
+  icon?: string;
   variant?: ButtonVariant;
   busy?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -263,6 +265,7 @@ interface ActionButtonProps extends Omit<PressableProps, 'children' | 'style'> {
 
 export function ActionButton({
   label,
+  icon,
   variant = 'primary',
   busy = false,
   disabled,
@@ -293,15 +296,29 @@ export function ActionButton({
       {busy ? (
         <ActivityIndicator color={variant === 'primary' ? colors.accentInk : colors.ink} />
       ) : (
-        <Text
-          style={[
-            styles.buttonText,
-            variant === 'primary' && styles.buttonTextPrimary,
-            variant === 'ghost' && styles.buttonTextGhost,
-          ]}
-        >
-          {label}
-        </Text>
+        <View style={styles.buttonContent}>
+          {icon ? (
+            <Text
+              importantForAccessibility="no-hide-descendants"
+              style={[
+                styles.buttonIcon,
+                variant === 'primary' && styles.buttonTextPrimary,
+                variant === 'ghost' && styles.buttonTextGhost,
+              ]}
+            >
+              {icon}
+            </Text>
+          ) : null}
+          <Text
+            style={[
+              styles.buttonText,
+              variant === 'primary' && styles.buttonTextPrimary,
+              variant === 'ghost' && styles.buttonTextGhost,
+            ]}
+          >
+            {label}
+          </Text>
+        </View>
       )}
     </Pressable>
   );
@@ -819,6 +836,19 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.46,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  buttonIcon: {
+    color: colors.ink,
+    fontFamily: typography.mono,
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: '900',
   },
   buttonText: {
     color: colors.ink,

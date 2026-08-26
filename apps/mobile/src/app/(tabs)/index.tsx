@@ -236,6 +236,16 @@ function UpNextShelf({ snapshot, featuredDramaId, t, onOpenDrama, onOpenSpark }:
               premise={promptDrama?.resumeLine ?? prompt.premise}
               characterName={promptDrama?.characterName ?? prompt.characterName}
               mood={promptDrama?.mood ?? prompt.mood}
+              artwork={promptDrama ? (
+                <SceneArtworkBackdrop
+                  sceneId={promptDrama.sceneId}
+                  revision={`${promptDrama.sceneNumber}:${promptDrama.resumeLine}`}
+                  accessibilityLabel={t(
+                    `Illustration for scene ${promptDrama.sceneNumber} of ${promptDrama.title}`,
+                    `Tranh minh họa cảnh ${promptDrama.sceneNumber} của ${promptDrama.title}`,
+                  )}
+                />
+              ) : undefined}
               sceneLabel={presentation.mode === 'resume-known' && promptDrama
                 ? `${t('SCENE', 'CẢNH')} ${String(promptDrama.sceneNumber).padStart(2, '0')}`
                 : presentation.mode === 'resume-generic'
@@ -257,6 +267,16 @@ function UpNextShelf({ snapshot, featuredDramaId, t, onOpenDrama, onOpenSpark }:
               premise={drama.resumeLine || drama.premise}
               characterName={drama.characterName}
               mood={drama.mood}
+              artwork={(
+                <SceneArtworkBackdrop
+                  sceneId={drama.sceneId}
+                  revision={`${drama.sceneNumber}:${drama.resumeLine}`}
+                  accessibilityLabel={t(
+                    `Illustration for scene ${drama.sceneNumber} of ${drama.title}`,
+                    `Tranh minh họa cảnh ${drama.sceneNumber} của ${drama.title}`,
+                  )}
+                />
+              )}
               sceneLabel={`${t('SCENE', 'CẢNH')} ${String(drama.sceneNumber).padStart(2, '0')}`}
               statusLabel={drama.status === 'awaiting_choice' ? t('Your choice is waiting', 'Đang chờ lựa chọn') : t('Continue from consequence', 'Tiếp tục từ hậu quả')}
               onPress={() => onOpenDrama(drama)}

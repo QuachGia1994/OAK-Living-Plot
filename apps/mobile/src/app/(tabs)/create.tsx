@@ -179,6 +179,7 @@ export default function CreateDramaScreen() {
     >
       <ActionButton
         label={generationJob.state === 'failed' ? t('Retry scene 1', 'Thử lại cảnh 1') : t('Begin the story', 'Bắt đầu câu chuyện')}
+        icon={generationJob.state === 'failed' ? '↻' : '→'}
         busy={generating}
         disabled={generating || suggestionPanel.loading}
         onPress={() => void submit()}
@@ -233,8 +234,9 @@ export default function CreateDramaScreen() {
         <View style={styles.suggestionActionRow}>
           <ActionButton
             label={suggestionPanel.suggestions ? t('Suggest more', 'Gợi ý thêm') : t('Suggest with AI', 'Gợi ý bằng AI')}
+            icon="✦"
             accessibilityLabel={suggestionPanel.suggestions ? t('Generate three more AI drama suggestions', 'Tạo thêm ba gợi ý drama bằng AI') : t('Generate three AI drama suggestions', 'Tạo ba gợi ý drama bằng AI')}
-            variant="ghost"
+            variant="secondary"
             busy={suggestionPanel.loading}
             disabled={generationJob.state === 'running' || suggestionPanel.loading}
             onPress={() => void requestSuggestions()}
@@ -248,8 +250,15 @@ export default function CreateDramaScreen() {
         ) : null}
 
         {suggestionPanel.error ? (
-          <View style={styles.suggestionError} accessibilityLiveRegion="assertive" accessible>
+          <View style={styles.suggestionError} accessibilityLiveRegion="assertive">
             <Text style={styles.suggestionErrorText}>{suggestionPanel.error}</Text>
+            <ActionButton
+              label={t('Try AI suggestions again', 'Thử gợi ý AI lại')}
+              icon="↻"
+              variant="ghost"
+              disabled={generationJob.state === 'running' || suggestionPanel.loading}
+              onPress={() => void requestSuggestions()}
+            />
           </View>
         ) : null}
 
@@ -273,8 +282,11 @@ export default function CreateDramaScreen() {
                   ]}
                 >
                   <View style={styles.suggestionCardHeader}>
-                    <Text style={styles.suggestionLabel}>{suggestion.label}</Text>
-                    <Text style={styles.suggestionMeta}>{moodLabel} · {suggestion.characterName}</Text>
+                    <View style={styles.suggestionCardHeaderCopy}>
+                      <Text style={styles.suggestionLabel}>{suggestion.label}</Text>
+                      <Text style={styles.suggestionMeta}>{moodLabel} · {suggestion.characterName}</Text>
+                    </View>
+                    <Text importantForAccessibility="no" style={[styles.suggestionSelectIcon, selected && styles.suggestionSelectIconSelected]}>{selected ? '✓' : '→'}</Text>
                   </View>
                   <Text style={styles.suggestionPremise}>{suggestion.premise}</Text>
                 </Pressable>
@@ -489,6 +501,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   suggestionError: {
+    gap: spacing.xs,
     padding: spacing.sm,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
@@ -517,7 +530,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceGlass,
   },
   suggestionCardPressed: { opacity: 0.78 },
-  suggestionCardHeader: { gap: 2 },
+  suggestionCardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  suggestionCardHeaderCopy: { minWidth: 0, flex: 1, gap: 2 },
+  suggestionSelectIcon: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 18, fontWeight: '900' },
+  suggestionSelectIconSelected: { color: colors.accentStrong },
   suggestionLabel: {
     color: colors.ink,
     fontFamily: typography.display,

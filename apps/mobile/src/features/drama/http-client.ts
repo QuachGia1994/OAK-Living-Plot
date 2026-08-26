@@ -16,7 +16,7 @@ import { createIdempotencyKey } from '../../lib/idempotency-key';
 import { AuthenticatedJsonTransport, HttpTransportError, type FetchLike, type TokenProvider } from '../../lib/http-transport';
 
 const AI_MUTATION_TIMEOUT_MS = 120_000;
-export const AI_SUGGESTION_TIMEOUT_MS = 30_000;
+export const AI_SUGGESTION_TIMEOUT_MS = 55_000;
 
 export class HttpDramaExperienceClient implements DramaExperienceClient {
   private readonly createGenerationKeys = new Map<string, string>();

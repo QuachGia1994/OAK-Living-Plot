@@ -3,8 +3,8 @@ import type { DramaLocale } from '../preferences/contracts';
 
 export const DRAMA_SUGGESTION_DAILY_LIMIT = 12;
 export const DRAMA_SUGGESTION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-export const DRAMA_SUGGESTION_PIPELINE_TIMEOUT_MS = 24 * 1000;
-export const DRAMA_SUGGESTION_LEASE_MS = 35 * 1000;
+export const DRAMA_SUGGESTION_PIPELINE_TIMEOUT_MS = 45 * 1000;
+export const DRAMA_SUGGESTION_LEASE_MS = 60 * 1000;
 
 export interface DramaSeedSuggestion {
   label: string;

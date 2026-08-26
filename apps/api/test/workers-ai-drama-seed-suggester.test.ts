@@ -10,7 +10,7 @@ const input = {
 };
 
 describe('WorkersAiDramaSeedSuggester', () => {
-  it('uses exactly one small structured Workers AI call on the happy path', async () => {
+  it('uses exactly one reliable structured Workers AI call on the happy path', async () => {
     const run = vi.fn().mockResolvedValue({ response: providerBatch('Một') });
     const suggester = new WorkersAiDramaSeedSuggester({ run } as unknown as Ai);
 
@@ -19,8 +19,8 @@ describe('WorkersAiDramaSeedSuggester', () => {
     expect(result).toMatchObject({ ok: true, value: { providerCalls: 1, repairs: 0 } });
     expect(run).toHaveBeenCalledTimes(1);
     const [model, request, options] = run.mock.calls[0] as [string, Record<string, unknown>, { signal?: AbortSignal }];
-    expect(model).toBe('@cf/meta/llama-3.1-8b-instruct-fast');
-    expect(request).toMatchObject({ response_format: { type: 'json_schema' }, max_tokens: 1200, temperature: 0.7 });
+    expect(model).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
+    expect(request).toMatchObject({ response_format: { type: 'json_schema' }, max_tokens: 1400, temperature: 0.5 });
     expect(options.signal).toBeInstanceOf(AbortSignal);
     const schema = JSON.stringify((request.response_format as { json_schema: unknown }).json_schema);
     expect(schema).toContain('incitingIncident');
@@ -50,7 +50,7 @@ describe('WorkersAiDramaSeedSuggester', () => {
     expect(result).toMatchObject({ ok: true, value: { providerCalls: 2, repairs: 1 } });
     expect(run).toHaveBeenCalledTimes(2);
     const repair = run.mock.calls[1][1] as { temperature: number; messages: Array<{ content: string }> };
-    expect(repair.temperature).toBe(0.25);
+    expect(repair.temperature).toBe(0.2);
     expect(repair.messages[0].content).toContain('Previous output failed validation');
   });
 

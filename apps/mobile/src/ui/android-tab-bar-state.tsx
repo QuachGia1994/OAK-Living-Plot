@@ -3,8 +3,8 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 export const ANDROID_TAB_ROUTES = ['index', 'create', 'library', 'settings'] as const;
 
 export const ANDROID_MINI_NAV_METRICS = {
-  expandedHeight: 68,
-  compactRailHeight: 46,
+  expandedHeight: 58,
+  compactRailHeight: 44,
   compactRailMaxWidth: 248,
   compactSideMargin: 20,
   minimumTapTarget: 44,
@@ -25,9 +25,9 @@ export function androidMiniRailWidth(viewportWidth: number): number {
 }
 
 const TOP_RESET_Y = 8;
-const MIN_COMPACT_Y = 28;
-const DOWN_THRESHOLD = 24;
-const UP_THRESHOLD = 18;
+const MIN_COMPACT_Y = 20;
+const DOWN_THRESHOLD = 12;
+const UP_THRESHOLD = 14;
 const JITTER_DELTA = 1;
 
 export interface AndroidTabBarScrollState {

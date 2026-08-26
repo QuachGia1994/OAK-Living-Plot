@@ -257,11 +257,11 @@ describe('HttpDramaExperienceClient', () => {
     expect(body).not.toHaveProperty('characterName');
   });
 
-  it('uses a 30-second defensive suggestion timeout without changing the 120-second Scene ceiling', async () => {
+  it('uses a 55-second defensive suggestion timeout without changing the 120-second Scene ceiling', async () => {
     vi.useFakeTimers();
     try {
       const fetcher = vi.fn<TestFetch>(async (_input, init) => new Promise<Response>((resolve, reject) => {
-        const timer = setTimeout(() => resolve(Response.json({ suggestions: suggestionPayload() })), 40_000);
+        const timer = setTimeout(() => resolve(Response.json({ suggestions: suggestionPayload() })), 60_000);
         init?.signal?.addEventListener('abort', () => {
           clearTimeout(timer);
           reject(new Error('aborted'));
@@ -269,7 +269,7 @@ describe('HttpDramaExperienceClient', () => {
       }));
       const client = new HttpDramaExperienceClient('https://api.test', async () => 'token', fetcher);
       const assertion = expect(client.suggestDramaSeeds({ mood: 'mysterious' }, 'suggestion-timeout-001')).rejects.toMatchObject({ code: 'backend_unavailable' });
-      await vi.advanceTimersByTimeAsync(30_001);
+      await vi.advanceTimersByTimeAsync(55_001);
       await assertion;
       expect(fetcher).toHaveBeenCalledTimes(1);
     } finally {

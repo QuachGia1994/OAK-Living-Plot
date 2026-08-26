@@ -10,7 +10,7 @@ import {
 } from '../drama-runtime/suggestion-contracts';
 import { boundedNormalizedText, validatePublicSuggestions } from '../drama-runtime/suggestion-validation';
 
-const WORKERS_AI_DRAMA_SEED_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
+const WORKERS_AI_DRAMA_SEED_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 interface SeedProposal {
   label: string;
@@ -95,8 +95,8 @@ export class WorkersAiDramaSeedSuggester implements DramaSeedSuggester {
           { role: 'user', content: prompt.user },
         ],
         response_format: { type: 'json_schema', json_schema: responseSchema },
-        max_tokens: 1200,
-        temperature: repairErrors ? 0.25 : 0.7,
+        max_tokens: 1400,
+        temperature: repairErrors ? 0.2 : 0.5,
       }, { signal: controller.signal });
       const deadline = new Promise<never>((_, reject) => {
         timeout = setTimeout(() => {

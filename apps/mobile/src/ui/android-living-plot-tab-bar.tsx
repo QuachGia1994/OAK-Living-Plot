@@ -18,7 +18,7 @@ export function AndroidLivingPlotTabBar({ compact, state, descriptors, navigatio
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const keyboardVisible = useKeyboardVisible();
-  const bottomInset = Math.max(insets.bottom, spacing.xs);
+  const bottomInset = Math.max(Math.min(insets.bottom, spacing.sm), spacing.xs);
   if (keyboardVisible) return null;
 
   return (
@@ -161,9 +161,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   expandedItem: {
-    minHeight: 54,
-    gap: 2,
-    borderRadius: 18,
+    minHeight: 46,
+    gap: 1,
+    borderRadius: 16,
   },
   expandedItemSelected: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -174,15 +174,15 @@ const styles = StyleSheet.create({
     minHeight: ANDROID_MINI_NAV_METRICS.minimumTapTarget,
   },
   iconShell: {
-    width: 36,
-    height: 30,
+    width: 32,
+    height: 26,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 15,
   },
   compactSelectedIcon: {
-    width: 38,
-    height: 34,
+    width: 36,
+    height: 32,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.violetSoft,
     borderRadius: 17,
@@ -191,8 +191,8 @@ const styles = StyleSheet.create({
   glyph: {
     color: colors.quietInk,
     fontFamily: typography.mono,
-    fontSize: 21,
-    lineHeight: 24,
+    fontSize: 19,
+    lineHeight: 21,
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -202,8 +202,8 @@ const styles = StyleSheet.create({
   label: {
     color: colors.quietInk,
     fontFamily: typography.mono,
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 9,
+    lineHeight: 11,
     fontWeight: '700',
   },
   labelSelected: {

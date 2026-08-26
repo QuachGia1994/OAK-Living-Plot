@@ -148,7 +148,7 @@ describe('drama seed suggestion HTTP boundary', () => {
     const newWorker = new FixtureSuggester(validSuggestions('Recovered'));
     const firstPromise = suggestionRequest(suggestionBody(), 'clerk-owner', oldWorker, { dramaClock: () => clock });
     await oldWorker.started;
-    clock += 36_000;
+    clock += 61_000;
     const recovered = await suggestionRequest(suggestionBody(), 'clerk-owner', newWorker, { dramaClock: () => clock });
     expect(recovered.status).toBe(200);
     const recoveredBody = await recovered.json();
