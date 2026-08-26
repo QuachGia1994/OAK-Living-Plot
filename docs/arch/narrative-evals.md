@@ -1,6 +1,6 @@
 # Narrative quality evaluations
 
-> updated 2026-08-20 · 0.0.0
+> updated 2026-08-26 · 0.0.0
 
 ## Purpose
 Deterministic offline scoring for narrative regressions, plus a separate **runtime publication gate** shared by every SceneGenerator adapter.
@@ -8,17 +8,11 @@ Deterministic offline scoring for narrative regressions, plus a separate **runti
 Offline pass (`evaluateNarrative().passed`) is **not** identical to runtime publication authority.
 
 ## Runtime publication (`validateNarrativePublication`)
-Provider-neutral. Called by **both** `GeminiSceneGenerator` and `WorkersAiSceneGenerator` after structural parse and before accepting a proposal.
+Provider-neutral. Called by **both** `GeminiSceneGenerator` and `WorkersAiSceneGenerator` after the strict provider parser and canonical business rules.
 
-May reject only:
-- structural/canonical failures
-- Phase-1 objective novelty failures (`trajectoryDiversity`, `structuralVariety`, `longRangeNovelty`)
-- Phase-2 hard codes: `BRANCH_NO_DURABLE_EFFECT`, `THREAD_EXPLOSION`, `CONSEQUENCE_NOT_REALIZED`, `PACING_ROLE_INVALID`
-- branch commitment floor
+Runtime publication rejects only structural/canonical failures. All narrative-score findings—including `trajectoryDiversity`, `structuralVariety`, `longRangeNovelty`, `branchCommitment`, `consequenceRealization`, and `threadPayoff`—remain visible in the report and in offline regressions, but cannot turn an otherwise valid continuation into `invalid_generation` after a canonical Branch commit.
 
-Must **not** reject solely on eval-only dimensions: `relationshipProgression`, `protagonistAgency`, `arcCoherence`, `returnPull`, `ENDLESS_ESCALATION`, `ENDLESS_BREATHER`, `CRITICAL_THREAD_STALLED`, `CONSEQUENCE_UNRELATED_PROGRESSION`.
-
-`CRITICAL_THREAD_STALLED` remains eval-only because current history does not encode per-thread first-seen age cheaply.
+The provider prompt still receives bounded novelty, pacing, consequence, and thread guidance. The strict creative/schema boundary still rejects malformed JSON, invalid or repeated Scene/Choice structure, missing provider-authored durable branch facts, invalid canonical references, and the spoken-length envelope. This separates fail-closed contract validity from heuristic narrative quality.
 
 ## Phase-1 dimensions
 continuity, threadMomentum, branchDistinctness, consequenceSpecificity, repetitionControl, characterConsistency, localeAlignment, sceneProgression, trajectoryDiversity, structuralVariety, longRangeNovelty.

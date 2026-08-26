@@ -20,6 +20,23 @@ describe('Phase-2 narrative quality', () => {
     }
   });
 
+  it('keeps beat cooldown as an observable quality finding instead of a runtime dead end', () => {
+    const input = makeGenerationInput();
+    input.novelty = {
+      excludedBeats: ['discovery'],
+      trajectoryConstraints: [],
+      motifHistory: [],
+    };
+    const proposal = makeValidProposal();
+    proposal.beat = 'discovery';
+
+    const decision = validateNarrativePublication(input, proposal);
+
+    expect(decision.report.findings.some((finding) => finding.code === 'BEAT_COOLDOWN_VIOLATION')).toBe(true);
+    expect(decision.publishable).toBe(true);
+    expect(decision.rejectionReasons).toEqual([]);
+  });
+
   it('fails three choices with no durable state effects', () => {
     const proposal = makeValidProposal();
     for (const choice of proposal.choices) {

@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { artworkLegibility } from './artwork-legibility';
 
 export const colors = {
   ink: '#F3E7CF',
@@ -72,11 +73,12 @@ export const cinematic = {
     top: 'rgba(6, 7, 5, 0.28)',
     middle: 'rgba(8, 8, 6, 0.16)',
     subtitle: 'rgba(10, 10, 8, 0.78)',
-    strong: 'rgba(7, 8, 6, 0.84)',
-    glass: 'rgba(18, 18, 14, 0.55)',
+    strong: artworkLegibility.overlay.strong,
+    glass: artworkLegibility.overlay.glass,
     hairline: 'rgba(240, 216, 167, 0.18)',
     violetHairline: 'rgba(211, 162, 93, 0.38)',
   },
+  artworkText: artworkLegibility.textShadow,
   glow: {
     violet: 'rgba(155, 106, 53, 0.22)',
     gold: 'rgba(200, 154, 85, 0.2)',

@@ -1,6 +1,6 @@
 # Scene-generation boundary
 
-> updated 2026-08-25 · 0.0.0
+> updated 2026-08-26 · 0.0.0
 
 ## Provider-neutral contract
 
@@ -55,15 +55,11 @@ Legacy `recentHistory` rows may omit beat/pacingRole/motifSignature; the provide
 
 ## Publication gate (shared)
 
-After structural parse, **both** adapters call `validateNarrativePublication(input, proposal)`:
+After strict creative/schema validation, **both** adapters call `validateNarrativePublication(input, proposal)`. Runtime authority rejects only structural/canonical failures. Narrative scoring remains provider-neutral and fully observable, but a heuristic quality miss cannot strand an otherwise valid continuation after its preceding Branch is already canonical.
 
-1. structural/canonical failures → reject/repair-or-retry;
-2. Phase-1 objective novelty floors (`trajectoryDiversity`, `structuralVariety`, `longRangeNovelty`) → targeted repair when recoverable without rewriting `script`, otherwise full regeneration;
-3. Phase-2 hard codes only: `BRANCH_NO_DURABLE_EFFECT`, `THREAD_EXPLOSION`, `CONSEQUENCE_NOT_REALIZED`, `PACING_ROLE_INVALID` (+ branch-commitment floor).
+Phase-1 novelty dimensions (`trajectoryDiversity`, `structuralVariety`, `longRangeNovelty`) and Phase-2 dimensions (`branchCommitment`, `consequenceRealization`, `threadPayoff`, `pacingQuality`, `relationshipProgression`, `protagonistAgency`, `arcCoherence`, `returnPull`) continue to guide prompts and offline regressions. They do not independently produce `invalid_generation`.
 
-Eval-only scores (`relationshipProgression`, `protagonistAgency`, `arcCoherence`, `returnPull`, `ENDLESS_ESCALATION`, `ENDLESS_BREATHER`, `CRITICAL_THREAD_STALLED`, `CONSEQUENCE_UNRELATED_PROGRESSION`) feed offline `evaluateNarrative()` regressions and **do not** block publication by themselves.
-
-Offline `evaluateNarrative().passed` (average ≥80 and every dimension ≥60) is a fixture/regression signal, not the runtime publication authority.
+Fail-closed contract checks remain earlier in the pipeline: malformed/invalid provider shape, spoken-length violations, repeated or invalid Scene/Choice structure, missing/non-distinct/unsupported provider-authored `durableFact`, and invalid canonical references. Offline `evaluateNarrative().passed` (average ≥80 and every dimension ≥60) remains a fixture/regression signal, not runtime authority.
 
 ## Pipeline
 
@@ -71,7 +67,7 @@ Offline `evaluateNarrative().passed` (average ≥80 and every dimension ≥60) i
 
 - `WorkersAiSceneGenerator` makes exactly one provider call on the happy path (8B slim creative schema).
 - Malformed/unrecoverable JSON on the first attempt triggers one full 70B regeneration with the 2300-token creative schema (no repair).
-- A first-attempt publication rejection that does not require rewriting `script` (e.g., excluded beat, missing durable commitment that can be repaired without new prose) triggers one targeted 70B repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation via `applyCreativeSceneRepair`).
+- A first-attempt recoverable creative/schema rejection (for example repeated Choice structure or missing provider-authored durable commitment) triggers one targeted 70B repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation via `applyCreativeSceneRepair`). Narrative-score findings alone do not trigger recovery or terminal failure.
 - Any second failure normalizes to `invalid_response` (attempts=2); provider/binding exceptions normalize to `provider_unavailable` without exposing internals.
 - The pipeline never makes a third provider call. Successful results and attempt/pipeline telemetry report the model that produced the accepted or terminal response; combined token usage still covers both calls.
 - Pipeline telemetry (`providerCalls`, `repairs`, `timings.providerMs/parseMs/compileMs/validateMs/totalMs`, `outcome`) is observational and fail-open; a telemetry write failure never changes generation behavior.
@@ -109,7 +105,7 @@ Idempotent scene-generation mutations use a 120-second request budget as a defen
 
 - `test/creative-scene-schema.test.ts`, `test/scene-compiler.test.ts` — slim schema, durableFact quality, exact-map compilation, no invented relationships, bounded resolved tombstones.
 - `test/scene-prompt.test.ts`, `test/scene-schema.test.ts`
-- `test/workers-ai-scene-generator.test.ts` — one 8B call happy path; one 70B second-call ceiling for full regeneration or targeted repair; no `stateDelta` in the primary schema; immutable repair script; actual model provenance; malformed→`invalid_response`; exception→`provider_unavailable`; pipeline telemetry counts/timings and fail-open behavior.
+- `test/workers-ai-scene-generator.test.ts` — one 8B call happy path; quality-only beat cooldown does not dead-end; one 70B second-call ceiling for full regeneration or targeted structural repair; no `stateDelta` in the primary schema; immutable repair script; actual model provenance; genuinely invalid provider material→`invalid_response`; exception→`provider_unavailable`; pipeline telemetry counts/timings and fail-open behavior.
 - `test/long-run-soak.test.ts` — 50-scene D1 soak through the real HTTP/service/repository/publisher/committer path with deterministic creative compilation; provider-facing context bytes are recorded at Scenes 1/10/25/50 and exact resolved-state resurrection is attempted again at Scene 50.
 - `test/schema.test.ts` — local migration sequence 0001→0012, legacy-row survival, checkpoint/artwork read-write constraints, cascades, and pre-0011 checkpoint-reader fail-open behavior.
 - `test/scene-artwork.test.ts`, `test/http-artwork.test.ts`, `test/scene-artwork-queue.test.ts` — Scene-specific prompt material, one-call replay, primary/fallback behavior, concurrency convergence, stale refresh, owner isolation, private delivery, fail-open canonical state, Queue ack/retry.

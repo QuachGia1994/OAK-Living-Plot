@@ -124,7 +124,7 @@ export function scoreThreadPayoff(
   }
 
   // Eval-only stall signal: global recentHistory length is not per-thread age.
-  // Do not hard-reject on this heuristic alone (see PHASE2_HARD_CODES).
+  // Narrative quality findings remain observable and never own runtime publication.
   if (
     advancedCritical.length === 0
     && input.recentHistory.length >= CRITICAL_THREAD_STALL_SCENES
@@ -334,21 +334,4 @@ export function scoreReturnPull(
     message: 'Scene neither pays something off nor opens a concrete return hook.',
   });
   return 40;
-}
-
-/**
- * Objective Phase-2 codes that may reject publication.
- * CRITICAL_THREAD_STALLED is intentionally excluded: age is not per-thread.
- * CONSEQUENCE_NOT_REALIZED remains hard only when there is zero development;
- * CONSEQUENCE_UNRELATED_PROGRESSION is eval-only.
- */
-export const PHASE2_HARD_CODES = new Set([
-  'BRANCH_NO_DURABLE_EFFECT',
-  'THREAD_EXPLOSION',
-  'CONSEQUENCE_NOT_REALIZED',
-  'PACING_ROLE_INVALID',
-]);
-
-export function isPhase2HardFailure(code: string): boolean {
-  return PHASE2_HARD_CODES.has(code);
 }

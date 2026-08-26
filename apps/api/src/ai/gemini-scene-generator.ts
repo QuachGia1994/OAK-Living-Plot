@@ -66,14 +66,10 @@ export class GeminiSceneGenerator implements SceneGenerator {
         validationErrors = validated.error;
       } else {
         const publication = validateNarrativePublication(input, validated.value);
-        const structuralRejections = publication.rejectionReasons.filter((reason) =>
-          reason.includes('STRUCTURAL_OR_CANONICAL_FAILURE'),
-        );
-        if (structuralRejections.length > 0) {
+        if (!publication.publishable) {
           this.recordAttempt(attempt as 1 | 2, 'rejected', provider.value.usage);
-          validationErrors = structuralRejections;
+          validationErrors = publication.rejectionReasons;
         } else {
-          // Novelty / Phase-2 scores remain observable offline; do not dead-end continuations.
           this.recordAttempt(attempt as 1 | 2, 'accepted', provider.value.usage);
           return {
             ok: true,

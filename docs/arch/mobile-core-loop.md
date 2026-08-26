@@ -1,6 +1,6 @@
 # Phase 1 mobile core loop
 
-> updated 2026-08-25 · 0.0.0
+> updated 2026-08-26 · 0.0.0
 
 ## Responsibility
 The Expo client owns presentation, transient selection/loading state, native audio playback, and navigation. Canonical Drama, Scene, Branch/Choice, quota, entitlement, media lifecycle, and retention history remain backend-owned.
@@ -79,11 +79,11 @@ The mobile design stays token-driven while matching the approved classical conce
 - Scene/Choice/Consequence keep the existing player contract but use classical framed surfaces; A is amber/gold, B slate/silver, and C forest green so branches remain materially scannable without encoding canonical meaning;
 - Living Character and History use the same black/gold hierarchy and ornate portrait/timeline frames while avoiding invented affinity scores, character stats, or non-canonical story data;
 - a generated 1280px classical fallback painting covers offline/loading/legacy cases; configured current Scenes swap to owner-private artwork generated from their actual canonical content;
-- high-contrast long-form reading typography remains prioritized over decorative glass effects;
+- artwork-backed narrative copy uses one shared legibility contract: strong copy scrims cap at 0.58 alpha, inset glass at 0.34, and a restrained shared text shadow carries local contrast so Home, Library, Scene, Consequence, recap, and generation artwork remains visible without sacrificing reading clarity;
 - reusable Screen/Card/Pill/ActionButton/loading/error primitives remain the presentation base;
 - semantic theme tokens rather than raw product state in TSX;
 - short entrance motion through the shared primitive, automatically disabled when the OS Reduce Motion setting is enabled;
 - Safe Area handling at the root and screen level.
 
 ## Verification
-Mobile tests cover Scene-1 creation/first-generation-key persistence including legacy-v1 upgrade, daily-spark hidden-resume presentation, AI-suggestion request-key persistence/owner isolation, synchronous single-flight, stale-response suppression, old-card retention during refresh/failure, exact form mapping after selection, strict 2–50-character response parsing, suggestion-specific errors/30-second timeout, deterministic preview replay/conflict/non-mutation/story locale and Unicode-safe inspiration truncation, Scene-tools reveal signaling, setup/localization validation, passwordless email-OTP existing/new-user transitions and single-flight guards, Android mini-tab scroll thresholds/route mapping/rail dimensions, authenticated API diagnostic normalization without bearer leakage, preview semantics, authenticated story DTO parsing, fresh bearer tokens, retry-key reuse, canonical resync after conflict, retention parsing, private audio request/status/playback-source authorization, RevenueCat Test Store selection, and backend entitlement refresh behavior. GitHub quality now also applies local D1 migrations and a Cloudflare development dry-run; iOS production export and Android native release APK are separate CI gates.
+Mobile tests cover Scene-1 creation/first-generation-key persistence including legacy-v1 upgrade, daily-spark hidden-resume presentation, AI-suggestion request-key persistence/owner isolation, synchronous single-flight, stale-response suppression, old-card retention during refresh/failure, exact form mapping after selection, strict 2–50-character response parsing, suggestion-specific errors/30-second timeout, deterministic preview replay/conflict/non-mutation/story locale and Unicode-safe inspiration truncation, shared artwork-overlay alpha/text-shadow bounds, Scene-tools reveal signaling, setup/localization validation, passwordless email-OTP existing/new-user transitions and single-flight guards, Android mini-tab scroll thresholds/route mapping/rail dimensions, authenticated API diagnostic normalization without bearer leakage, preview semantics, authenticated story DTO parsing, fresh bearer tokens, retry-key reuse, canonical resync after conflict, retention parsing, private audio request/status/playback-source authorization, RevenueCat Test Store selection, and backend entitlement refresh behavior. GitHub quality now also applies local D1 migrations and a Cloudflare development dry-run; iOS production export and Android native release APK are separate CI gates.
