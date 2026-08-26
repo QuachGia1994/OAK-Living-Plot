@@ -24,55 +24,64 @@ export function AndroidLivingPlotTabBar({ compact, state, descriptors, navigatio
   return (
     <View pointerEvents="box-none" style={[styles.overlay, { paddingBottom: bottomInset }]}>
       <View style={[compact ? styles.compactRail : styles.expandedRail, compact ? { width: androidMiniRailWidth(width) } : null]}>
-        <BlurView
-          pointerEvents="none"
-          intensity={72}
-          tint="dark"
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFill}
-        />
+        {!compact ? (
+          <BlurView
+            pointerEvents="none"
+            intensity={72}
+            tint="dark"
+            experimentalBlurMethod="dimezisBlurView"
+            style={[StyleSheet.absoluteFill, styles.blurLayer]}
+          />
+        ) : null}
         <View pointerEvents="none" style={styles.railPatina} />
         <View pointerEvents="none" style={styles.railInnerFrame} />
-        {state.routes.map((route, index) => {
-          const focused = state.index === index;
-          const options = descriptors[route.key]?.options;
-          const routeName = isAndroidTabRoute(route.name) ? route.name : null;
-          if (!routeName) return null;
-          const label = options?.tabBarAccessibilityLabel ?? readLabel(options?.title, routeName);
+        <View style={styles.itemsRow}>
+          {state.routes.map((route, index) => {
+            const focused = state.index === index;
+            const options = descriptors[route.key]?.options;
+            const routeName = isAndroidTabRoute(route.name) ? route.name : null;
+            if (!routeName) return null;
+            const label = options?.tabBarAccessibilityLabel ?? readLabel(options?.title, routeName);
 
-          const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (event.defaultPrevented) return;
-            if (routeName === 'library') {
-              navigation.navigate(route.name, { screen: 'index' });
-              return;
-            }
-            if (!focused) navigation.navigate(route.name, route.params);
-          };
-          const onLongPress = () => navigation.emit({ type: 'tabLongPress', target: route.key });
+            const onPress = () => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (event.defaultPrevented) return;
+              if (routeName === 'library') {
+                navigation.navigate(route.name, { screen: 'index' });
+                return;
+              }
+              if (!focused) navigation.navigate(route.name, route.params);
+            };
+            const onLongPress = () => navigation.emit({ type: 'tabLongPress', target: route.key });
 
-          return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="tab"
-              accessibilityLabel={label}
-              accessibilityState={{ selected: focused }}
-              onLongPress={onLongPress}
-              onPress={onPress}
-              style={({ pressed }) => [
-                styles.item,
-                compact ? styles.compactItem : styles.expandedItem,
-                !compact && focused && styles.expandedItemSelected,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={[styles.iconShell, compact && focused && styles.compactSelectedIcon]}>
-                <Text importantForAccessibility="no" style={[styles.glyph, focused && styles.glyphSelected]}>{ANDROID_TAB_GLYPHS[routeName]}</Text>
-              </View>
-              {!compact ? <Text style={[styles.label, focused && styles.labelSelected]}>{readLabel(options?.title, routeName)}</Text> : null}
-            </Pressable>
-          );
-        })}
+            return (
+              <Pressable
+                key={route.key}
+                accessibilityRole="tab"
+                accessibilityLabel={label}
+                accessibilityState={{ selected: focused }}
+                onLongPress={onLongPress}
+                onPress={onPress}
+                style={({ pressed }) => [
+                  styles.item,
+                  compact ? styles.compactItem : styles.expandedItem,
+                  !compact && focused && styles.expandedItemSelected,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={[styles.iconShell, compact && focused && styles.compactSelectedIcon]}>
+                  <Text
+                    importantForAccessibility="no"
+                    style={[styles.glyph, compact && styles.compactGlyph, focused && styles.glyphSelected]}
+                  >
+                    {ANDROID_TAB_GLYPHS[routeName]}
+                  </Text>
+                </View>
+                {!compact ? <Text style={[styles.label, focused && styles.labelSelected]}>{readLabel(options?.title, routeName)}</Text> : null}
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -130,12 +139,23 @@ const styles = StyleSheet.create({
     borderColor: colors.borderGlow,
     borderRadius: radius.pill,
     overflow: 'hidden',
-    backgroundColor: 'rgba(12, 10, 7, 0.72)',
+    backgroundColor: 'rgba(12, 10, 7, 0.96)',
     shadowColor: colors.accentStrong,
     shadowOpacity: 0.18,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 10,
+  },
+  blurLayer: {
+    zIndex: 0,
+  },
+  itemsRow: {
+    width: '100%',
+    height: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 3,
+    elevation: 12,
   },
   railPatina: {
     position: 'absolute',
@@ -171,7 +191,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(190, 131, 52, 0.15)',
   },
   compactItem: {
-    minHeight: ANDROID_MINI_NAV_METRICS.minimumTapTarget,
+    height: ANDROID_MINI_NAV_METRICS.minimumTapTarget,
+    minWidth: ANDROID_MINI_NAV_METRICS.minimumTapTarget,
   },
   iconShell: {
     width: 32,
@@ -195,6 +216,12 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     fontWeight: '800',
     textAlign: 'center',
+  },
+  compactGlyph: {
+    fontFamily: 'sans-serif',
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: '700',
   },
   glyphSelected: {
     color: colors.accentStrong,
