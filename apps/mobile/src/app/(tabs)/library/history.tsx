@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
+import { dramaRoute } from '@/features/drama/drama-navigation';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHistory, DramaHistoryItem } from '@/features/drama/contracts';
 import { journeyStats } from '@/features/drama/journey-stats';
@@ -51,7 +52,7 @@ export default function DramaHistoryScreen() {
 
   const backToDrama = () => {
     if (router.canGoBack()) return router.back();
-    router.replace(dramaId ? { pathname: '/library/drama', params: { dramaId } } : '/');
+    router.replace(dramaId ? dramaRoute(dramaId) : '/');
   };
   const currentItem = history?.items[history.items.length - 1];
   const footer = dramaId ? (

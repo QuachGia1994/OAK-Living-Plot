@@ -13,7 +13,6 @@ import {
   creativeSceneResponseSchema,
   parseCreativeSceneProposal,
   parseCreativeSceneRepair,
-  validateCreativeSceneSemantics,
   type CreativeSceneProposal,
 } from './creative-scene-schema';
 import { compileCreativeScene } from './scene-compiler';
@@ -26,10 +25,9 @@ import {
   type GenerationTelemetrySink,
 } from '../telemetry/contracts';
 
-/** Fast primary model; the slim schema leaves canonical state compilation to the server. */
-export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
-/** Stronger recovery model; used only after the fast primary proposal is rejected. */
-export const WORKERS_AI_SCENE_RECOVERY_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+/** Scene generation uses the stronger structured-output model; canonical state compilation remains server-owned. */
+export const WORKERS_AI_SCENE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+export const WORKERS_AI_SCENE_RECOVERY_MODEL = WORKERS_AI_SCENE_MODEL;
 
 interface ProviderResponse {
   text: string;
@@ -252,7 +250,7 @@ export class WorkersAiSceneGenerator implements SceneGenerator {
             content: [
               prompt.systemInstruction,
               'Repair metadata and choices only. The original script is immutable and MUST NOT be returned.',
-              'Return the smaller repair schema only. Make each durableFact concrete, branch-specific, and supported by its consequence.',
+              'Return the smaller repair schema only. Make each consequence concrete and branch-specific.',
             ].join('\n'),
           },
           {
@@ -364,9 +362,6 @@ function validateCreative(
   creative: CreativeSceneProposal,
   timings: PipelineTimings,
 ): { ok: true; proposal: SceneProposal } | { ok: false; errors: string[] } {
-  const creativeErrors = validateCreativeSceneSemantics(creative);
-  if (creativeErrors.length > 0) return { ok: false, errors: creativeErrors };
-
   const compileStartedAt = Date.now();
   const compiled = compileCreativeScene(input, creative);
   timings.compileMs += Date.now() - compileStartedAt;

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { buildCharacterProfile } from '@/features/drama/character-profile';
 import type { Drama, DramaHistory } from '@/features/drama/contracts';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
+import { dramaRoute } from '@/features/drama/drama-navigation';
 import { dramaMoodLabel } from '@/features/localization/drama-labels';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import { CharacterPortraitCard } from '@/features/portrait/character-portrait-card';
@@ -70,7 +71,7 @@ export default function CharacterScreen() {
   );
   const backToDrama = () => {
     if (router.canGoBack()) return router.back();
-    router.replace(dramaId ? { pathname: '/library/drama', params: { dramaId } } : '/');
+    router.replace(dramaId ? dramaRoute(dramaId) : '/');
   };
   const footer = profile ? (
     <TaskActionDock

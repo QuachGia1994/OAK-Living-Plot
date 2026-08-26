@@ -1,6 +1,6 @@
 # Live development setup
 
-> updated 2026-08-19 · 0.0.0
+> updated 2026-08-26 · 0.0.0
 
 Living Plot keeps preview-safe local/UI work separate from provider-backed development. Do not put Worker secrets in `EXPO_PUBLIC_*` values.
 
@@ -37,7 +37,7 @@ Copy `apps/api/.dev.vars.example` to ignored `apps/api/.dev.vars` for local work
 
 `apps/api/wrangler.jsonc` defines the non-production `development` environment as `living-plot-api-dev`, with separate development D1, R2, and Queue/DLQ bindings. Analytics Engine is observational and optional; the development Worker runs with a no-op telemetry sink when that account service is not enabled.
 
-As of 2026-08-19, D1 `living-plot-dev`, `living-plot-tts-dev`, `living-plot-tts-dlq-dev`, private R2 bucket `living-plot-audio-dev`, and a Workers AI binding are provisioned; remote D1 migrations `0001`–`0009` are current. Live development Scene generation uses `@cf/meta/llama-3.1-8b-instruct-fast` behind the provider-neutral `SceneGenerator` boundary because the direct Gemini Developer API path from the current Worker egress is region-rejected. Gemini TTS still uses `GEMINI_API_KEY` independently, so Scene readiness does not imply narration readiness. The R2 bucket has no public application URL and remains owner-served only through authenticated Worker media routes.
+As of 2026-08-19, D1 `living-plot-dev`, `living-plot-tts-dev`, `living-plot-tts-dlq-dev`, private R2 bucket `living-plot-audio-dev`, and a Workers AI binding are provisioned; remote D1 migrations `0001`–`0009` are current. Live development Scene generation uses `@cf/meta/llama-3.3-70b-instruct-fp8-fast` behind the provider-neutral `SceneGenerator` boundary because the direct Gemini Developer API path from the current Worker egress is region-rejected. Gemini TTS still uses `GEMINI_API_KEY` independently, so Scene readiness does not imply narration readiness. The R2 bucket has no public application URL and remains owner-served only through authenticated Worker media routes.
 
 Useful commands:
 

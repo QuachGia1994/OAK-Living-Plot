@@ -170,9 +170,8 @@ export function buildCreativeScenePrompt(input: SceneGenerationInput, repairReas
       'The script MUST contain 130–180 whitespace-separated words and roughly 60–90 seconds of speech. Count before returning; fewer than 100 or more than 300 words is rejected. Aim for 10–14 concrete sentences. Keep title/summary/metadata concise.',
       'Return exactly three materially distinct choices keyed A, B, C in that order.',
       'Give A/B/C different action families (for example confront, seek help, evade), not three paraphrases of confession or investigation.',
-      'For EVERY choice, durableFact must be a concrete branch-specific fact that becomes true if that choice is committed. This text is model-authored canonical material, so never use placeholders, IDs, snake_case, or vague tone-only statements.',
-      'Write each durableFact as the completed event established by that same choice consequence. Reuse at least one concrete content word from the consequence so support is explicit; do not add an inferred event such as a friendship ending merely because someone leaves.',
-      'durableFact must differ materially across A/B/C in its event/predicate. Shared character/topic words do not make branches distinct, and copying one generic sentence three times is rejected.',
+      'For EVERY choice, consequence is the single branch-specific event that becomes canonical if that choice is committed. Write it as a concrete completed outcome, never as vague tone-only metadata.',
+      'Make the three consequences materially different in action and fallout. Do not invent a second duplicate fact field; server code derives durable branch memory from consequence.',
       'If resolving an existing fact or thread, copy its supplied natural-language text/title exactly into factTextsToResolve/threadTitlesToResolve. Never output database keys.',
       'threadsToOpen may contain only genuinely new concrete threads. Prefer advancing/resolving a high-urgency existing thread before opening multiple mysteries.',
       'Use nextTone only as tone metadata; it never counts as a durable branch effect.',
@@ -183,7 +182,7 @@ export function buildCreativeScenePrompt(input: SceneGenerationInput, repairReas
       'DRAMA_CONTEXT_JSON',
       JSON.stringify(context),
       'END_DRAMA_CONTEXT_JSON',
-      'Write the next scene now. Before returning JSON, silently verify: script 130–180 words; exactly A/B/C; three distinct action families; every consequence has its own concrete supported durableFact.',
+      'Write the next scene now. Before returning JSON, silently verify: script 130–180 words; exactly A/B/C; three distinct action families; each consequence is a concrete completed outcome.',
     ].join('\n'),
   };
 }

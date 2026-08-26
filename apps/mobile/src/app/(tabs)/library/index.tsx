@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SceneArtworkBackdrop } from '@/features/artwork/scene-artwork-backdrop';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
+import { dramaRoute } from '@/features/drama/drama-navigation';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaLibrarySnapshot, DramaSummary } from '@/features/drama/contracts';
 import { libraryView, type DramaLibraryFilter } from '@/features/drama/library-view';
@@ -119,7 +120,7 @@ export default function DramaLibraryScreen() {
                     )}
                   />
                 )}
-                onPress={() => router.push({ pathname: '/library/drama', params: { dramaId: featured.id } })}
+                onPress={() => router.push(dramaRoute(featured.id))}
               />
               <View style={styles.coverFooter}>
                 <Text style={styles.updated}>{featured.updatedLabel}</Text>
@@ -142,7 +143,7 @@ export default function DramaLibraryScreen() {
               action="archive"
               busyId={busyId}
               t={t}
-              onOpen={(drama) => router.push({ pathname: '/library/drama', params: { dramaId: drama.id } })}
+              onOpen={(drama) => router.push(dramaRoute(drama.id))}
               onChange={change}
             />
           ) : null}
@@ -154,7 +155,7 @@ export default function DramaLibraryScreen() {
               action="restore"
               busyId={busyId}
               t={t}
-              onOpen={(drama) => router.push({ pathname: '/library/drama', params: { dramaId: drama.id, readOnly: '1' } })}
+              onOpen={(drama) => router.push(dramaRoute(drama.id, true))}
               onChange={change}
             />
           ) : null}

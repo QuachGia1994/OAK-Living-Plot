@@ -5,6 +5,7 @@ import { SceneArtworkBackdrop } from '@/features/artwork/scene-artwork-backdrop'
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
 import { dailyPromptAction, dailyPromptPresentation } from '@/features/drama/daily-prompt-action';
+import { dramaRoute } from '@/features/drama/drama-navigation';
 import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
 import type { DramaHomeSnapshot, DramaSummary } from '@/features/drama/contracts';
 import { useRefreshOnForeground } from '@/lib/use-refresh-on-foreground';
@@ -38,7 +39,7 @@ export default function HomeScreen() {
     const prompt = source.retention.dailyPrompt;
     const action = dailyPromptAction(prompt);
     if (action.kind === 'resume') {
-      router.push({ pathname: '/library/drama', params: { dramaId: action.dramaId } });
+      router.push(dramaRoute(action.dramaId));
       return;
     }
     router.navigate({
@@ -136,7 +137,7 @@ export default function HomeScreen() {
             />
           ) : undefined}
           onPress={() => featuredDrama
-            ? router.push({ pathname: '/library/drama', params: { dramaId: featuredDrama.id } })
+            ? router.push(dramaRoute(featuredDrama.id))
             : openDailySpark(snapshot)}
           style={styles.heroPoster}
         />
@@ -155,7 +156,7 @@ export default function HomeScreen() {
               snapshot={snapshot}
               featuredDramaId={featuredDrama.id}
               t={t}
-              onOpenDrama={(drama) => router.push({ pathname: '/library/drama', params: { dramaId: drama.id } })}
+              onOpenDrama={(drama) => router.push(dramaRoute(drama.id))}
               onOpenSpark={() => openDailySpark(snapshot)}
             />
           ) : (

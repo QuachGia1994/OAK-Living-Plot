@@ -1,0 +1,643 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { PanResponder, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { SceneArtworkBackdrop } from '@/features/artwork/scene-artwork-backdrop';
+import { SceneVoiceCard } from '@/features/audio/scene-voice-card';
+import { useDramaPlayback, type DramaFailure } from '@/features/drama/use-drama-playback';
+import { canViewSceneSheet, liveSceneSheet, sceneSheetAfterSwipe, type SceneSheet } from '@/features/drama/scene-sheet-navigation';
+import {
+  closedSceneToolsDisclosure,
+  sceneToolsRevealSignal,
+  toggleSceneToolsDisclosure,
+} from '@/features/drama/scene-tools-disclosure';
+import { useMobileAuth } from '@/features/auth/mobile-auth-context';
+import { dramaMoodLabel } from '@/features/localization/drama-labels';
+import { sharedUiCopy, useUiCopy } from '@/features/localization/ui-copy';
+import { buildSpoilerSafeDramaShareText } from '@/features/share/drama-share';
+import { DramaChoiceCard, DramaLoadingStage, DramaSceneStage } from '@/ui/drama-visuals';
+import { conceptFlowStep } from '@/ui/concept-flow';
+import { ActionButton, BrandMark, ConceptStageHeader, ErrorState, Eyebrow, MotionReveal, Screen, TaskActionDock } from '@/ui/primitives';
+import { classical, colors, radius, spacing, typography } from '@/ui/theme';
+import { readParam } from '@/lib/route-params';
+
+export default function DramaScreen() {
+  const router = useRouter();
+  const auth = useMobileAuth();
+  const { locale, t } = useUiCopy();
+  const params = useLocalSearchParams<{ dramaId?: string | string[]; readOnly?: string | string[] }>();
+  const dramaId = useMemo(() => readParam(params.dramaId), [params.dramaId]);
+  const readOnly = useMemo(() => readParam(params.readOnly) === '1', [params.readOnly]);
+  const authReady = !auth.configured || (auth.isLoaded && auth.isSignedIn);
+  const playback = useDramaPlayback({ dramaId, enabled: authReady });
+  const [sheet, setSheet] = useState<SceneSheet>('scene');
+  const [sceneToolsDisclosure, setSceneToolsDisclosure] = useState(closedSceneToolsDisclosure);
+  const utilitiesOpen = sceneToolsDisclosure.expanded;
+  const liveSheet = liveSceneSheet(playback.playbackState.phase);
+  const activeConceptStep = conceptFlowStep(locale, sheet === 'scene' ? 'scene' : sheet === 'choice' ? 'choice' : 'consequence');
+  const sceneKey = playback.drama?.currentScene.id ?? '';
+  const utilityRevealSignal = sceneToolsRevealSignal(sceneToolsDisclosure, sceneKey);
+  const lastSceneKey = useRef('');
+  const lastLiveSheet = useRef<SceneSheet>('scene');
+
+  useEffect(() => {
+    if (!sceneKey) return;
+    if (lastSceneKey.current !== sceneKey) {
+      lastSceneKey.current = sceneKey;
+      lastLiveSheet.current = liveSheet;
+      setSheet('scene');
+      return;
+    }
+    if (lastLiveSheet.current !== liveSheet) {
+      lastLiveSheet.current = liveSheet;
+      setSheet(liveSheet);
+    }
+  }, [liveSheet, sceneKey]);
+
+  const sheetPanResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > 18 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2,
+    onPanResponderRelease: (_event, gesture) => {
+      setSheet((current) => sceneSheetAfterSwipe(current, liveSheet, gesture.dx, gesture.dy));
+    },
+  }), [liveSheet]);
+
+  if (auth.configured && (!auth.isLoaded || !auth.isSignedIn)) {
+    return (
+      <Screen>
+        <BrandMark />
+        <ErrorState
+          title={auth.isLoaded ? t('Sign in to continue this drama', 'Đăng nhập để tiếp tục drama') : t('Opening your account…', 'Đang mở tài khoản…')}
+          message={t('Sign in so Living Plot can restore your choices and continue from the canonical scene.', 'Đăng nhập để Living Plot khôi phục các lựa chọn và tiếp tục đúng cảnh chuẩn.')}
+        />
+        {auth.isLoaded ? <ActionButton label={t('Sign in with email code', 'Đăng nhập bằng mã email')} onPress={() => router.push({ pathname: '/auth', params: { returnTo: 'drama', dramaId } })} /> : null}
+        <ActionButton label={t('Back to home', 'Về trang chủ')} variant="ghost" onPress={() => router.replace('/')} />
+      </Screen>
+    );
+  }
+
+  if (!dramaId) {
+    return (
+      <Screen>
+        <BrandMark />
+        <ErrorState title={t('Drama unavailable', 'Drama không khả dụng')} message={t('This drama link is missing its identifier.', 'Liên kết drama thiếu mã định danh.')} />
+        <ActionButton label={t('Back to home', 'Về trang chủ')} variant="ghost" onPress={() => router.replace('/')} />
+      </Screen>
+    );
+  }
+
+  if (playback.loading || playback.playbackState.phase === 'restoring') {
+    return (
+      <Screen contentStyle={styles.playerScreen}>
+        <View style={styles.topBar}><BrandMark /></View>
+        <DramaLoadingStage
+          label={t('Restoring your latest scene…', 'Đang khôi phục cảnh mới nhất…')}
+          detail={t('Loading the canonical drama, branch and scene state.', 'Đang tải drama, nhánh lựa chọn và trạng thái cảnh chuẩn.')}
+          locale={locale}
+        />
+      </Screen>
+    );
+  }
+
+  if (!playback.drama) {
+    return (
+      <Screen>
+        <BrandMark />
+        <ErrorState
+          title={t('Drama unavailable', 'Drama không khả dụng')}
+          message={failureMessage(playback.failure, locale)}
+          retryLabel={sharedUiCopy.tryAgain[locale]}
+          onRetry={() => void playback.load()}
+        />
+        <ActionButton label={t('Back to home', 'Về trang chủ')} variant="ghost" onPress={() => router.replace('/')} />
+      </Screen>
+    );
+  }
+
+  const drama = playback.drama;
+  const scene = drama.currentScene;
+  const consequence = scene.branch.state === 'committed' ? scene.branch.consequence : undefined;
+  const canonicalChoiceId = scene.branch.state === 'committed' ? scene.branch.choiceId : playback.selectedChoiceId;
+  const canonicalChoice = scene.choices.find((choice) => choice.id === canonicalChoiceId) ?? null;
+  const stageTitle = sheet === 'scene'
+    ? scene.title
+    : sheet === 'choice'
+      ? t(`What should ${drama.leadCharacter.name} do?`, `${drama.leadCharacter.name} nên làm gì?`)
+      : t('The story remembers', 'Câu chuyện ghi nhớ');
+  const footer = readOnly ? (
+    <TaskActionDock
+      eyebrow={t('Archived drama', 'Drama đã tạm dừng')}
+      title={t('This scene is read only', 'Cảnh này ở chế độ chỉ đọc')}
+      detail={t('Return to your library to choose another drama.', 'Trở về thư viện để chọn một drama khác.')}
+    >
+      <ActionButton label={t('Open library', 'Mở thư viện')} variant="secondary" onPress={() => router.push('/library')} />
+    </TaskActionDock>
+  ) : sheet !== liveSheet ? (
+    <TaskActionDock
+      eyebrow={t('Reviewing an earlier step', 'Đang xem lại bước trước')}
+      title={activeConceptStep.label}
+      detail={t('Your canonical story state is unchanged.', 'Trạng thái chuẩn của câu chuyện không thay đổi.')}
+    >
+      <ActionButton label={t('Return to current step', 'Về bước hiện tại')} variant="secondary" onPress={() => setSheet(liveSheet)} />
+    </TaskActionDock>
+  ) : sheet === 'scene' ? (
+    <TaskActionDock
+      eyebrow={t(`Scene ${scene.number}`, `Cảnh ${scene.number}`)}
+      title={scene.title}
+      detail={t('Finish reading, then direct the next turn.', 'Đọc xong rồi chỉ đạo bước ngoặt tiếp theo.')}
+    >
+      <ActionButton label={t('See choices', 'Xem lựa chọn')} onPress={playback.markSceneComplete} />
+    </TaskActionDock>
+  ) : sheet === 'choice' ? (
+    <TaskActionDock
+      eyebrow={t('Canonical decision', 'Quyết định nhánh chuẩn')}
+      title={playback.selectedChoice?.label ?? t('Choose one branch', 'Chọn một nhánh')}
+      detail={playback.selectedChoice
+        ? t('This choice becomes permanent when locked.', 'Lựa chọn này trở thành nhánh chuẩn khi được chốt.')
+        : t('Compare A, B and C before continuing.', 'So sánh A, B và C trước khi tiếp tục.')}
+    >
+      <ActionButton
+        label={t('Lock this choice', 'Chốt lựa chọn')}
+        busy={playback.playbackState.phase === 'committing_choice'}
+        disabled={!playback.selectedChoice}
+        onPress={() => void playback.commitChoice()}
+      />
+    </TaskActionDock>
+  ) : (
+    <TaskActionDock
+      eyebrow={t('Branch committed', 'Đã chốt nhánh')}
+      title={canonicalChoice?.label ?? t('Consequence recorded', 'Hệ quả đã được ghi nhận')}
+      detail={t('The next scene will continue from this exact consequence.', 'Cảnh tiếp theo sẽ nối tiếp chính xác hệ quả này.')}
+    >
+      <ActionButton
+        label={t(`Continue to scene ${scene.number + 1}`, `Tiếp tục cảnh ${scene.number + 1}`)}
+        busy={playback.playbackState.phase === 'continuing'}
+        onPress={() => void playback.continueDrama()}
+      />
+    </TaskActionDock>
+  );
+
+  return (
+    <Screen contentStyle={styles.playerScreen} footer={footer} scrollToEndSignal={utilityRevealSignal}>
+      <View style={styles.topBar}>
+        <BrandMark />
+        <ActionButton label={t('My dramas', 'Drama của tôi')} variant="ghost" onPress={() => router.push('/library')} />
+      </View>
+
+      <View style={styles.stageWrap}>
+        <ConceptStageHeader
+          number={activeConceptStep.number}
+          kicker={activeConceptStep.kicker}
+          title={stageTitle}
+          description={activeConceptStep.description}
+          meta={t(`Scene ${scene.number} · ${drama.title}`, `Cảnh ${scene.number} · ${drama.title}`)}
+        />
+      </View>
+
+      <View style={styles.sheetDeck} {...sheetPanResponder.panHandlers}>
+        <SceneSheetRail current={sheet} live={liveSheet} locale={locale} onSelect={setSheet} />
+        {sheet !== liveSheet ? (
+          <Text style={styles.reviewNote}>{t('Review mode · swipe left to return toward the live step.', 'Chế độ xem lại · vuốt sang trái để trở về bước hiện tại.')}</Text>
+        ) : null}
+
+        {sheet === 'scene' ? (
+          <MotionReveal key={`scene-${scene.id}-${scene.branch.state}`}>
+            <DramaSceneStage
+              sceneNumber={scene.number}
+              title={scene.title}
+              body={scene.script}
+              characterName={drama.leadCharacter.name}
+              mood={drama.mood}
+              locale={locale}
+              artwork={(
+                <SceneArtworkBackdrop
+                  sceneId={scene.id}
+                  revision={`${scene.number}:${scene.title}:${scene.summary}`}
+                  accessibilityLabel={t(
+                    `Generated illustration for scene ${scene.number}: ${scene.title}`,
+                    `Tranh minh họa được tạo cho cảnh ${scene.number}: ${scene.title}`,
+                  )}
+                />
+              )}
+              onPlaybackComplete={playback.markSceneComplete}
+            />
+          </MotionReveal>
+        ) : null}
+
+        {sheet === 'choice' ? (
+          <MotionReveal key={`choice-${scene.id}-${scene.branch.state}`}>
+            <View style={styles.sheetPanelBody}>
+              <View style={styles.choiceSection}>
+                <View style={styles.choiceHeading}>
+                  <Eyebrow>{scene.branch.state === 'committed' ? t('Choice review', 'Xem lại lựa chọn') : t('Choose the next turn', 'Chọn bước ngoặt tiếp theo')}</Eyebrow>
+                  <Text style={styles.choiceTitle}>{t(`What should ${drama.leadCharacter.name} do next?`, `${drama.leadCharacter.name} nên làm gì tiếp theo?`)}</Text>
+                </View>
+
+                <View style={styles.choiceGrid}>
+                  {scene.choices.map((choice) => (
+                    <DramaChoiceCard
+                      key={choice.id}
+                      choice={choice}
+                      selected={choice.id === canonicalChoiceId}
+                      disabled={readOnly || scene.branch.state === 'committed' || playback.playbackState.phase === 'committing_choice'}
+                      mood={drama.mood}
+                      locale={locale}
+                      onPress={() => playback.selectChoice(choice.id)}
+                    />
+                  ))}
+                </View>
+
+                {scene.branch.state === 'committed' ? (
+                  <View style={styles.commitDock}>
+                    <Text style={styles.commitText} numberOfLines={2}>{canonicalChoice?.label ?? t('Canonical branch locked', 'Nhánh chuẩn đã được chốt')}</Text>
+                    <Text style={styles.commitMeta}>{t('This is the canonical choice for this scene.', 'Đây là lựa chọn chuẩn của cảnh này.')}</Text>
+                  </View>
+                ) : !playback.selectedChoice ? (
+                  <Text style={styles.choiceHint}>{t('Pick a branch to continue the drama.', 'Chọn một nhánh để tiếp tục drama.')}</Text>
+                ) : (
+                  <View style={styles.commitDock}>
+                    <Text style={styles.commitText} numberOfLines={1}>{playback.selectedChoice.label}</Text>
+                    <Text style={styles.commitMeta}>{t('Ready to lock from the action bar below.', 'Sẵn sàng chốt tại thanh hành động bên dưới.')}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </MotionReveal>
+        ) : null}
+
+        {sheet === 'consequence' && consequence ? (
+          <MotionReveal key={`consequence-${scene.id}`}>
+            <View style={styles.sheetPanelBody}>
+              <View style={styles.nextSection}>
+                <Eyebrow>{t('Branch committed', 'Đã chốt nhánh')}</Eyebrow>
+                <Text style={styles.nextTitle}>{t('Your choice changed what happens next.', 'Lựa chọn của bạn đã thay đổi cảnh tiếp theo.')}</Text>
+                {canonicalChoice ? <Text style={styles.consequenceChoice}>{canonicalChoice.label}</Text> : null}
+                <Text style={styles.consequenceText}>{consequence}</Text>
+              </View>
+            </View>
+          </MotionReveal>
+        ) : null}
+      </View>
+
+      <View style={styles.playerBody}>
+        {playback.failure ? (
+          <ErrorState
+            title={t('That action didn’t finish', 'Thao tác chưa hoàn tất')}
+            message={failureMessage(playback.failure, locale)}
+            retryLabel={sharedUiCopy.tryAgain[locale]}
+            onRetry={playback.failure.source === 'commit_choice'
+              ? () => void playback.commitChoice()
+              : playback.failure.source === 'continue'
+                ? () => void playback.continueDrama()
+                : () => void playback.load()}
+          />
+        ) : null}
+
+        {readOnly ? (
+          <View style={styles.readOnlyDock}>
+            <View style={styles.readOnlyHeader}>
+              <Eyebrow>{t('Archived drama', 'Drama đã tạm dừng')}</Eyebrow>
+              <Text style={styles.readOnlyStatus}>{t('READ ONLY', 'CHỈ ĐỌC')}</Text>
+            </View>
+            <Text style={styles.readOnlyTitle}>{t('Paused at this scene.', 'Tạm dừng tại cảnh này.')}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.storyTools}>
+          <View style={styles.dramaUtilityCopy}>
+            <Text style={styles.dramaUtilityKicker}>{playbackLabel(playback.playbackState.phase, locale)}</Text>
+            <Text style={styles.dramaUtilityTitle} numberOfLines={2}>{drama.title}</Text>
+            <Text style={styles.dramaUtilityMeta}>{drama.leadCharacter.name} · {dramaMoodLabel(drama.mood, locale)}</Text>
+          </View>
+
+          <View style={styles.utilityGrid}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t(`Open ${drama.leadCharacter.name}'s living profile`, `Mở hồ sơ sống của ${drama.leadCharacter.name}`)}
+              onPress={() => router.push({ pathname: '/library/character', params: { dramaId: drama.id } })}
+              style={({ pressed }) => [styles.utilityCard, pressed && styles.utilityCardPressed]}
+            >
+              <Text style={styles.utilityNumber}>05</Text>
+              <View style={styles.utilityCopy}>
+                <Text style={styles.utilityLabel}>{t('Living character', 'Nhân vật sống')}</Text>
+                <Text style={styles.utilityDetail} numberOfLines={1}>{drama.leadCharacter.name}</Text>
+              </View>
+              <Text style={styles.utilityArrow}>›</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('Open canonical timeline', 'Mở dòng lịch sử chuẩn')}
+              onPress={() => router.push({ pathname: '/library/history', params: { dramaId: drama.id } })}
+              style={({ pressed }) => [styles.utilityCard, pressed && styles.utilityCardPressed]}
+            >
+              <Text style={styles.utilityNumber}>06</Text>
+              <View style={styles.utilityCopy}>
+                <Text style={styles.utilityLabel}>{t('Timeline', 'Dòng lịch sử')}</Text>
+                <Text style={styles.utilityDetail} numberOfLines={1}>{t(`Through scene ${scene.number}`, `Đến cảnh ${scene.number}`)}</Text>
+              </View>
+              <Text style={styles.utilityArrow}>›</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: utilitiesOpen }}
+              accessibilityLabel={t('Toggle scene tools', 'Bật tắt công cụ cảnh')}
+              onPress={() => setSceneToolsDisclosure(toggleSceneToolsDisclosure)}
+              style={({ pressed }) => [styles.utilityCard, pressed && styles.utilityCardPressed]}
+            >
+              <Text style={styles.utilityNumber}>••</Text>
+              <View style={styles.utilityCopy}>
+                <Text style={styles.utilityLabel}>{t('Scene tools', 'Công cụ cảnh')}</Text>
+                <Text style={styles.utilityDetail} numberOfLines={1}>{t('Voice and sharing', 'Giọng đọc và chia sẻ')}</Text>
+              </View>
+              <Text style={styles.utilityArrow}>{utilitiesOpen ? '⌃' : '⌄'}</Text>
+            </Pressable>
+          </View>
+
+          {utilitiesOpen ? (
+            <MotionReveal>
+              <View accessibilityLiveRegion="polite" style={styles.utilityPanel}>
+                <SceneVoiceCard key={scene.id} sceneId={scene.id} sceneText={scene.script} />
+                <ActionButton
+                  label={t('Share this drama', 'Chia sẻ drama này')}
+                  variant="secondary"
+                  onPress={() => void Share.share({ message: buildSpoilerSafeDramaShareText({ title: drama.title, sceneNumber: scene.number, premise: drama.premise, uiLocale: locale }) })}
+                />
+              </View>
+            </MotionReveal>
+          ) : null}
+        </View>
+      </View>
+    </Screen>
+  );
+}
+
+function SceneSheetRail({
+  current,
+  live,
+  locale,
+  onSelect,
+}: {
+  current: SceneSheet;
+  live: SceneSheet;
+  locale: 'en' | 'vi';
+  onSelect: (sheet: SceneSheet) => void;
+}) {
+  const labels: Record<SceneSheet, string> = locale === 'vi'
+    ? { scene: 'CẢNH', choice: 'LỰA CHỌN', consequence: 'HỆ QUẢ' }
+    : { scene: 'SCENE', choice: 'CHOICE', consequence: 'CONSEQUENCE' };
+  return (
+    <View style={styles.sheetRail}>
+      {(['scene', 'choice', 'consequence'] as SceneSheet[]).map((item, index) => {
+        const enabled = canViewSceneSheet(item, live);
+        const selected = item === current;
+        return (
+          <Pressable
+            key={item}
+            accessibilityRole="tab"
+            accessibilityState={{ selected, disabled: !enabled }}
+            disabled={!enabled}
+            onPress={() => onSelect(item)}
+            style={({ pressed }) => [styles.sheetTab, selected && styles.sheetTabSelected, !enabled && styles.sheetTabDisabled, pressed && enabled && styles.sheetTabPressed]}
+          >
+            <Text style={[styles.sheetTabIndex, selected && styles.sheetTabIndexSelected]}>{String(index + 1).padStart(2, '0')}</Text>
+            <Text style={[styles.sheetTabLabel, selected && styles.sheetTabLabelSelected]}>{labels[item]}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function playbackLabel(phase: string, locale: 'en' | 'vi'): string {
+  if (locale === 'vi') {
+    if (phase === 'playing') return 'ĐANG PHÁT CẢNH';
+    if (phase === 'choice' || phase === 'committing_choice') return 'ĐIỂM QUYẾT ĐỊNH';
+    if (phase === 'continuing') return 'ĐANG DỰNG CẢNH TIẾP';
+    return 'NHÁNH ĐÃ CHỐT';
+  }
+  if (phase === 'playing') return 'SCENE PLAYING';
+  if (phase === 'choice' || phase === 'committing_choice') return 'DECISION POINT';
+  if (phase === 'continuing') return 'BUILDING NEXT SCENE';
+  return 'BRANCH COMMITTED';
+}
+
+function failureMessage(failure: DramaFailure | null, locale: 'en' | 'vi'): string {
+  const vi = locale === 'vi';
+  if (!failure) return vi ? 'Không thể tải drama này.' : 'This drama could not be loaded.';
+  if (failure.code === 'choice_conflict') return vi ? 'Một lựa chọn khác đã là nhánh chuẩn của cảnh này. Drama đã được đồng bộ lại.' : 'A different choice is already canonical for this scene. The drama has been resynced.';
+  if (failure.code === 'choice_required') return vi ? 'Cần chốt một lựa chọn trước khi dựng cảnh tiếp theo.' : 'Commit a choice before continuing to the next scene.';
+  if (failure.code === 'not_found') return vi ? 'Drama hoặc lựa chọn này không còn khớp trạng thái chuẩn.' : 'This drama or choice no longer matches canonical state.';
+  if (failure.code === 'auth_required') return vi ? 'Đăng nhập lại trước khi tiếp tục drama.' : 'Sign in again before continuing this drama.';
+  if (failure.code === 'quota_exceeded') return vi ? 'Máy chủ đang giới hạn tạm thời việc tạo cảnh. Cốt truyện hiện tại vẫn được giữ nguyên để bạn thử lại.' : 'The server is temporarily limiting Scene generation. Current story state is unchanged so you can retry.';
+  if (failure.code === 'provider_unavailable') return vi ? 'Tạo drama tạm thời không khả dụng. Nhánh đã chốt vẫn được giữ nguyên.' : 'Drama generation is temporarily unavailable. Your committed branch is unchanged.';
+  if (failure.code === 'invalid_generation') return vi
+    ? 'Bộ máy AI chưa sinh được cảnh tiếp theo khớp với hợp đồng drama. Trạng thái hiện tại vẫn được giữ nguyên; bấm "Thử lại" để yêu cầu lại.'
+    : 'The drama engine could not author the next scene that satisfies the contract. Current state is preserved; tap "Try again" to retry the same request.';
+  if (failure.code === 'backend_unavailable' && failure.message?.includes('too long')) {
+    return vi
+      ? 'Bộ máy tạo cảnh phản hồi quá chậm. Nhánh chuẩn và khóa tạo vẫn được giữ an toàn; thử lại sẽ tiếp tục cùng yêu cầu.'
+      : 'Scene generation took too long to respond. Canonical branch state and the generation key are preserved; retry continues the same request.';
+  }
+  return vi ? 'Thao tác chưa hoàn tất. Trạng thái chuẩn vẫn được giữ nguyên.' : 'The action did not finish. Canonical state is unchanged.';
+}
+
+const styles = StyleSheet.create({
+  playerScreen: {
+    gap: 0,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+  },
+  topBar: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: 'transparent',
+  },
+  stageWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  sheetDeck: {
+    overflow: 'hidden',
+    marginHorizontal: spacing.sm,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: classical.goldDeep,
+    backgroundColor: colors.surfaceGlass,
+  },
+  sheetRail: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderStrong,
+    backgroundColor: colors.surfaceGlass,
+  },
+  sheetTab: {
+    minHeight: 52,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  sheetTabSelected: { borderBottomColor: classical.gold, backgroundColor: classical.patina },
+  sheetTabDisabled: { opacity: 0.32 },
+  sheetTabPressed: { opacity: 0.72 },
+  sheetTabIndex: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  sheetTabIndexSelected: { color: colors.violetStrong },
+  sheetTabLabel: { color: colors.inkMuted, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  sheetTabLabelSelected: { color: colors.ink },
+  reviewNote: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, color: colors.quietInk, fontSize: 10, lineHeight: 15, textAlign: 'center' },
+  sheetPanelBody: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  playerBody: {
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  storyTools: {
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
+  },
+  dramaUtilityCopy: { gap: 4 },
+  dramaUtilityKicker: { color: colors.accentStrong, fontFamily: typography.mono, fontSize: 9, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
+  dramaUtilityTitle: { color: colors.ink, fontFamily: typography.display, fontSize: 22, lineHeight: 27, fontWeight: '700' },
+  dramaUtilityMeta: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 9, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  utilityGrid: { gap: spacing.xs },
+  utilityCard: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceGlass,
+  },
+  utilityCardPressed: { opacity: 0.72 },
+  utilityNumber: {
+    width: 24,
+    color: colors.violetStrong,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  utilityCopy: { minWidth: 0, flex: 1, gap: 2 },
+  utilityLabel: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: '700',
+  },
+  utilityDetail: { color: colors.quietInk, fontSize: 10, lineHeight: 14 },
+  utilityArrow: { color: colors.accentStrong, fontSize: 22, lineHeight: 24 },
+  utilityPanel: { gap: spacing.md, paddingTop: spacing.xs },
+  choiceSection: {
+    gap: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  choiceHeading: {
+    gap: spacing.sm,
+  },
+  choiceTitle: {
+    maxWidth: 520,
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 22,
+    lineHeight: 27,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  choiceGrid: {
+    gap: spacing.xs,
+  },
+  choiceHint: {
+    color: colors.quietInk,
+    fontFamily: typography.mono,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  commitDock: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: classical.hairline,
+    backgroundColor: colors.surfaceGlass,
+  },
+  commitText: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  commitMeta: {
+    color: colors.quietInk,
+    fontFamily: typography.mono,
+    fontSize: 9,
+    lineHeight: 14,
+    fontWeight: '700',
+    letterSpacing: 0.35,
+  },
+  nextSection: {
+    gap: spacing.md,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: classical.hairline,
+    backgroundColor: colors.surfaceGlass,
+  },
+  nextTitle: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
+  },
+  consequenceChoice: {
+    color: colors.violetStrong,
+    fontFamily: typography.mono,
+    fontSize: 10,
+    lineHeight: 16,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  consequenceText: {
+    color: colors.narrativeInk,
+    fontFamily: typography.display,
+    fontSize: 19,
+    lineHeight: 28,
+    fontWeight: '700',
+  },
+  readOnlyDock: {
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderGlow,
+    backgroundColor: colors.surfaceGlass,
+  },
+  readOnlyHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  readOnlyStatus: { color: colors.quietInk, fontFamily: typography.mono, fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
+  readOnlyTitle: {
+    color: colors.ink,
+    fontFamily: typography.display,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '700',
+  },
+});

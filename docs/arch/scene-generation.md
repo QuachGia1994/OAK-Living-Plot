@@ -8,7 +8,7 @@ Pre-story **AI drama-seed suggestions are outside this boundary**. They use the 
 
 Application code generates one drama scene through `SceneGenerator` in `apps/api/src/ai/contracts.ts`. Its input/output are `SceneGenerationInput` and `SceneProposal`; neither contains provider-native response types.
 
-Scene-provider selection is explicit through `SCENE_GENERATOR_PROVIDER`, not inferred from the presence of the Worker `AI` binding. The default environment is configured for Gemini and development explicitly selects `WorkersAiSceneGenerator`; that adapter uses `@cf/meta/llama-3.1-8b-instruct-fast` for the one-call happy path and `@cf/meta/llama-3.3-70b-instruct-fp8-fast` only for the already-bounded second recovery call. Both environments may bind Workers AI for the separate suggestion helper without changing canonical Scene routing. The Workers AI Scene adapter receives `response_format.type = json_schema` with the slim Living Plot creative JSON Schema directly in `json_schema` (`durableFact`, natural-language resolution hints, `establishedFacts`/`threadsToOpen`, no `stateDelta`/`affinityDelta`/`trustDelta`/`tensionDelta` or canonical DB keys), a 2300-token output ceiling on the happy path, and temperature 0.45. Targeted recovery uses a smaller 1200-token repair schema that omits `script` entirely and merges byte-for-byte back into the original script. An explicit `workers_ai` Scene selection fails closed if the `AI` binding is missing, and an unknown provider value also fails closed rather than silently switching adapters. A configured Gemini key is not used as failover for an explicitly selected Workers AI Scene path because the deployed Worker region currently receives a Gemini HTTP 400 location restriction; routing a deterministic Workers AI validation failure into that endpoint only changed the user-visible error to `provider_unavailable`. Both provider adapters retain the same structural parser and narrative publication decision; the Workers AI path keeps the fast 8B primary while using the stronger 70B model to improve second-call contract convergence.
+Scene-provider selection is explicit through `SCENE_GENERATOR_PROVIDER`, not inferred from the presence of the Worker `AI` binding. The default environment is configured for Gemini and development explicitly selects `WorkersAiSceneGenerator`; that adapter uses `@cf/meta/llama-3.3-70b-instruct-fp8-fast` for both the one-call happy path and the single bounded recovery call. Both environments may bind Workers AI for the separate suggestion helper without changing canonical Scene routing. The Workers AI Scene adapter receives `response_format.type = json_schema` with the slim Living Plot creative JSON Schema directly in `json_schema` (natural-language resolution hints, `establishedFacts`/`threadsToOpen`, no duplicate `durableFact`, no `stateDelta`/`affinityDelta`/`trustDelta`/`tensionDelta`, and no canonical DB keys), a 2300-token output ceiling on the happy path, and temperature 0.45. Targeted recovery uses a smaller 1200-token repair schema that omits `script` entirely and merges byte-for-byte back into the original script. An explicit `workers_ai` Scene selection fails closed if the `AI` binding is missing, and an unknown provider value also fails closed rather than silently switching adapters. A configured Gemini key is not used as failover for an explicitly selected Workers AI Scene path because the deployed Worker region currently receives a Gemini HTTP 400 location restriction; routing a deterministic Workers AI validation failure into that endpoint only changed the user-visible error to `provider_unavailable`. Both provider adapters retain the same structural parser and narrative publication decision.
 
 ## Canonical input
 
@@ -37,7 +37,7 @@ D1-backed drama state remains the source of truth. No unbounded generation conte
 - `resolvedMemory` contains deliberately resolved facts/threads that must never be resurrected or reopened as if unresolved;
 - script must be 130–180 words (~60–90s speech); title/summary/metadata concise;
 - exactly three materially distinct choices keyed A, B, C in that order;
-- for every choice, `durableFact` must be a concrete branch-specific fact supported by its `consequence`; placeholders, IDs, snake_case, or vague tone-only statements are rejected;
+- for every choice, `consequence` is the single branch-specific event that becomes durable canonical memory if committed; it must be concrete and distinct rather than duplicated into a second provider-authored fact field;
 - if resolving an existing fact/thread, the provider copies its supplied natural-language text/title exactly into `factTextsToResolve`/`threadTitlesToResolve`; no database keys are ever emitted;
 - the creative context also strips provider-irrelevant canonical keys/state-version metadata, maps relationship and trajectory endpoints to character names, and omits server-only committed relationship deltas; no relationship keys or canonical IDs are emitted back by the model; server code owns canonical mapping.
 
@@ -45,8 +45,8 @@ D1-backed drama state remains the source of truth. No unbounded generation conte
 
 `creative-scene-schema.ts` is the slim provider schema (no `stateDelta` or relationship deltas). `scene-compiler.ts` then deterministically compiles that creative output into the canonical `SceneProposal` without inventing narrative facts or relationships:
 
-- both primary and repair provider schemas require a non-empty `durableFact`; the primary parser tolerates an omitted field only as an incomplete draft so it can enter targeted repair, where the provider must supply the missing story material before compilation;
-- `compileCreativeScene` may only copy provider-authored `durableFact` text into `factsToAdd` and map `factTextsToResolve`/`threadTitlesToResolve` by exact normalized text/title to canonical keys;
+- primary and repair provider schemas carry one branch-truth field: `consequence`; there is no duplicate `durableFact` contract;
+- `compileCreativeScene` copies the selected choice's provider-authored `consequence` into `factsToAdd` and maps `factTextsToResolve`/`threadTitlesToResolve` by exact normalized text/title to canonical keys;
 - ambiguous or unknown hints are dropped; no guessing, no invented relationship deltas (`relationships: []` always);
 - `resolvedMemory` tombstones are applied: `establishedFacts`, `threadsToOpen`, and `factsToAdd` that exactly match a resolved entry are removed, so exact resurrection is blocked while the tombstone set itself remains bounded;
 - `scene-schema.ts` then performs structural validation and `validateNarrativePublication` applies the shared publication gate.
@@ -59,15 +59,15 @@ After strict creative/schema validation, **both** adapters call `validateNarrati
 
 Phase-1 novelty dimensions (`trajectoryDiversity`, `structuralVariety`, `longRangeNovelty`) and Phase-2 dimensions (`branchCommitment`, `consequenceRealization`, `threadPayoff`, `pacingQuality`, `relationshipProgression`, `protagonistAgency`, `arcCoherence`, `returnPull`) continue to guide prompts and offline regressions. They do not independently produce `invalid_generation`.
 
-Fail-closed contract checks remain earlier in the pipeline: malformed/invalid provider shape, spoken-length violations, repeated or invalid Scene/Choice structure, missing/non-distinct/unsupported provider-authored `durableFact`, and invalid canonical references. Offline `evaluateNarrative().passed` (average ≥80 and every dimension ≥60) remains a fixture/regression signal, not runtime authority.
+Fail-closed contract checks remain earlier in the pipeline for malformed provider shape and invalid canonical references. Narrative shape, novelty, length, and branch-quality findings remain prompt/eval signals rather than a second terminal runtime authority. Offline `evaluateNarrative().passed` (average ≥80 and every dimension ≥60) remains a fixture/regression signal, not runtime authority.
 
 ## Pipeline
 
-`bounded context -> one 8B creative call -> deterministic compiler -> structural/publication gate -> at most one 70B recovery call -> atomic persistence`
+`bounded context -> one 70B creative call -> deterministic compiler -> canonical publication gate -> at most one 70B recovery call -> atomic persistence`
 
-- `WorkersAiSceneGenerator` makes exactly one provider call on the happy path (8B slim creative schema).
-- Malformed/unrecoverable JSON on the first attempt triggers one full 70B regeneration with the 2300-token creative schema (no repair).
-- A first-attempt recoverable creative/schema rejection (for example repeated Choice structure or missing provider-authored durable commitment) triggers one targeted 70B repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation via `applyCreativeSceneRepair`). Narrative-score findings alone do not trigger recovery or terminal failure.
+- `WorkersAiSceneGenerator` makes exactly one 70B provider call on the happy path using the slim creative schema.
+- Malformed/unrecoverable JSON on the first attempt triggers one full 70B regeneration with the 2300-token creative schema.
+- A first-attempt recoverable canonical/schema rejection triggers one targeted 70B repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation via `applyCreativeSceneRepair`). Narrative-score findings alone do not trigger recovery or terminal failure.
 - Any second failure normalizes to `invalid_response` (attempts=2); provider/binding exceptions normalize to `provider_unavailable` without exposing internals.
 - The pipeline never makes a third provider call. Successful results and attempt/pipeline telemetry report the model that produced the accepted or terminal response; combined token usage still covers both calls.
 - Pipeline telemetry (`providerCalls`, `repairs`, `timings.providerMs/parseMs/compileMs/validateMs/totalMs`, `outcome`) is observational and fail-open; a telemetry write failure never changes generation behavior.
@@ -103,9 +103,9 @@ Idempotent scene-generation mutations use a 120-second request budget as a defen
 
 ## Verification
 
-- `test/creative-scene-schema.test.ts`, `test/scene-compiler.test.ts` — slim schema, durableFact quality, exact-map compilation, no invented relationships, bounded resolved tombstones.
+- `test/creative-scene-schema.test.ts`, `test/scene-compiler.test.ts` — slim consequence-only branch contract, exact-map compilation, no invented relationships, bounded resolved tombstones.
 - `test/scene-prompt.test.ts`, `test/scene-schema.test.ts`
-- `test/workers-ai-scene-generator.test.ts` — one 8B call happy path; quality-only beat cooldown does not dead-end; one 70B second-call ceiling for full regeneration or targeted structural repair; no `stateDelta` in the primary schema; immutable repair script; actual model provenance; genuinely invalid provider material→`invalid_response`; exception→`provider_unavailable`; pipeline telemetry counts/timings and fail-open behavior.
+- `test/workers-ai-scene-generator.test.ts` — one 70B call happy path; consequence-only branch truth; quality-only findings do not dead-end; one bounded second-call ceiling for full regeneration or targeted repair; no `stateDelta` or duplicate `durableFact` in the primary schema; immutable repair script; actual model provenance; genuinely malformed provider material→`invalid_response`; exception→`provider_unavailable`; pipeline telemetry counts/timings and fail-open behavior.
 - `test/long-run-soak.test.ts` — 50-scene D1 soak through the real HTTP/service/repository/publisher/committer path with deterministic creative compilation; provider-facing context bytes are recorded at Scenes 1/10/25/50 and exact resolved-state resurrection is attempted again at Scene 50.
 - `test/schema.test.ts` — local migration sequence 0001→0012, legacy-row survival, checkpoint/artwork read-write constraints, cascades, and pre-0011 checkpoint-reader fail-open behavior.
 - `test/scene-artwork.test.ts`, `test/http-artwork.test.ts`, `test/scene-artwork-queue.test.ts` — Scene-specific prompt material, one-call replay, primary/fallback behavior, concurrency convergence, stale refresh, owner isolation, private delivery, fail-open canonical state, Queue ack/retry.

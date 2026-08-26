@@ -21,13 +21,12 @@ function creative(): CreativeSceneProposal {
   };
 }
 
-function choice(key: 'A' | 'B' | 'C', durableFact: string) {
+function choice(key: 'A' | 'B' | 'C', consequence: string) {
   return {
     key,
     label: `Lựa chọn ${key}`,
     intent: `ý định ${key}`,
-    consequence: `Hệ quả riêng của nhánh ${key} xảy ra ngay lập tức và thay đổi tình thế.`,
-    durableFact,
+    consequence,
     factTextsToResolve: ['An cố tình giấu một tin nhắn khỏi Linh.'],
     threadTitlesToResolve: ['Linh nghi ngờ sự thành thật của An.'],
     threadsToOpen: [],
@@ -36,7 +35,7 @@ function choice(key: 'A' | 'B' | 'C', durableFact: string) {
 }
 
 describe('compileCreativeScene', () => {
-  it('copies model-authored durable facts and never invents relationship deltas', () => {
+  it('uses consequence as the single durable branch fact and never invents relationship deltas', () => {
     const compiled = compileCreativeScene(makeGenerationInput(), creative());
     expect(compiled.choices.map((item) => item.stateDelta.factsToAdd)).toEqual([
       ['Người lạ đã nhìn thấy An trực tiếp.'],
@@ -70,17 +69,15 @@ describe('compileCreativeScene', () => {
     const input = makeGenerationInput();
     input.activeFacts.push({ key: 'fact-hidden-message-duplicate', text: input.activeFacts[0]!.text });
     input.openThreads.push({ key: 'thread-trust-duplicate', title: input.openThreads[0]!.title, urgency: 50 });
-
     const compiled = compileCreativeScene(input, creative());
-
     expect(compiled.threadChanges.resolve).toEqual([]);
     expect(compiled.choices[0].stateDelta.factKeysToResolve).toEqual([]);
     expect(compiled.choices[0].stateDelta.threadKeysToResolve).toEqual([]);
   });
 
-  it('keeps one-character branches durable using only provider-authored fact text', () => {
+  it('keeps one-character branches durable using provider-authored consequences', () => {
     const input = makeGenerationInput();
-    input.characters = [input.characters[0]];
+    input.characters = [input.characters[0]!];
     input.relationships = [];
     const compiled = compileCreativeScene(input, creative());
     expect(compiled.choices.every((item) => item.stateDelta.relationships.length === 0)).toBe(true);
@@ -101,12 +98,5 @@ describe('compileCreativeScene', () => {
     expect(compiled.threadChanges.open).toEqual([]);
     expect(compiled.choices[0].stateDelta.factsToAdd).toEqual([]);
     expect(compiled.choices[0].stateDelta.threadsToOpen).toEqual([]);
-  });
-
-  it('never turns missing provider story material into an empty or fabricated canonical fact', () => {
-    const proposal = creative();
-    proposal.choices[1].durableFact = '';
-    const compiled = compileCreativeScene(makeGenerationInput(), proposal);
-    expect(compiled.choices[1].stateDelta.factsToAdd).toEqual([]);
   });
 });

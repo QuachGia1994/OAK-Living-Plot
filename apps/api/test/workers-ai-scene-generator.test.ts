@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CreativeSceneProposal, CreativeSceneRepair } from '../src/ai/creative-scene-schema';
+import type { CreativeSceneProposal } from '../src/ai/creative-scene-schema';
 import type { GenerationTelemetrySink } from '../src/telemetry/contracts';
 import {
   WORKERS_AI_SCENE_MODEL,
@@ -19,16 +19,11 @@ function creativeProposal(): CreativeSceneProposal {
     establishedFacts: proposal.establishedFacts,
     threadsToOpen: proposal.threadChanges.open,
     threadTitlesToResolve: ['Linh nghi ngờ sự thành thật của An.'],
-    choices: proposal.choices.map((choice, index) => ({
+    choices: proposal.choices.map((choice) => ({
       key: choice.key,
       label: choice.label,
       intent: choice.intent,
       consequence: choice.consequence,
-      durableFact: [
-        'An và Linh quyết định cùng đối chất người gửi tin.',
-        'Linh cảm thấy an toàn hơn sau khi An giao chiếc điện thoại đi xử lý.',
-        'An và Linh rời căn hộ bằng lối thoát phía sau.',
-      ][index]!,
       factTextsToResolve: [],
       threadTitlesToResolve: [],
       threadsToOpen: [],
@@ -37,16 +32,11 @@ function creativeProposal(): CreativeSceneProposal {
   };
 }
 
-function repairFrom(creative: CreativeSceneProposal): CreativeSceneRepair {
-  const { script: _omitScript, ...repair } = creative;
-  void _omitScript;
-  return repair;
-}
-
 describe('WorkersAiSceneGenerator', () => {
-  it('uses one slim 8B creative call on the happy path', async () => {
+  it('uses one strong-model consequence-only creative call on the happy path', async () => {
+    const creative = creativeProposal();
     const run = vi.fn().mockResolvedValue({
-      response: creativeProposal(),
+      response: creative,
       usage: { prompt_tokens: 120, completion_tokens: 80 },
     });
     const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
@@ -64,21 +54,21 @@ describe('WorkersAiSceneGenerator', () => {
     });
     expect(run).toHaveBeenCalledTimes(1);
     const [model, request] = run.mock.calls[0] as [string, Record<string, unknown>];
-    expect(model).toBe('@cf/meta/llama-3.1-8b-instruct-fast');
+    expect(model).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
     expect(request).toMatchObject({ response_format: { type: 'json_schema' }, max_tokens: 2300, temperature: 0.45 });
     const responseFormat = request.response_format as { json_schema: Record<string, unknown> };
-    expect(responseFormat.json_schema.type).toBe('object');
-    const schemaText = JSON.stringify(responseFormat.json_schema);
-    expect(schemaText).toContain('durableFact');
-    expect(schemaText).not.toContain('stateDelta');
-    expect(schemaText).not.toContain('affinityDelta');
+    expect(JSON.stringify(responseFormat.json_schema)).not.toContain('durableFact');
     const messages = request.messages as Array<{ role: string; content: string }>;
-    expect(messages[0].content).toContain('creative scene writer');
-    expect(messages[0].content).toContain('durableFact');
+    expect(messages[0].content).toContain('consequence is the single branch-specific event');
+    expect(messages[0].content).not.toContain('durableFact');
     expect(messages[1].content).toContain('DRAMA_CONTEXT_JSON');
+    if (!result.ok) return;
+    expect(result.value.proposal.choices.map((choice) => choice.stateDelta.factsToAdd)).toEqual(
+      creative.choices.map((choice) => [choice.consequence]),
+    );
   });
 
-  it('uses a second full creative call only when the first response cannot be parsed', async () => {
+  it('uses one recovery call only when the first creative response cannot be parsed', async () => {
     const run = vi
       .fn()
       .mockResolvedValueOnce({ response: { title: 'broken' }, usage: { prompt_tokens: 10, completion_tokens: 5 } })
@@ -98,83 +88,6 @@ describe('WorkersAiSceneGenerator', () => {
     });
     expect(run.mock.calls[0]?.[0]).toBe(WORKERS_AI_SCENE_MODEL);
     expect(run.mock.calls[1]?.[0]).toBe(WORKERS_AI_SCENE_RECOVERY_MODEL);
-    const second = run.mock.calls[1][1] as { max_tokens: number; messages: Array<{ content: string }> };
-    expect(second.max_tokens).toBe(2300);
-    expect(second.messages[0].content).toContain('prior draft was rejected');
-  });
-
-  it('uses the smaller targeted repair schema for a structural choice rejection and preserves the script', async () => {
-    const invalid = creativeProposal();
-    invalid.choices[1].label = invalid.choices[0].label;
-    const fixed = repairFrom(creativeProposal());
-    fixed.choices[1].label = 'Đánh lạc hướng người gửi tin';
-    const run = vi
-      .fn()
-      .mockResolvedValueOnce({ response: invalid, usage: { prompt_tokens: 10, completion_tokens: 5 } })
-      .mockResolvedValueOnce({ response: fixed, usage: { prompt_tokens: 12, completion_tokens: 7 } });
-    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
-
-    const result = await generator.generate(makeGenerationInput());
-
-    expect(result).toMatchObject({ ok: true, value: { attempts: 2 } });
-    expect(run).toHaveBeenCalledTimes(2);
-    const repairRequest = run.mock.calls[1][1] as {
-      max_tokens: number;
-      response_format: { json_schema: unknown };
-      messages: Array<{ content: string }>;
-    };
-    expect(repairRequest.max_tokens).toBe(1200);
-    expect(run.mock.calls[0]?.[0]).toBe(WORKERS_AI_SCENE_MODEL);
-    expect(run.mock.calls[1]?.[0]).toBe(WORKERS_AI_SCENE_RECOVERY_MODEL);
-    expect(JSON.stringify(repairRequest.response_format.json_schema)).not.toContain('"script"');
-    expect(repairRequest.messages[0].content).toContain('script is immutable');
-    expect(repairRequest.messages[1].content).not.toContain(invalid.script.slice(0, 80));
-    if (result.ok) {
-      expect(result.value.proposal.choices[1].label).toBe('Đánh lạc hướng người gửi tin');
-      expect(result.value.proposal.script).toBe(invalid.script);
-      expect(result.value.model).toBe(WORKERS_AI_SCENE_RECOVERY_MODEL);
-    }
-  });
-
-  it('routes a missing primary durable fact to repair without deriving canonical story truth on the server', async () => {
-    const incomplete = creativeProposal() as unknown as { choices: Array<Record<string, unknown>>; script: string };
-    delete incomplete.choices[1].durableFact;
-    const repaired = repairFrom(creativeProposal());
-    repaired.choices[1].durableFact = 'Bảo vệ đã niêm phong lối vào căn hộ.';
-    repaired.choices[1].consequence = 'Bảo vệ niêm phong lối vào, buộc Linh phải tìm đường khác.';
-    const run = vi
-      .fn()
-      .mockResolvedValueOnce({ response: incomplete, usage: { prompt_tokens: 10, completion_tokens: 5 } })
-      .mockResolvedValueOnce({ response: repaired, usage: { prompt_tokens: 12, completion_tokens: 7 } });
-    const telemetry: GenerationTelemetrySink = {
-      recordGenerationAttempt: vi.fn(),
-      recordGenerationPipeline: vi.fn(),
-    };
-    const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai, telemetry);
-
-    const result = await generator.generate(makeGenerationInput());
-
-    expect(run).toHaveBeenCalledTimes(2);
-    expect(result).toMatchObject({ ok: true, value: { attempts: 2 } });
-    if (!result.ok) return;
-    expect(result.value.proposal.script).toBe(incomplete.script);
-    expect(result.value.proposal.choices[1].stateDelta.factsToAdd).toEqual([
-      'Bảo vệ đã niêm phong lối vào căn hộ.',
-    ]);
-    expect(result.value.proposal.choices[1].stateDelta.factsToAdd).not.toContain(
-      incomplete.choices[1].consequence,
-    );
-    expect(telemetry.recordGenerationPipeline).toHaveBeenCalledWith(expect.objectContaining({
-      model: WORKERS_AI_SCENE_RECOVERY_MODEL,
-      providerCalls: 2,
-      repairs: 1,
-      outcome: 'accepted',
-    }));
-    expect(telemetry.recordGenerationAttempt).toHaveBeenLastCalledWith(expect.objectContaining({
-      attempt: 2,
-      model: WORKERS_AI_SCENE_RECOVERY_MODEL,
-      outcome: 'accepted',
-    }));
   });
 
   it('canonicalizes only exact natural-language resolution hints and never creates relationship deltas', async () => {
@@ -193,7 +106,7 @@ describe('WorkersAiSceneGenerator', () => {
     expect(result.value.proposal.choices.every((choice) => choice.stateDelta.relationships.length === 0)).toBe(true);
   });
 
-  it('keeps a one-character story durable with provider-authored branch facts', async () => {
+  it('keeps a one-character story durable from branch consequences', async () => {
     const input = makeGenerationInput();
     input.characters = [input.characters[0]!];
     input.relationships = [];
@@ -220,7 +133,7 @@ describe('WorkersAiSceneGenerator', () => {
     });
   });
 
-  it('returns invalid_response only when creative parse still fails after one controlled retry', async () => {
+  it('returns invalid_response only when creative parsing still fails after one controlled retry', async () => {
     const run = vi
       .fn()
       .mockResolvedValueOnce({ response: { title: 'broken' }, usage: { prompt_tokens: 10, completion_tokens: 5 } })
@@ -233,7 +146,7 @@ describe('WorkersAiSceneGenerator', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'invalid_response', attempts: 2 } });
   });
 
-  it('does not dead-end a structurally valid continuation on a quality-only beat cooldown', async () => {
+  it('does not dead-end a structurally valid continuation on quality-only novelty', async () => {
     const input = makeGenerationInput();
     input.recentHistory = [
       { sceneNumber: 1, title: 'Một', summary: 'Một biến cố cũ.', committedChoice: 'Đi tiếp', choiceIntent: 'tiếp cận', consequence: 'Cửa đã mở.', choiceLabels: ['Đi', 'Dừng', 'Chờ'], beat: 'revelation' },
@@ -243,10 +156,7 @@ describe('WorkersAiSceneGenerator', () => {
     input.novelty = { excludedBeats: ['revelation', 'dilemma', 'pursuit'], trajectoryConstraints: [], motifHistory: [] };
     const recycled = creativeProposal();
     recycled.beat = 'revelation';
-    const run = vi.fn().mockResolvedValue({
-      response: recycled,
-      usage: { prompt_tokens: 10, completion_tokens: 5 },
-    });
+    const run = vi.fn().mockResolvedValue({ response: recycled, usage: { prompt_tokens: 10, completion_tokens: 5 } });
     const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
 
     const result = await generator.generate(input);
@@ -255,19 +165,18 @@ describe('WorkersAiSceneGenerator', () => {
     expect(result).toMatchObject({ ok: true, value: { attempts: 1, proposal: { beat: 'revelation' } } });
   });
 
-  it('returns invalid_response when targeted repair still lacks distinct provider-authored branch facts', async () => {
-    const invalid = creativeProposal();
-    invalid.choices[1].durableFact = invalid.choices[0].durableFact;
-    const run = vi
-      .fn()
-      .mockResolvedValueOnce({ response: invalid, usage: { prompt_tokens: 10, completion_tokens: 5 } })
-      .mockResolvedValueOnce({ response: repairFrom(invalid), usage: { prompt_tokens: 10, completion_tokens: 5 } });
+  it('keeps repetition findings observable instead of converting them into invalid_generation', async () => {
+    const input = makeGenerationInput();
+    const creative = creativeProposal();
+    creative.summary = input.previous!.sceneSummary;
+    creative.choices[0].label = input.previous!.chosenAction;
+    const run = vi.fn().mockResolvedValue({ response: creative, usage: { prompt_tokens: 10, completion_tokens: 5 } });
     const generator = new WorkersAiSceneGenerator({ run } as unknown as Ai);
 
-    const result = await generator.generate(makeGenerationInput());
+    const result = await generator.generate(input);
 
-    expect(run).toHaveBeenCalledTimes(2);
-    expect(result).toMatchObject({ ok: false, error: { code: 'invalid_response', attempts: 2 } });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(true);
   });
 
   it('emits privacy-safe pipeline timings and provider-call counts', async () => {

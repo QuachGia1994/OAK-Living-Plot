@@ -7,8 +7,6 @@ export interface CreativeSceneChoice {
   label: string;
   intent: string;
   consequence: string;
-  /** Model-authored durable branch fact. The server may canonicalize storage, but never invent this text. */
-  durableFact: string;
   factTextsToResolve: string[];
   threadTitlesToResolve: string[];
   threadsToOpen: ThreadProposal[];
@@ -83,7 +81,6 @@ export const creativeSceneResponseSchema = {
           'label',
           'intent',
           'consequence',
-          'durableFact',
           'factTextsToResolve',
           'threadTitlesToResolve',
           'threadsToOpen',
@@ -94,12 +91,6 @@ export const creativeSceneResponseSchema = {
           label: { type: 'string', minLength: 1, maxLength: 120 },
           intent: { type: 'string', minLength: 1, maxLength: 120 },
           consequence: { type: 'string', minLength: 1, maxLength: 240 },
-          durableFact: {
-            type: 'string',
-            minLength: 1,
-            maxLength: 160,
-            description: 'A concrete completed fact caused by this consequence; reuse at least one concrete consequence word.',
-          },
           factTextsToResolve: {
             type: 'array',
             maxItems: 2,
@@ -176,7 +167,7 @@ export function parseCreativeSceneProposal(raw: string): Result<CreativeScenePro
 
   const choices: CreativeSceneChoice[] = [];
   for (const choice of value.choices) {
-    const parsed = parseChoice(choice, true);
+    const parsed = parseChoice(choice);
     if (!parsed.ok) return parsed;
     choices.push(parsed.value);
   }
@@ -219,7 +210,7 @@ export function parseCreativeSceneRepair(raw: string): Result<CreativeSceneRepai
   if (!Array.isArray(value.choices) || value.choices.length !== 3) return invalid('Creative repair requires exactly three choices.');
   const choices: CreativeSceneChoice[] = [];
   for (const choice of value.choices) {
-    const parsed = parseChoice(choice, false);
+    const parsed = parseChoice(choice);
     if (!parsed.ok) return parsed;
     choices.push(parsed.value);
   }
@@ -243,60 +234,23 @@ export function applyCreativeSceneRepair(base: CreativeSceneProposal, repair: Cr
   return { ...repair, script: base.script };
 }
 
-export function validateCreativeSceneSemantics(creative: CreativeSceneProposal): string[] {
-  const errors: string[] = [];
-  const durableFacts = creative.choices.map((choice) => choice.durableFact);
-  const nonEmptyFacts = durableFacts.filter((fact) => fact.trim().length > 0);
-  if (new Set(nonEmptyFacts.map(semanticText)).size !== nonEmptyFacts.length) {
-    errors.push('Creative durable facts must be branch-specific and distinct.');
-  }
-  for (const choice of creative.choices) {
-    if (!choice.durableFact.trim()) {
-      errors.push(`Choice ${choice.key} durableFact is missing provider-authored story material.`);
-      continue;
-    }
-    const tokens = semanticTokens(choice.durableFact);
-    if (tokens.length < 3 || isPlaceholderDurableFact(choice.durableFact)) {
-      errors.push(`Choice ${choice.key} durableFact is too generic to become canonical story state.`);
-      continue;
-    }
-    const consequenceTokens = new Set(semanticTokens(choice.consequence));
-    if (!tokens.some((token) => consequenceTokens.has(token))) {
-      errors.push(`Choice ${choice.key} durableFact is not supported by its consequence.`);
-    }
-  }
-  if (hasMateriallySimilarPair(nonEmptyFacts, 0.68)) {
-    errors.push('Creative durable facts must create materially different branch outcomes.');
-  }
-  return errors;
-}
-
-function parseChoice(value: unknown, allowMissingDurableFact: boolean): Result<CreativeSceneChoice, string[]> {
+function parseChoice(value: unknown): Result<CreativeSceneChoice, string[]> {
   const keys = [
     'key',
     'label',
     'intent',
     'consequence',
-    'durableFact',
     'factTextsToResolve',
     'threadTitlesToResolve',
     'threadsToOpen',
     'nextTone',
   ];
-  const shapeIsValid = allowMissingDurableFact
-    ? isRecord(value) && hasOnlyKeysWithOptional(value, keys.filter((key) => key !== 'durableFact'), ['durableFact'])
-    : isRecord(value) && hasOnlyKeys(value, keys);
-  if (!shapeIsValid || !isRecord(value)) {
-    return invalid('Creative choice shape is invalid.');
-  }
+  if (!isRecord(value) || !hasOnlyKeys(value, keys)) return invalid('Creative choice shape is invalid.');
   if (value.key !== 'A' && value.key !== 'B' && value.key !== 'C') return invalid('Creative choice key is invalid.');
   if (
     !boundedText(value.label, 1, 240)
     || !boundedText(value.intent, 1, 240)
     || !boundedText(value.consequence, 1, 500)
-    || (allowMissingDurableFact
-      ? value.durableFact !== undefined && (typeof value.durableFact !== 'string' || value.durableFact.length > 400)
-      : !boundedText(value.durableFact, 1, 400))
     || !boundedText(value.nextTone, 1, 80)
   ) {
     return invalid('Creative choice text is invalid.');
@@ -313,7 +267,6 @@ function parseChoice(value: unknown, allowMissingDurableFact: boolean): Result<C
       label: value.label,
       intent: value.intent,
       consequence: value.consequence,
-      durableFact: typeof value.durableFact === 'string' ? value.durableFact : '',
       factTextsToResolve: value.factTextsToResolve,
       threadTitlesToResolve: value.threadTitlesToResolve,
       threadsToOpen: threadsToOpen.value,
@@ -331,7 +284,6 @@ function creativeChoiceSchema() {
       'label',
       'intent',
       'consequence',
-      'durableFact',
       'factTextsToResolve',
       'threadTitlesToResolve',
       'threadsToOpen',
@@ -342,12 +294,6 @@ function creativeChoiceSchema() {
       label: { type: 'string', minLength: 1, maxLength: 120 },
       intent: { type: 'string', minLength: 1, maxLength: 120 },
       consequence: { type: 'string', minLength: 1, maxLength: 240 },
-      durableFact: {
-        type: 'string',
-        minLength: 1,
-        maxLength: 160,
-        description: 'A concrete completed fact caused by this consequence; reuse at least one concrete consequence word.',
-      },
       factTextsToResolve: { type: 'array', maxItems: 2, items: { type: 'string', minLength: 1, maxLength: 160 } },
       threadTitlesToResolve: { type: 'array', maxItems: 2, items: { type: 'string', minLength: 1, maxLength: 160 } },
       threadsToOpen: { type: 'array', maxItems: 1, items: threadSchema() },
@@ -385,12 +331,6 @@ function hasOnlyKeys(value: Record<string, unknown>, expected: string[]): boolea
   return expected.every((key) => actual.includes(key)) && actual.every((key) => allowed.has(key));
 }
 
-function hasOnlyKeysWithOptional(value: Record<string, unknown>, required: string[], optional: string[]): boolean {
-  const actual = Object.keys(value);
-  const allowed = new Set([...required, ...optional]);
-  return required.every((key) => actual.includes(key)) && actual.every((key) => allowed.has(key));
-}
-
 function stringArray(value: unknown, maxItems: number, maxLength: number): value is string[] {
   return Array.isArray(value) && value.length <= maxItems && value.every((item) => boundedText(item, 1, maxLength));
 }
@@ -401,47 +341,6 @@ function boundedText(value: unknown, min: number, max: number): value is string 
 
 function integerBetween(value: unknown, min: number, max: number): value is number {
   return Number.isInteger(value) && Number(value) >= min && Number(value) <= max;
-}
-
-function isPlaceholderDurableFact(value: string): boolean {
-  const normalized = semanticText(value);
-  return /^branch [abc]\b/u.test(normalized)
-    || /\bcreates? (a )?(distinct )?(immediate )?consequence\b/u.test(normalized)
-    || /\bdurable (branch )?effect\b/u.test(normalized);
-}
-
-function hasMateriallySimilarPair(values: string[], threshold: number): boolean {
-  const tokenSets = values.map((value) => new Set(semanticTokens(value)));
-  const commonTokens = new Set(tokenSets[0] ?? []);
-  for (const tokens of tokenSets.slice(1)) {
-    for (const token of commonTokens) if (!tokens.has(token)) commonTokens.delete(token);
-  }
-  for (let left = 0; left < values.length; left += 1) {
-    for (let right = left + 1; right < values.length; right += 1) {
-      const leftTokens = new Set([...tokenSets[left]!].filter((token) => !commonTokens.has(token)));
-      const rightTokens = new Set([...tokenSets[right]!].filter((token) => !commonTokens.has(token)));
-      const union = new Set([...leftTokens, ...rightTokens]);
-      if (union.size === 0) return true;
-      let intersection = 0;
-      for (const token of leftTokens) if (rightTokens.has(token)) intersection += 1;
-      if (intersection / union.size >= threshold) return true;
-    }
-  }
-  return false;
-}
-
-function semanticText(value: string): string {
-  return value
-    .normalize('NFKC')
-    .toLocaleLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .replace(/\s+/gu, ' ')
-    .trim();
-}
-
-function semanticTokens(value: string): string[] {
-  const stopwords = new Set(['a', 'an', 'and', 'the', 'to', 'of', 'in', 'on', 'for', 'with', 'và', 'là', 'của', 'cho', 'trong', 'một', 'đã', 'sẽ']);
-  return semanticText(value).split(' ').filter((token) => token.length >= 3 && !stopwords.has(token));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

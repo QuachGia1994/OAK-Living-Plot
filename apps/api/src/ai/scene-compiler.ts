@@ -14,16 +14,16 @@ export function compileCreativeScene(input: SceneGenerationInput, creative: Crea
 
   const sceneResolvedThreadKeys = resolveExactKeys(creative.threadTitlesToResolve, threadKeyByTitle);
   const choices = creative.choices.map((choice) => {
-    const durableFact = choice.durableFact.trim();
+    const consequence = choice.consequence.trim();
     return {
       key: choice.key,
       label: choice.label.trim(),
       intent: choice.intent.trim(),
-      consequence: choice.consequence.trim(),
+      consequence,
       stateDelta: {
         relationships: [],
-        // Durable branch commitment comes directly from provider-authored text. Empty or resolved text is filtered, never replaced.
-        factsToAdd: durableFact && !resolvedFacts.has(semanticTextKey(durableFact)) ? [durableFact] : [],
+        // The committed consequence is the single provider-authored source for durable branch truth.
+        factsToAdd: consequence && !resolvedFacts.has(semanticTextKey(consequence)) ? [consequence] : [],
         factKeysToResolve: resolveExactKeys(choice.factTextsToResolve, factKeyByText),
         threadsToOpen: uniqueThreads(choice.threadsToOpen, resolvedThreads),
         threadKeysToResolve: resolveExactKeys(choice.threadTitlesToResolve, threadKeyByTitle),

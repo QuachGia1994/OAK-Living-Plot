@@ -22,6 +22,7 @@ import { dramaDraftValidationSummary, dramaMoodOptionsFor, hasDraftErrors, norma
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
 import { useUiCopy } from '@/features/localization/ui-copy';
 import { useDramaExperienceClient } from '@/features/drama/drama-client-context';
+import { dramaRoute } from '@/features/drama/drama-navigation';
 import { DramaComposerPreview, DramaGenerationState, DramaUtilityHero } from '@/ui/drama-visuals';
 import { conceptFlowStep } from '@/ui/concept-flow';
 import { ActionButton, BrandMark, ConceptStageHeader, Screen, TaskActionDock } from '@/ui/primitives';
@@ -104,7 +105,7 @@ export default function CreateDramaScreen() {
       attempt = await creationAttemptCoordinator.resolve(ownerId, fingerprint);
       setGenerationJob({ state: 'running', operation: 'first_scene', requestKey: attempt.key });
       const drama = await dramaExperienceClient.createDrama(normalizedDraft, attempt.key, attempt.generationKey);
-      router.replace({ pathname: '/library/drama', params: { dramaId: drama.id } });
+      router.replace(dramaRoute(drama.id));
       await creationAttemptCoordinator.complete(ownerId, fingerprint, attempt.key);
     } catch (caught) {
       if (attempt && caught instanceof DramaClientError && (caught.code === 'invalid_input' || caught.code === 'choice_required')) {

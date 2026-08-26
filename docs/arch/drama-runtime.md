@@ -1,6 +1,6 @@
 # Canonical drama runtime ownership
 
-> updated 2026-08-23 · 0.0.0
+> updated 2026-08-26 · 0.0.0
 
 Living Plot has one product vocabulary above persistence: **Drama → Scene → Choice → Branch → next Scene**. The existing D1 schema still stores historical table/column names such as `plots`, `episodes`, `plot_id`, `episode_id`, and `story_locale`. Those names are storage details and must not be projected into new mobile or HTTP contracts.
 
@@ -34,6 +34,7 @@ Mobile product domain:
 - `apps/mobile/src/features/drama/domain.ts` — client `Drama/Scene/Branch`, `GenerationJob`, and `MediaAsset` product status.
 - `apps/mobile/src/features/drama/contracts.ts` — application client/summary/history contracts.
 - `apps/mobile/src/features/drama/use-drama-playback.ts` — playback orchestration owner.
+- `apps/mobile/src/features/drama/drama-navigation.ts` — canonical root `/drama` target construction so selecting a Drama cannot inherit stale nested Library stack state.
 - `apps/mobile/src/features/drama/playback-state.ts` — pure phase derivation.
 
 The D1 schema is not the domain model. In particular, a D1 `episode` row is projected as a product `Scene`, and `plots.state_json` is parsed as `DramaState` before it is trusted.
@@ -62,15 +63,15 @@ Suggestion telemetry records only provider/parse/validate/total timings, provide
 
 ## Generation boundary
 
-`SceneGenerator` is provider-neutral. Canonical provider selection is explicit through `SCENE_GENERATOR_PROVIDER`; merely binding Workers AI for suggestions cannot switch Scene generation. The default environment is configured for `gemini`, while development is explicitly configured for `workers_ai` with `@cf/meta/llama-3.1-8b-instruct-fast` (slim creative schema, no `stateDelta` in provider output). Both environments may expose the `AI` binding for noncanonical suggestions. `DramaService`, D1 projection, and mobile code depend on neither provider response type.
+`SceneGenerator` is provider-neutral. Canonical provider selection is explicit through `SCENE_GENERATOR_PROVIDER`; merely binding Workers AI for suggestions cannot switch Scene generation. The default environment is configured for `gemini`, while development is explicitly configured for `workers_ai` with `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (slim creative schema, no `stateDelta` in provider output). Both environments may expose the `AI` binding for noncanonical suggestions. `DramaService`, D1 projection, and mobile code depend on neither provider response type.
 
-Provider flow is `bounded context -> one 8B creative call -> deterministic compiler -> structural/publication gate -> targeted repair when appropriate -> atomic persistence`:
+Provider flow is `bounded context -> one 70B creative call -> deterministic compiler -> canonical publication gate -> targeted repair when appropriate -> atomic persistence`:
 
 1. `SceneGenerationInput` is assembled only from bounded canonical drama memory: full canonical D1 history is retained, but generation input is bounded to last 4 scenes, ≤24 facts, ≤12 threads, ≤20 relationships, ≤3 arc checkpoints, bounded latest-unique resolved tombstones rebuilt from commits (≤24 fact texts + ≤24 thread titles), and bounded novelty (`excludedBeats` ≤4, `trajectoryConstraints` ≤20, `motifHistory` ≤12). Old `script_json` rows without `beat`/`pacingRole`/`motifSignature` remain readable.
-2. `scene-prompt.ts` serializes user/drama strings as data inside `DRAMA_CONTEXT_JSON`; the creative path strips provider-irrelevant canonical keys/state-version metadata, maps relationship/trajectory endpoints to character names, omits server-only committed relationship deltas, and instructs the provider to emit `durableFact` per choice plus exact natural-language resolution hints rather than canonical keys or relationship deltas.
-3. The selected adapter requests structured JSON via the slim creative schema; on the happy path exactly one 8B provider call is made (`max_tokens: 2300`, `temperature: 0.45`). Primary and repair schemas require `durableFact`; an omitted primary field is held as an incomplete draft only long enough to request provider-authored targeted repair. The adapter never derives a canonical fact from a label or consequence, and compilation does exact normalized mapping only.
-4. `scene-compiler.ts` deterministically compiles the creative proposal: `durableFact` text is copied into `factsToAdd`, `factTextsToResolve`/`threadTitlesToResolve` are exact-mapped to canonical keys (unknown/ambiguous dropped, no invented relationships), and `resolvedMemory` tombstones block exact resurrection.
-5. `scene-schema.ts` parses and validates the compiled proposal, including A/B/C branches, canonical references, score bounds, script envelope, continuation advancement, active-thread duplication, and no unexpected fields. Schema string bounds mirror the domain envelope so incomplete/undersized provider output is rejected before publication.
+2. `scene-prompt.ts` serializes user/drama strings as data inside `DRAMA_CONTEXT_JSON`; the creative path strips provider-irrelevant canonical keys/state-version metadata, maps relationship/trajectory endpoints to character names, omits server-only committed relationship deltas, and treats each choice `consequence` as the single branch-specific event that becomes durable if committed. Natural-language resolution hints remain provider-authored; canonical keys and relationship deltas never leave the server.
+3. The selected adapter requests structured JSON via the slim creative schema; on the happy path exactly one 70B provider call is made (`max_tokens: 2300`, `temperature: 0.45`). Primary and repair schemas do not duplicate branch truth into `durableFact`; `consequence` is the one provider-authored source for both immediate fallout and durable branch memory.
+4. `scene-compiler.ts` deterministically compiles the creative proposal: `consequence` is copied into `factsToAdd`, `factTextsToResolve`/`threadTitlesToResolve` are exact-mapped to canonical keys (unknown/ambiguous dropped, no invented relationships), and `resolvedMemory` tombstones block exact resurrection.
+5. `scene-schema.ts` parses and validates the compiled proposal for canonical shape and references. Narrative novelty, spoken-length, repetition, and branch-quality scoring remain prompt/eval signals rather than a second terminal runtime authority.
 6. Failures are handled with at most one controlled follow-up: malformed JSON or a script-level failure such as unrealized prior consequence triggers one full regeneration; publication/metadata/branch rejections that do not require rewriting `script` trigger one targeted repair using the smaller repair schema (1200 tokens, no `script`, byte-for-byte script preservation). A second failure normalizes to `invalid_response`; binding/network exceptions normalize to `provider_unavailable`. Telemetry (`providerCalls`/`repairs`/`timings`/`outcome`) is observational and fail-open.
 7. Only validated `SceneProposal` reaches publication. Canonical state application deduplicates semantically identical fact/thread text before and during branch commits, and generation context performs the same normalization so previously polluted development state cannot keep feeding repeated facts/threads back into later Scenes. `arc_checkpoints` (`plot_id`, `through_scene_number`, `summary`, `created_at`, unique on `(plot_id, through_scene_number)`) is a derived cache only; `saveArcCheckpoint` is fail-open and never invalidates a successful canonical commit.
 
@@ -145,8 +146,8 @@ Changing UI language may choose matching defaults for a new drama/narrator, but 
 
 Behavioral proof is intentionally attached to business transitions:
 - `apps/api/test/http-drama.test.ts` — create, persisted restore, owner isolation, branch commit/conflict, next-scene consequence, idempotent retry, generation failure/quota release.
-- `apps/api/test/creative-scene-schema.test.ts` + `apps/api/test/scene-compiler.test.ts` — slim creative schema, durableFact quality, exact-map compilation, no invented relationships, resolved tombstone blocking.
-- `apps/api/test/workers-ai-scene-generator.test.ts` — one 8B happy-path call, no `stateDelta` in primary schema, targeted repair with immutable script, malformed→`invalid_response`, exception→`provider_unavailable`, pipeline telemetry and fail-open behavior.
+- `apps/api/test/creative-scene-schema.test.ts` + `apps/api/test/scene-compiler.test.ts` — slim consequence-only branch contract, exact-map compilation, no invented relationships, resolved tombstone blocking.
+- `apps/api/test/workers-ai-scene-generator.test.ts` — one 70B happy-path call, no `stateDelta` or duplicate `durableFact` in primary schema, targeted repair with immutable script, malformed→`invalid_response`, exception→`provider_unavailable`, pipeline telemetry and fail-open behavior.
 - `apps/api/test/long-run-soak.test.ts` — 50-scene deterministic D1 soak with bounded memory and plateaued context bytes, old episode rows readable.
 - `apps/api/test/scene-schema.test.ts` — provider normalization and invalid references/shape rejection.
 - `apps/api/test/gemini-scene-generator.test.ts` + `workers-ai-scene-generator.test.ts` — provider adapters, Worker-safe fetch binding, structured output, canonical-reference normalization, controlled validation retry, normalized failures.

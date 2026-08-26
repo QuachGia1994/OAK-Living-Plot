@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useMobileAuth } from '@/features/auth/mobile-auth-context';
+import { dramaRoute } from '@/features/drama/drama-navigation';
 import {
   beginPasswordlessEmailOtp,
   createAsyncActionGate,
@@ -256,7 +257,7 @@ function finishAuth(
       router.replace('/create');
       break;
     case 'drama':
-      router.replace(options.dramaId ? { pathname: '/library/drama', params: { dramaId: options.dramaId } } : '/library');
+      router.replace(options.dramaId ? dramaRoute(options.dramaId) : '/library');
       break;
     case 'plus':
       router.replace('/plus');
